@@ -3,7 +3,7 @@
 开源的 AI 编码助手，运行在你的终端中——由 Claude 驱动。
 
 ```bash
-npm install -g myclaude
+npm install -g @thomaslwq/myclaude
 myclaude
 ```
 
@@ -25,7 +25,7 @@ myclaude
 ### 1. 安装
 
 ```bash
-npm install -g myclaude
+npm install -g @thomaslwq/myclaude
 ```
 
 ### 2. 设置 API Key

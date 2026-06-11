@@ -3,7 +3,7 @@
 An open-source AI coding assistant in your terminal — powered by Claude.
 
 ```bash
-npm install -g myclaude
+npm install -g @thomaslwq/myclaude
 myclaude
 ```
 
@@ -25,7 +25,7 @@ myclaude
 ### 1. Install
 
 ```bash
-npm install -g myclaude
+npm install -g @thomaslwq/myclaude
 ```
 
 ### 2. Set your API key
