@@ -1,68 +1,44 @@
 # myclaude
 
-> An open-source AI coding assistant in your terminal — powered by Claude, fork of Claude Code
-
-<p align="center">
-  <img src="preview.png?raw=true" alt="myclaude CLI" width="700">
-</p>
-
-<p align="center">
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#environment-variables">Environment Variables</a> •
-  <a href="#building">Building</a> •
-  <a href="#license">License</a>
-</p>
-
-<p align="center">
-  <a href="README.zh-CN.md">中文文档</a>
-</p>
-
----
-
-**myclaude** is an open-source AI coding assistant that lives in your terminal — powered by Claude.
-
----
-
-## Features
-
-- **AI-Powered Terminal** — Natural language coding: write, refactor, debug, and explain code
-- **Slash Commands** — 80+ built-in commands: `/commit`, `/review`, `/test`, `/doc`, and more
-- **File Operations** — Edit, write, and create files with AI guidance
-- **Git Integration** — Automatic commit messages, PR creation, branch management
-- **MCP Support** — Model Context Protocol for extensible tool integrations
-- **Plugin System** — Extend with community plugins and custom tools
-- **Agent Mode** — Multi-step autonomous task execution
-- **Terminal UI** — Beautiful React Ink-based TUI with syntax highlighting
-
----
-
-## Quick Start
-
-### Install via npm (once published)
+An open-source AI coding assistant in your terminal — powered by Claude.
 
 ```bash
 npm install -g myclaude
 myclaude
 ```
 
-### Or run from source
+---
+
+## Features
+
+- **Natural Language Coding** — Write, refactor, debug, and explain code by chatting with AI
+- **Slash Commands** — 80+ built-in commands: `/commit`, `/review`, `/test`, `/doc`, and more
+- **Git Integration** — Automatic commit messages, PR creation, branch management
+- **MCP Support** — Extensible tool integrations via Model Context Protocol
+- **Plugin System** — Extend with community plugins
+- **Terminal UI** — Beautiful React Ink-based interface with syntax highlighting
+
+---
+
+## Quick Start
+
+### 1. Install
 
 ```bash
-# Prerequisites: Bun >= 1.3.5, Node.js >= 18
-git clone https://gitee.com/thomaslwq/myclaude.git
-cd myclaude
-bun install
-bun run dev
+npm install -g myclaude
 ```
 
-### Set your API key
+### 2. Set your API key
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 # Or use the myclaude alias:
 export MYCLAUDE_API_KEY=sk-ant-...
+```
+
+### 3. Run
+
+```bash
 myclaude
 ```
 
@@ -71,20 +47,13 @@ myclaude
 ## Usage
 
 ```bash
-# Start interactive REPL
-myclaude
-
-# Run with a prompt (non-interactive)
-myclaude -p "Explain this project's architecture"
-
-# Show version
-myclaude --version
-
-# Show help
-myclaude --help
+myclaude                      # Start interactive REPL
+myclaude -p "explain this project"  # Run with a prompt
+myclaude --version            # Show version
+myclaude --help               # Show help
 ```
 
-### Slash Commands
+### Common Commands
 
 | Command | Description |
 |---------|-------------|
@@ -92,64 +61,45 @@ myclaude --help
 | `/review` | Review code changes |
 | `/test` | Generate and run tests |
 | `/doc` | Generate documentation |
-| `/config` | Configure myclaude settings |
-| `/doctor` | Diagnose and verify installation |
-| `/plugin` | Manage plugins and marketplaces |
-| `/model` | Change the AI model |
-| `/clear` | Clear conversation history |
+| `/config` | Configure settings |
+| `/doctor` | Diagnose installation |
+| `/model` | Change AI model |
+| `/clear` | Clear conversation |
 | `/cost` | Show usage statistics |
-| `/compact` | Compact conversation |
 
 ---
 
 ## Environment Variables
 
-myclaude supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` naming conventions.
-If both are set, `CLAUDE_CODE_*` takes priority.
-
-<details>
-<summary>Click to expand full environment variable list</summary>
+You can use either `MYCLAUDE_*` or `CLAUDE_CODE_*` names.  
+`CLAUDE_CODE_*` takes priority if both are set.
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` / `MYCLAUDE_API_KEY` | Anthropic API key |
+| `ANTHROPIC_API_KEY` / `MYCLAUDE_API_KEY` | API key (required) |
 | `ANTHROPIC_BASE_URL` / `MYCLAUDE_BASE_URL` | Custom API base URL |
-| `MYCLAUDE_MODEL` / `CLAUDE_CODE_MODEL` | Model override |
-| `MYCLAUDE_MAX_OUTPUT_TOKENS` / `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | Max output tokens |
-| `MYCLAUDE_DISABLE_THINKING` / `CLAUDE_CODE_DISABLE_THINKING` | Disable thinking |
-| `MYCLAUDE_SIMPLE` / `CLAUDE_CODE_SIMPLE` | Simple mode (no TUI) |
-| `MYCLAUDE_BRIEF` / `CLAUDE_CODE_BRIEF` | Brief mode (shorter output) |
-| `MYCLAUDE_PROACTIVE` / `CLAUDE_CODE_PROACTIVE` | Proactive mode |
-| `MYCLAUDE_USE_BEDROCK` / `CLAUDE_CODE_USE_BEDROCK` | Use AWS Bedrock |
-| `MYCLAUDE_USE_VERTEX` / `CLAUDE_CODE_USE_VERTEX` | Use Google Vertex AI |
-| `MYCLAUDE_USE_FOUNDRY` / `CLAUDE_CODE_USE_FOUNDRY` | Use Microsoft Foundry |
-| `MYCLAUDE_DISABLE_AUTO_MEMORY` / `CLAUDE_CODE_DISABLE_AUTO_MEMORY` | Disable auto memory |
-| `MYCLAUDE_SYNTAX_HIGHLIGHT` / `CLAUDE_CODE_SYNTAX_HIGHLIGHT` | Syntax highlight theme |
-| `MYCLAUDE_IDLE_THRESHOLD_MINUTES` / `CLAUDE_CODE_IDLE_THRESHOLD_MINUTES` | Idle timeout |
-| `MYCLAUDE_EFFORT_LEVEL` / `CLAUDE_CODE_EFFORT_LEVEL` | Effort level |
-
-</details>
+| `MYCLAUDE_MODEL` | Model override |
+| `MYCLAUDE_SIMPLE` | Simple mode (no TUI) |
+| `MYCLAUDE_BRIEF` | Brief mode (shorter output) |
+| `MYCLAUDE_DISABLE_THINKING` | Disable thinking |
+| `MYCLAUDE_PROACTIVE` | Proactive mode |
+| `MYCLAUDE_USE_BEDROCK` | Use AWS Bedrock |
+| `MYCLAUDE_USE_VERTEX` | Use Google Vertex AI |
+| `MYCLAUDE_USE_FOUNDRY` | Use Microsoft Foundry |
+| `MYCLAUDE_DISABLE_AUTO_MEMORY` | Disable auto memory |
+| `MYCLAUDE_SYNTAX_HIGHLIGHT` | Syntax highlight theme |
+| `MYCLAUDE_IDLE_THRESHOLD_MINUTES` | Idle timeout (default: 75) |
+| `MYCLAUDE_EFFORT_LEVEL` | Effort level |
 
 ---
 
-## Building
+## Links
 
-```bash
-bun run build    # Build to dist/myclaude.js
-bun run dev      # Development mode
-bun run version  # Verify version
-```
-
-The build bundles 3796+ modules into a single Bun-compatible executable.
-
----
-
-## Contributing
-
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+- **Source code**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
+- **Issues**: [https://gitee.com/thomaslwq/myclaude/issues](https://gitee.com/thomaslwq/myclaude/issues)
 
 ---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT
