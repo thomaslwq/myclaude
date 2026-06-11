@@ -23,8 +23,7 @@
     "start": "bun run ./src/dev-entry.ts",
     "build": "bun run ./scripts/build.ts",
     "prepublishOnly": "bun run build",
-    "version": "bun run ./src/dev-entry.ts --version",
-    "postinstall": "bun run ./shims/setup.ts"
+    "version": "bun run ./src/dev-entry.ts --version"
   },
   "bin": {
     "myclaude": "./dist/myclaude.js"
@@ -40,10 +39,6 @@
   },
   "dependencies": {
     "@alcalzone/ansi-tokenize": "*",
-    "@ant/claude-for-chrome-mcp": "file:./shims/ant-claude-for-chrome-mcp",
-    "@ant/computer-use-input": "file:./shims/ant-computer-use-input",
-    "@ant/computer-use-mcp": "file:./shims/ant-computer-use-mcp",
-    "@ant/computer-use-swift": "file:./shims/ant-computer-use-swift",
     "@anthropic-ai/claude-agent-sdk": "*",
     "@anthropic-ai/mcpb": "*",
     "@anthropic-ai/sandbox-runtime": "*",
@@ -109,7 +104,13 @@
     "ws": "*",
     "xss": "*",
     "yaml": "*",
-    "zod": "*",
+    "zod": "*"
+  },
+  "optionalDependencies": {
+    "@ant/claude-for-chrome-mcp": "file:./shims/ant-claude-for-chrome-mcp",
+    "@ant/computer-use-input": "file:./shims/ant-computer-use-input",
+    "@ant/computer-use-mcp": "file:./shims/ant-computer-use-mcp",
+    "@ant/computer-use-swift": "file:./shims/ant-computer-use-swift",
     "color-diff-napi": "file:./shims/color-diff-napi",
     "modifiers-napi": "file:./shims/modifiers-napi",
     "url-handler-napi": "file:./shims/url-handler-napi"
