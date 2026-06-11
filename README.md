@@ -3,8 +3,14 @@
 An open-source AI coding assistant in your terminal — powered by Claude.
 
 ```bash
+npx @thomaslwq/myclaude
+```
+
+Or install globally:
+
+```bash
 npm install -g @thomaslwq/myclaude
-myclaude
+npx @thomaslwq/myclaude
 ```
 
 ---

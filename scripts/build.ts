@@ -60,7 +60,7 @@ console.log(`  Output: ${OUTFILE}`)
 
 const result = spawnSync('bun', [
   'build', ENTRY,
-  '--target=bun',
+  '--target=node',
   `--outfile=${OUTFILE}`,
   ...EXTERNAL.flatMap(pkg => ['--external', pkg]),
 ], { stdio: 'inherit', cwd: ROOT })
