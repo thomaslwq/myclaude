@@ -72,7 +72,9 @@ if (result.status !== 0) {
 
 // Prepend MACRO preamble to the bundled output
 const bundle = readFileSync(OUTFILE, 'utf8')
-writeFileSync(OUTFILE, MACRO_PREAMBLE + '\n' + bundle)
+
+// Add Node.js shebang for npm bin compat, then MACRO preamble
+writeFileSync(OUTFILE, '#!/usr/bin/env node\n\n' + MACRO_PREAMBLE + '\n' + bundle)
 
 // Also inject MACRO before feature() calls: replace "if (false)" that came
 // from feature() with the actual MACRO-aware check
