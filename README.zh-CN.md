@@ -21,9 +21,7 @@
 
 ---
 
-**myclaude** 是一款开源的 AI 编码助手，运行在终端中。基于 Claude Code（Anthropic 官方 CLI 工具）还原的 TypeScript 源码，myclaude 为命令行带来先进的 AI 驱动编码工作流。
-
-> **注意：** 本项目是独立开源项目，基于 `@anthropic-ai/claude-code` npm 包的公开 source map 还原。原始代码版权归 Anthropic 所有。
+**myclaude** 是一款开源的 AI 编码助手，运行在终端中——由 Claude 驱动。
 
 ---
 
@@ -146,33 +144,6 @@ bun run version  # 验证版本
 
 ---
 
-## 项目结构
-
-```
-myclaude/
-├── src/                    # 核心 TypeScript 源码（~1987 文件）
-│   ├── entrypoints/        # CLI 入口
-│   ├── commands/           # 80+ 斜杠命令
-│   ├── services/           # API、MCP、分析服务
-│   ├── components/         # React Ink UI 组件
-│   ├── tools/              # 工具实现
-│   ├── hooks/              # 自定义 React Hooks
-│   ├── buddy/              # AI 宠物伴侣系统
-│   ├── assistant/          # KAIROS 助手模式
-│   ├── coordinator/        # 多 Agent 协调器
-│   ├── bridge/             # 远程控制桥接
-│   ├── proactive/          # 主动模式
-│   └── vim/                # Vim 模式引擎
-├── shims/                  # 原生模块兼容替代
-├── vendor/                 # 原生绑定源码
-├── scripts/                # 构建和工具脚本
-│   └── build.ts            # Bun 构建脚本
-└── dist/                   # 构建产物
-    └── myclaude.js         # 打包后的可执行文件
-```
-
----
-
 ## 贡献
 
 欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解指南。
@@ -182,5 +153,3 @@ myclaude/
 ## 许可证
 
 MIT 许可证。详见 [LICENSE](LICENSE)。
-
-本项目基于 `@anthropic-ai/claude-code` npm 包的公开 source map 还原的源码。原始代码版权归 Anthropic 所有。本项目与 Anthropic 无关，也未获其认可。

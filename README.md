@@ -21,9 +21,7 @@
 
 ---
 
-**myclaude** is an open-source AI coding assistant that lives in your terminal. Based on the restored TypeScript source code of Claude Code (Anthropic's official CLI tool), myclaude brings advanced AI-powered coding workflows to your command line.
-
-> **Note:** This is an independent open-source project based on publicly available source maps from the `@anthropic-ai/claude-code` npm package. The original code is copyright © Anthropic. See the [License](#license) section for details.
+**myclaude** is an open-source AI coding assistant that lives in your terminal — powered by Claude.
 
 ---
 
@@ -146,33 +144,6 @@ The build bundles 3796+ modules into a single Bun-compatible executable.
 
 ---
 
-## Project Structure
-
-```
-myclaude/
-├── src/                    # Core TypeScript source (~1987 files)
-│   ├── entrypoints/        # CLI entry points
-│   ├── commands/           # 80+ slash commands
-│   ├── services/           # API, MCP, analytics
-│   ├── components/         # React Ink UI components
-│   ├── tools/              # Tool implementations
-│   ├── hooks/              # Custom React hooks
-│   ├── buddy/              # AI pet companion system
-│   ├── assistant/          # KAIROS assistant mode
-│   ├── coordinator/        # Multi-agent coordinator
-│   ├── bridge/             # Remote control bridge
-│   ├── proactive/          # Proactive mode
-│   └── vim/                # Vim mode engine
-├── shims/                  # Native module shims
-├── vendor/                 # Native bindings source
-├── scripts/                # Build and utility scripts
-│   └── build.ts            # Bun build script
-└── dist/                   # Build output
-    └── myclaude.js         # Bundled executable
-```
-
----
-
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -182,5 +153,3 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
-
-This project is based on publicly available source code from the `@anthropic-ai/claude-code` npm package, reconstructed from source maps. The original code is copyright © Anthropic. This project is not affiliated with or endorsed by Anthropic.
