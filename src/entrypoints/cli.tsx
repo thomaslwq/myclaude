@@ -1,5 +1,9 @@
 import { feature } from 'bun:bundle';
 
+// Apply MYCLAUDE_* env var aliases before any code reads them
+import { applyEnvAliases } from '../utils/envCompat.js'
+applyEnvAliases()
+
 // Bugfix for corepack auto-pinning, which adds yarnpkg to peoples' package.jsons
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
 process.env.COREPACK_ENABLE_AUTO_PIN = '0';

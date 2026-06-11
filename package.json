@@ -21,8 +21,22 @@
   "scripts": {
     "dev": "bun run ./src/dev-entry.ts",
     "start": "bun run ./src/dev-entry.ts",
-    "build": "echo 'build script TBD - see docs/development.md'",
-    "version": "bun run ./src/dev-entry.ts --version"
+    "build": "bun run ./scripts/build.ts",
+    "prepublishOnly": "bun run build",
+    "version": "bun run ./src/dev-entry.ts --version",
+    "postinstall": "bun run ./shims/setup.ts"
+  },
+  "bin": {
+    "myclaude": "./dist/myclaude.js"
+  },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@alcalzone/ansi-tokenize": "*",

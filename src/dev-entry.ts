@@ -2,6 +2,10 @@ import pkg from '../package.json'
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { dirname, extname, join, resolve } from 'path'
 
+// Apply MYCLAUDE_* env var aliases before any code reads them
+import { applyEnvAliases } from './utils/envCompat.js'
+applyEnvAliases()
+
 type MacroConfig = {
   VERSION: string
   BUILD_TIME: string
