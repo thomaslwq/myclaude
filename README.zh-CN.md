@@ -93,13 +93,6 @@ myclaude --help               # 查看帮助
 
 ---
 
-## 相关链接
-
-- **源码仓库**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
-- **问题反馈**: [https://gitee.com/thomaslwq/myclaude/issues](https://gitee.com/thomaslwq/myclaude/issues)
-
----
-
 ## 许可证
 
 MIT

@@ -93,13 +93,6 @@ You can use either `MYCLAUDE_*` or `CLAUDE_CODE_*` names.
 
 ---
 
-## Links
-
-- **Source code**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
-- **Issues**: [https://gitee.com/thomaslwq/myclaude/issues](https://gitee.com/thomaslwq/myclaude/issues)
-
----
-
 ## License
 
 MIT
