@@ -213,7 +213,7 @@ export function SpinnerAnimationRow({
               {thinkingText}
             </Text>] : [])];
   const status = foregroundedTeammate && !foregroundedTeammate.isIdle ? <>
-        <Text dimColor>(esc to interrupt </Text>
+        <Text dimColor>(</Text>
         <Text color={toInkColor(foregroundedTeammate.identity.color)}>
           {foregroundedTeammate.identity.agentName}
         </Text>
