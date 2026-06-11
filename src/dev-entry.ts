@@ -110,14 +110,14 @@ if (args.includes('--version')) {
 
 if (args.includes('--help')) {
   if (missingImports.length > 0) {
-    console.log('Claude Code restored development workspace')
+    console.log('myclaude development workspace')
     console.log(`version: ${pkg.version}`)
     console.log(`missing relative imports: ${missingImports.length}`)
     process.exit(0)
   }
-  console.log('Usage: claude [options] [prompt]')
+  console.log('Usage: myclaude [options] [prompt]')
   console.log('')
-  console.log('Basic restored commands:')
+  console.log('Basic commands:')
   console.log('  --help       Show this help')
   console.log('  --version    Show version')
   console.log('')
@@ -126,7 +126,7 @@ if (args.includes('--help')) {
 }
 
 if (missingImports.length > 0) {
-  console.log('Claude Code restored development workspace')
+  console.log('myclaude development workspace')
   console.log(`version: ${pkg.version}`)
   console.log(`missing relative imports: ${missingImports.length}`)
   console.log('')

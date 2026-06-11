@@ -14,5 +14,9 @@ coverage/
 *.swo
 
 .claude/
+.atomcode/
 .idea/
 .vscode/
+
+# npm publish
+*.tgz

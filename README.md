@@ -1,9 +1,9 @@
-# Claude Code 源码还原
+# myclaude
 
-> 从 `@anthropic-ai/claude-code` npm 包的 source map 中还原的完整 TypeScript 源码，**可本地运行**
+> 基于 Claude Code 源码的开源 AI 编码助手 — **可本地运行**
 
 <p align="center">
-  <img src="preview.png?raw=true" alt="Claude Code CLI" width="700">
+  <img src="preview.png?raw=true" alt="myclaude CLI" width="700">
 </p>
 
 > [!WARNING]
@@ -296,11 +296,13 @@ vendor/                 # 原生绑定源码
 
 ## 数据来源
 
-- npm 包：[@anthropic-ai/claude-code](https://www.npmjs.com/package/@anthropic-ai/claude-code)
+- npm 包：[@anthropic-ai/claude-code](https://www.npmjs.com/package/@anthropic-ai/claude-code)（原始）
+- 开源版本：[myclaude](https://gitee.com/thomaslwq/myclaude)（本仓库）
 - 还原方式：提取 `cli.js.map` 中的 `sourcesContent`
 
 ## 声明
 
-- 源码版权归 [Anthropic](https://www.anthropic.com) 所有
-- 仅用于技术研究与学习，请勿用于商业用途
-- 如有侵权，请联系删除
+本项目基于 Anthropic 发布的 `@anthropic-ai/claude-code` npm 包的 source map 中还原的 TypeScript 源码进行改造。
+原始代码版权归 [Anthropic](https://www.anthropic.com) 所有。
+
+本项目以 MIT 许可证发布，用户可自由使用、修改和分发（需遵守原始代码的许可条款）。
