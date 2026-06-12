@@ -34,7 +34,9 @@
     "bin/",
     "LICENSE",
     "README.md",
-    "CHANGELOG.md"
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "docs/funnycode.png"
   ],
   "publishConfig": {
     "access": "public"

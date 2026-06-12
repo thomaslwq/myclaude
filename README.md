@@ -3,6 +3,8 @@
 **myclaude** — An open-source AI coding assistant that runs in your terminal.  
 This project is a fork/rebrand of Claude Code, committed to providing an independent, open AI coding experience.
 
+![myclaude](docs/funnycode.png)
+
 ```bash
 npx @funnycode/myclaude
 ```
