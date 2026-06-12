@@ -270,6 +270,10 @@ export type GlobalConfig = {
   companion?: import('../buddy/types.js').StoredCompanion
   companionMuted?: boolean
 
+  // Achievement system
+  unlockedAchievements?: string[]
+  achievementCounters?: Record<string, number>
+
   // Feedback survey tracking
   feedbackSurveyState?: {
     lastShownTime?: number

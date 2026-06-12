@@ -4,6 +4,7 @@ import { RARITY_STARS, RARITY_COLORS, type Species, SPECIES } from '../../buddy/
 import { renderFace, renderSprite } from '../../buddy/sprites.js'
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
 import { getSettingSourceName } from '../../utils/settings/constants.js'
+import { checkOnBuddyHatch, checkOnBuddyPet } from '../../achievements/checker.js'
 
 const SPECIES_NAMES: Record<Species, string> = {
   duck: '🦆 鸭子',
@@ -107,6 +108,8 @@ function handleHatch(): { type: 'text'; value: string } {
     `  /buddy mute    — hide companion`,
   ].join('\n')
 
+  checkOnBuddyHatch()
+
   return { type: 'text', value: result }
 }
 
@@ -118,6 +121,8 @@ function handlePet(): { type: 'text'; value: string } {
       value: `You don't have a companion yet! Use /buddy hatch to get one.`,
     }
   }
+
+  checkOnBuddyPet()
 
   return {
     type: 'text',

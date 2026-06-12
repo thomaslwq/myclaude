@@ -140,6 +140,7 @@ import mockLimits from './commands/mock-limits/index.js'
 import bridgeKick from './commands/bridge-kick.js'
 import version from './commands/version.js'
 import summary from './commands/summary/index.js'
+import achievements from './commands/achievements/index.js'
 import {
   resetLimits,
   resetLimitsNonInteractive,
@@ -258,6 +259,7 @@ export const INTERNAL_ONLY_COMMANDS = [
 const COMMANDS = memoize((): Command[] => [
   addDir,
   advisor,
+  achievements,
   agents,
   branch,
   btw,
