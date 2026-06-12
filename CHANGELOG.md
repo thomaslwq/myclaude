@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5] - 2026-06-12
+
+### Changed
+- Updated README.md and README.zh-CN.md to reflect actual project state
+- Added multi-model provider support documentation
+- Added missing commands (review, feedback, summary, thinkback)
+- Updated repository links and build instructions
+
 ## [0.1.0] - 2025-03-01
 
 ### Added
