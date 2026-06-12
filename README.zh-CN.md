@@ -1,6 +1,7 @@
 # @funnycode/myclaude
 
-开源的 AI 编码助手，运行在你的终端中——由 Claude 驱动。
+**myclaude** — 开源的 AI 编程助手，运行在你的终端中。  
+本项目是 Claude Code 的 fork/rebrand，致力于提供独立、开放的 AI 编码体验。
 
 ```bash
 npx @funnycode/myclaude
@@ -11,7 +12,7 @@ npx @funnycode/myclaude
 ## 功能特性
 
 - **AI 对话** — 通过自然语言编写、重构、调试和解释代码
-- **80+ 斜杠命令** — `/commit`、`/review`、`/test`、`/doc`、`/config`、`/doctor` 等
+- **80+ 斜杠命令** — `/commit`、`/review`、`/plan`、`/test`、`/doctor` 等
 - **文件操作** — 在 AI 指导下编辑、写入、创建和搜索文件
 - **Git 集成** — 自动生成提交信息、管理分支、创建 PR
 - **MCP 支持** — Model Context Protocol 可扩展工具集成
@@ -19,6 +20,7 @@ npx @funnycode/myclaude
 - **Agent 模式** — 多步自主任务执行
 - **技能系统** — 通过可复用技能扩展能力
 - **终端 UI** — React Ink 界面，支持语法高亮、主题和 Vim 模式
+- **多模型支持** — Anthropic、AWS Bedrock、Google Vertex AI、Microsoft Foundry
 
 ---
 
@@ -40,7 +42,7 @@ npx @funnycode/myclaude
 
 ```bash
 npm install -g @funnycode/myclaude
-npx @funnycode/myclaude
+myclaude
 ```
 
 ### 设置 API Key
@@ -85,6 +87,7 @@ npx @funnycode/myclaude --help                 # 查看帮助
 | `/diff` | 查看 Git 差异 |
 | `/branch` | 切换/创建分支 |
 | `/plan` | 创建实施计划 |
+| `/review` | 代码审查 |
 
 ### AI 和模型
 | 命令 | 说明 |
@@ -129,6 +132,9 @@ npx @funnycode/myclaude --help                 # 查看帮助
 | `/tag` | 标记当前会话 |
 | `/export` | 导出会话 |
 | `/upgrade` | 检查更新 |
+| `/feedback` | 提交反馈 |
+| `/summary` | 生成会话摘要 |
+| `/thinkback` | 回溯思考过程 |
 
 ---
 
@@ -139,7 +145,7 @@ npx @funnycode/myclaude --help                 # 查看帮助
 - ✅ 交互式 REPL（与 AI 对话）
 - ✅ 打印模式（`-p` 参数）
 - ✅ 模型切换（`/model`）
-- ✅ 大部分斜杠命令
+- ✅ 大多数斜杠命令
 - ✅ MCP 服务器添加/删除/列表
 - ✅ 插件安装
 - ✅ Git 提交信息生成
@@ -151,6 +157,7 @@ npx @funnycode/myclaude --help                 # 查看帮助
 - ✅ 深色/浅色主题
 - ✅ 按键绑定自定义
 - ✅ API 密钥认证（兼容任何 Anthropic API 提供商）
+- ✅ 多模型提供商（Bedrock / Vertex / Foundry）
 
 ---
 
@@ -178,39 +185,54 @@ npx @funnycode/myclaude --help                 # 查看帮助
 
 ---
 
-## 贡献
-
-欢迎提交 MR（Merge Request）参与贡献！
-
-### 开发
+## 开发
 
 ```bash
-git clone https://github.com/thomaslwq/myclaude.git
+git clone https://gitee.com/thomaslwq/myclaude.git
 cd myclaude
 bun install
-bun run dev
+bun run dev        # 开发模式
+bun run build      # 构建到 dist/myclaude.js
+bun run version    # 验证 CLI 启动
 ```
 
-### 构建
+### 构建产物
 
-```bash
-bun run build    # 构建到 dist/myclaude.js
+构建脚本会将 `src/entrypoints/cli.tsx` 打包为单文件 `dist/myclaude.js`，并注入版本号等编译时常量。
+
+### 目录结构
+
 ```
+src/
+├── commands/     # 斜杠命令实现
+├── components/   # React Ink UI 组件
+├── services/     # 后端服务（API、MCP、分析）
+├── tools/        # 工具实现
+├── utils/        # 共享工具函数
+├── entrypoints/  # CLI 入口
+└── main.tsx      # TUI 主入口
+```
+
+---
+
+## 贡献
+
+欢迎提交 PR 参与贡献！
 
 ### 指南
 
 - Fork 仓库并创建功能分支
 - 保持改动聚焦且最小化
 - 提交前测试你的改动
-- 向 `main` 分支发起 MR
+- 向 `main` 分支发起 PR
 
 ---
 
 ## 相关链接
 
+- **Gitee**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
 - **GitHub**: [https://github.com/thomaslwq/myclaude](https://github.com/thomaslwq/myclaude)
 - **npm**: [https://www.npmjs.com/package/@funnycode/myclaude](https://www.npmjs.com/package/@funnycode/myclaude)
-- **Gitee**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
 
 ---
 
