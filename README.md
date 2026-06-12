@@ -14,7 +14,9 @@ npx @funnycode/myclaude
 ## Features
 
 - **AI Chat** — Write, refactor, debug, and explain code via natural language
-- **80+ Slash Commands** — `/commit`, `/review`, `/plan`, `/test`, `/doctor` and more
+- **80+ Slash Commands** — `/commit`, `/review`, `/plan`, `/doctor`, `/buddy`, `/achievements` and more
+- **BUDDY Companion** — A terminal pet that grows with you. Hatch, pet, and bond with your ASCII companion. 18 species, 5 rarity tiers, shiny variants.
+- **Achievements** — Unlock 20+ achievements as you code: streaks, milestones, discoveries.
 - **File Operations** — Edit, write, create, and search files with AI guidance
 - **Git Integration** — Automatic commit messages, branch management, PR creation
 - **MCP Support** — Model Context Protocol for extensible tool integrations
@@ -116,6 +118,12 @@ npx @funnycode/myclaude --help                 # Show help
 | `/reload-plugins` | Reload all plugins |
 | `/hooks` | Manage hooks |
 
+### Companion & Achievements
+| Command | Description |
+|---------|-------------|
+| `/buddy` | Manage your terminal companion (hatch, pet, card, mute) |
+| `/achievements` | View unlocked achievements and progress |
+
 ### System
 | Command | Description |
 |---------|-------------|
@@ -140,6 +148,68 @@ npx @funnycode/myclaude --help                 # Show help
 
 ---
 
+## BUDDY — Your Terminal Companion
+
+myclaude comes with a built-in virtual pet that lives in your terminal. Each pet is **deterministically generated** from your user ID — what you get is uniquely yours and cannot be cheated.
+
+### Species (18 total)
+
+🦆 Duck &nbsp; 🪿 Goose &nbsp; 🫧 Blob &nbsp; 🐱 Cat &nbsp; 🐉 Dragon  
+🐙 Octopus &nbsp; 🦉 Owl &nbsp; 🐧 Penguin &nbsp; 🐢 Turtle &nbsp; 🐌 Snail  
+👻 Ghost &nbsp; 🦎 Axolotl &nbsp; 🦫 Capybara &nbsp; 🌵 Cactus &nbsp; 🤖 Robot  
+🐰 Rabbit &nbsp; 🍄 Mushroom &nbsp; 🐈 Chonk
+
+### Rarity System
+
+| Rarity | Chance | Stars |
+|--------|--------|-------|
+| Common | 60% | ★ |
+| Uncommon | 25% | ★★ |
+| Rare | 10% | ★★★ |
+| Epic | 4% | ★★★★ |
+| Legendary | 1% | ★★★★★ |
+
+There's also a **1% shiny chance** independent of rarity — shiny companions sparkle ✨
+
+### Stats
+
+Each companion has 5 attributes: `DEBUGGING`, `PATIENCE`, `CHAOS`, `WISDOM`, `SNARK` — with one peak stat and one dump stat.
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/buddy hatch` | Hatch a new companion |
+| `/buddy pet` | Pet your companion (hearts animation) |
+| `/buddy card` | View companion card with stats |
+| `/buddy mute` | Hide companion from terminal |
+| `/buddy unmute` | Show companion again |
+
+The companion reacts to your conversation and occasionally comments via speech bubbles. Each species has custom idle animations and pet reactions.
+
+---
+
+## Achievements
+
+Unlock achievements as you use myclaude. Track your progress with `/achievements`.
+
+### Categories
+
+| Category | Description |
+|----------|-------------|
+| 🌟 Getting Started | First hatch, first commit, first review, first plugin, first skill |
+| 📊 Usage | 10/100 commits, 100/1000 messages, model switching, config changes |
+| 🔥 Streaks | 3/7/30 consecutive days of use |
+| 🐾 Buddy | Hatch, pet 10/100 times, legendary or shiny companion |
+| ⚡ Power | Add an MCP server |
+
+```bash
+/achievements        # Show unlocked achievements summary
+/achievements list   # Show all achievements with progress
+```
+
+---
+
 ## Verified Working Features
 
 The following features have been tested and confirmed working:
@@ -153,6 +223,8 @@ The following features have been tested and confirmed working:
 - ✅ Git commit generation
 - ✅ File editing and creation
 - ✅ Skills system
+- ✅ BUDDY companion (hatch, pet, card, mute)
+- ✅ Achievements system
 - ✅ Vim mode
 - ✅ Config management
 - ✅ Doctor diagnostics
@@ -206,14 +278,28 @@ The build script bundles `src/entrypoints/cli.tsx` into a single file `dist/mycl
 
 ```
 src/
-├── commands/     # Slash command implementations
-├── components/   # React Ink UI components
-├── services/     # Backend services (API, MCP, analytics)
-├── tools/        # Tool implementations
-├── utils/        # Shared utilities
-├── entrypoints/  # CLI entry points
-└── main.tsx      # TUI main entry
+├── achievements/  # Achievement system (types, storage, checker)
+├── buddy/         # BUDDY companion (sprites, animations, types)
+├── commands/      # Slash command implementations
+├── components/    # React Ink UI components
+├── services/      # Backend services (API, MCP, analytics)
+├── tools/         # Tool implementations
+├── utils/         # Shared utilities
+├── entrypoints/   # CLI entry points
+└── main.tsx       # TUI main entry
 ```
+
+---
+
+## Roadmap
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the full iteration plan:
+
+- **P0** — Activate hidden features (BUDDY, Auto Memory) ✅
+- **P1** — Growth system (Achievements, skill recommendations)
+- **P2** — Interactive experience (multi-interaction, events)
+- **P3** — Extension ecosystem (plugin marketplace, Skill Studio)
+- **P4** — Intelligent evolution (personalized fine-tuning, offline mode)
 
 ---
 
