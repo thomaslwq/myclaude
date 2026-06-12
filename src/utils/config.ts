@@ -283,6 +283,14 @@ export type GlobalConfig = {
     playCount: number
   }
 
+  // BUDDY milestone memories
+  buddyMilestones?: Array<{
+    type: string
+    label: string
+    icon: string
+    achievedAt: number
+  }>
+
   // Usage stats (for /mystats)
   usageStats?: {
     firstUsedAt: number

@@ -6,6 +6,7 @@ import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
 import { checkOnBuddyHatch, checkOnBuddyPet } from '../../achievements/checker.js'
 import { addXp, getLevel, getXp, getXpForNextLevel, getEvolutionStage, getEvolvedSpecies, XP_REWARDS, incrementFeed, incrementPlay, getInteractionCounts } from '../../buddy/evolution/index.js'
 import { trackBuddyInteraction } from '../../stats/usageStats.js'
+import { formatMilestones } from '../../buddy/milestones.js'
 
 const SPECIES_NAMES: Record<Species, string> = {
   duck: '🦆 Duck', goose: '🪿 Goose', blob: '🫧 Blob', cat: '🐱 Cat',
@@ -213,6 +214,9 @@ function handleCard() {
     stats,
     ``,
     `Personality: ${companion.personality}`,
+    ``,
+    `📖 History:`,
+    formatMilestones(),
   ].join('\n')
 
   return { type: 'text', value: result }

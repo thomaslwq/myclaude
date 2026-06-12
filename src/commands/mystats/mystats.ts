@@ -4,6 +4,8 @@ import { getLevel, getXp, getXpForNextLevel, getEvolutionStage, getInteractionCo
 import { getCompanion } from '../../buddy/companion.js'
 import { getUnlockedAchievements } from '../../achievements/storage.js'
 import { ACHIEVEMENTS } from '../../achievements/types.js'
+import { getSuggestions } from '../../skills/suggestions.js'
+import { getRandomTip } from '../../stats/tips.js'
 
 export const call: LocalCommandCall = async () => {
   const stats = getUsageStats()
@@ -68,6 +70,24 @@ export const call: LocalCommandCall = async () => {
   if (unlocked.size < 5) {
     lines.push('  🏆 Try /achievements to see what you can unlock!')
   }
+
+  // Smart tip
+  const tip = getRandomTip()
+  if (tip) {
+    lines.push('')
+    lines.push(`  ${tip}`)
+  }
+
+  // Suggestions
+  const suggestions = getSuggestions(4)
+  if (suggestions.length > 0) {
+    lines.push('')
+    lines.push('🎯 Suggested for you:')
+    for (const s of suggestions) {
+      lines.push(`  ${s.command.padEnd(18)} ${s.description}`)
+    }
+  }
+
   lines.push('')
 
   return { type: 'text', value: lines.join('\n') }

@@ -5,6 +5,7 @@
 import {
   unlockAchievement,
   hasAchievement,
+  getUnlockedAchievements,
   incrementCounter,
   getCounter,
 } from './storage.js'
@@ -12,6 +13,7 @@ import { ACHIEVEMENTS } from './types.js'
 import type { AchievementId } from './types.js'
 import { getCompanion } from '../buddy/companion.js'
 import { addXp, XP_REWARDS } from '../buddy/evolution/index.js'
+import { addMilestone } from '../buddy/milestones.js'
 import { trackDailyLogin, trackCommit, trackReview, trackPluginInstall, trackSkillUse, trackBuddyInteraction, trackCommand } from '../stats/usageStats.js'
 
 const NOTIFIED_KEY = 'achievement_notified'
@@ -81,6 +83,9 @@ export function checkOnCommit(): void {
   tryUnlock('commits_100', count >= 100)
   addXp(XP_REWARDS.COMMIT)
   trackCommit()
+  if (count === 1) addMilestone('first_commit')
+  if (count === 10) addMilestone('commits_10')
+  if (count === 100) addMilestone('commits_100')
 }
 
 /** Called when a code review is done. */
@@ -88,6 +93,7 @@ export function checkOnReview(): void {
   tryUnlock('first_review')
   addXp(XP_REWARDS.REVIEW)
   trackReview()
+  addMilestone('first_review')
 }
 
 /** Called when a plugin is installed. */
@@ -95,6 +101,7 @@ export function checkOnPluginInstall(): void {
   tryUnlock('first_plugin')
   addXp(XP_REWARDS.PLUGIN_INSTALL)
   trackPluginInstall()
+  addMilestone('first_plugin')
 }
 
 /** Called when a skill is used. */
@@ -102,6 +109,7 @@ export function checkOnSkillUse(): void {
   tryUnlock('first_skill')
   addXp(XP_REWARDS.SKILL_USE)
   trackSkillUse()
+  addMilestone('first_skill')
 }
 
 /** Called when an MCP server is added. */
@@ -139,6 +147,8 @@ export function checkOnDailyUse(): void {
     tryUnlock('streak_7', streak >= 7)
     tryUnlock('streak_30', streak >= 30)
     addXp(XP_REWARDS.DAILY_LOGIN)
+    if (streak === 7) addMilestone('streak_7')
+    if (streak === 30) addMilestone('streak_30')
   }
 }
 
@@ -149,6 +159,10 @@ function tryUnlock(id: AchievementId, condition = true): void {
   if (hasAchievement(id)) return
   if (unlockAchievement(id)) {
     addXp(XP_REWARDS.ACHIEVEMENT_UNLOCK)
+    const unlocked = getUnlockedAchievements()
+    if (unlocked.size === 5) addMilestone('achievement_5')
+    if (unlocked.size === 10) addMilestone('achievement_10')
+    if (unlocked.size === 20) addMilestone('achievement_20')
     const achievement = ACHIEVEMENTS[id]
     // Log to console (visible in TUI)
     console.error(

@@ -7,6 +7,7 @@
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
 import { getCompanion } from '../companion.js'
 import type { Species } from '../types.js'
+import { addMilestone } from '../milestones.js'
 
 // ── XP / Level ────────────────────────────────────────────────────
 
@@ -77,6 +78,12 @@ export function addXp(amount: number): Array<{ type: 'level_up' | 'evolution'; l
       state.evolutionStage = newStage
       events.push({ type: 'evolution', stage: newStage })
     }
+
+    // Record milestones
+    if (state.level === 5) addMilestone('level_5')
+    if (state.level === 10) addMilestone('level_10')
+    if (state.level === 25) addMilestone('level_25')
+    if (state.level === 50) addMilestone('level_50')
   }
 
   state.xp = Math.min(newXp, MAX_LEVEL * XP_PER_LEVEL)
