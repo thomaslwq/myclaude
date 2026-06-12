@@ -310,6 +310,9 @@ export type GlobalConfig = {
   // Smart tips already shown
   shownTips?: string[]
 
+  // Easter eggs already triggered
+  shownEasterEggs?: string[]
+
   // Feedback survey tracking
   feedbackSurveyState?: {
     lastShownTime?: number

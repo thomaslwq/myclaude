@@ -7,6 +7,7 @@ import { checkOnBuddyHatch, checkOnBuddyPet } from '../../achievements/checker.j
 import { addXp, getLevel, getXp, getXpForNextLevel, getEvolutionStage, getEvolvedSpecies, XP_REWARDS, incrementFeed, incrementPlay, getInteractionCounts } from '../../buddy/evolution/index.js'
 import { trackBuddyInteraction } from '../../stats/usageStats.js'
 import { formatMilestones } from '../../buddy/milestones.js'
+import { getEventReaction, getTodayEvent } from '../../events/calendar.js'
 
 const SPECIES_NAMES: Record<Species, string> = {
   duck: '🦆 Duck', goose: '🪿 Goose', blob: '🫧 Blob', cat: '🐱 Cat',
@@ -99,15 +100,25 @@ function handleHatch() {
     `+${XP_REWARDS.BUDDY_HATCH} XP for hatching!`,
     ...xpMsgs,
     ``,
+  ]
+
+  // Special event message
+  const eventMsg = getEventReaction()
+  if (eventMsg) {
+    result.push(`${eventMsg}`)
+    result.push('')
+  }
+
+  result.push(
     `You can interact with it using:`,
     `  /buddy pet     — pet (+5 XP)`,
     `  /buddy feed    — feed (+15 XP)`,
     `  /buddy play    — play (+20 XP)`,
     `  /buddy card    — view stats & level`,
     `  /buddy mute    — hide companion`,
-  ].join('\n')
+  )
 
-  return { type: 'text', value: result }
+  return { type: 'text', value: result.join('\n') }
 }
 
 function handlePet() {
@@ -217,9 +228,17 @@ function handleCard() {
     ``,
     `📖 History:`,
     formatMilestones(),
-  ].join('\n')
+    ``,
+  ]
 
-  return { type: 'text', value: result }
+  // Special event
+  const eventMsg = getEventReaction()
+  if (eventMsg) {
+    result.push(`${eventMsg}`)
+    result.push('')
+  }
+
+  return { type: 'text', value: result.join('\n') }
 }
 
 function handleMute() {
