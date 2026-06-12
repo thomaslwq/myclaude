@@ -11,6 +11,8 @@ import {
 import { ACHIEVEMENTS } from './types.js'
 import type { AchievementId } from './types.js'
 import { getCompanion } from '../buddy/companion.js'
+import { addXp, XP_REWARDS } from '../buddy/evolution/index.js'
+import { trackDailyLogin, trackCommit, trackReview, trackPluginInstall, trackSkillUse, trackBuddyInteraction, trackCommand } from '../stats/usageStats.js'
 
 const NOTIFIED_KEY = 'achievement_notified'
 
@@ -77,21 +79,29 @@ export function checkOnCommit(): void {
   const count = incrementCounter('commits')
   tryUnlock('commits_10', count >= 10)
   tryUnlock('commits_100', count >= 100)
+  addXp(XP_REWARDS.COMMIT)
+  trackCommit()
 }
 
 /** Called when a code review is done. */
 export function checkOnReview(): void {
   tryUnlock('first_review')
+  addXp(XP_REWARDS.REVIEW)
+  trackReview()
 }
 
 /** Called when a plugin is installed. */
 export function checkOnPluginInstall(): void {
   tryUnlock('first_plugin')
+  addXp(XP_REWARDS.PLUGIN_INSTALL)
+  trackPluginInstall()
 }
 
 /** Called when a skill is used. */
 export function checkOnSkillUse(): void {
   tryUnlock('first_skill')
+  addXp(XP_REWARDS.SKILL_USE)
+  trackSkillUse()
 }
 
 /** Called when an MCP server is added. */
@@ -111,6 +121,7 @@ export function checkOnConfigChange(): void {
 
 /** Called daily to check streak. */
 export function checkOnDailyUse(): void {
+  trackDailyLogin()
   const config =
     typeof process !== 'undefined'
       ? { lastSeenDate: process.env.__ACHIEVEMENT_LAST_SEEN__ }
@@ -127,6 +138,7 @@ export function checkOnDailyUse(): void {
     tryUnlock('streak_3', streak >= 3)
     tryUnlock('streak_7', streak >= 7)
     tryUnlock('streak_30', streak >= 30)
+    addXp(XP_REWARDS.DAILY_LOGIN)
   }
 }
 
@@ -136,6 +148,7 @@ function tryUnlock(id: AchievementId, condition = true): void {
   if (!condition) return
   if (hasAchievement(id)) return
   if (unlockAchievement(id)) {
+    addXp(XP_REWARDS.ACHIEVEMENT_UNLOCK)
     const achievement = ACHIEVEMENTS[id]
     // Log to console (visible in TUI)
     console.error(

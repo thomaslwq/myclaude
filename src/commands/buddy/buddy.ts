@@ -3,94 +3,89 @@ import { getCompanion, companionUserId, roll } from '../../buddy/companion.js'
 import { RARITY_STARS, RARITY_COLORS, type Species, SPECIES } from '../../buddy/types.js'
 import { renderFace, renderSprite } from '../../buddy/sprites.js'
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
-import { getSettingSourceName } from '../../utils/settings/constants.js'
 import { checkOnBuddyHatch, checkOnBuddyPet } from '../../achievements/checker.js'
+import { addXp, getLevel, getXp, getXpForNextLevel, getEvolutionStage, getEvolvedSpecies, XP_REWARDS, incrementFeed, incrementPlay, getInteractionCounts } from '../../buddy/evolution/index.js'
+import { trackBuddyInteraction } from '../../stats/usageStats.js'
 
 const SPECIES_NAMES: Record<Species, string> = {
-  duck: '🦆 鸭子',
-  goose: '🪿 鹅',
-  blob: '🫧 果冻',
-  cat: '🐱 猫',
-  dragon: '🐉 龙',
-  octopus: '🐙 章鱼',
-  owl: '🦉 猫头鹰',
-  penguin: '🐧 企鹅',
-  turtle: '🐢 乌龟',
-  snail: '🐌 蜗牛',
-  ghost: '👻 幽灵',
-  axolotl: '🦎 六角恐龙',
-  capybara: '🦫 水豚',
-  cactus: '🌵 仙人掌',
-  robot: '🤖 机器人',
-  rabbit: '🐰 兔子',
-  mushroom: '🍄 蘑菇',
-  chonk: '🐈 胖猫',
+  duck: '🦆 Duck', goose: '🪿 Goose', blob: '🫧 Blob', cat: '🐱 Cat',
+  dragon: '🐉 Dragon', octopus: '🐙 Octopus', owl: '🦉 Owl',
+  penguin: '🐧 Penguin', turtle: '🐢 Turtle', snail: '🐌 Snail',
+  ghost: '👻 Ghost', axolotl: '🦎 Axolotl', capybara: '🦫 Capybara',
+  cactus: '🌵 Cactus', robot: '🤖 Robot', rabbit: '🐰 Rabbit',
+  mushroom: '🍄 Mushroom', chonk: '🐈 Chonk',
 }
 
 const HELP_TEXT = `Usage: /buddy <subcommand>
 
 Subcommands:
-  hatch              Hatch a new companion (AI generates name & personality)
-  pet                Pet your companion (hearts animation)
-  card               Show companion card with stats
-  mute               Mute companion (hide from terminal)
-  unmute             Unmute companion (show in terminal)
+  hatch              Hatch a new companion
+  pet                Pet your companion (+5 XP)
+  feed               Feed your companion (+15 XP)
+  play               Play with your companion (+20 XP)
+  card               Show companion card with stats and level
+  mute               Mute companion
+  unmute             Unmute companion
 
-Examples:
-  /buddy hatch       Hatch a new companion
-  /buddy pet         Pet your companion
-  /buddy card        View companion card
-`
+XP is earned through interactions. Level up to evolve your companion!`
 
 export const call: LocalCommandCall = async (args: string) => {
   const [subcommand] = args.trim().toLowerCase().split(/\s+/)
 
   switch (subcommand) {
-    case 'hatch':
-      return handleHatch()
-    case 'pet':
-      return handlePet()
-    case 'card':
-      return handleCard()
-    case 'mute':
-      return handleMute()
-    case 'unmute':
-      return handleUnmute()
-    default:
-      return { type: 'text', value: HELP_TEXT }
+    case 'hatch': return handleHatch()
+    case 'pet': return handlePet()
+    case 'feed': return handleFeed()
+    case 'play': return handlePlay()
+    case 'card': return handleCard()
+    case 'mute': return handleMute()
+    case 'unmute': return handleUnmute()
+    default: return { type: 'text', value: HELP_TEXT }
   }
 }
 
-function handleHatch(): { type: 'text'; value: string } {
-  const existing = getGlobalConfig().companion
-  if (existing) {
-    const companion = getCompanion()
-    if (companion) {
-      return {
-        type: 'text',
-        value: `You already have a companion! ${companion.name} the ${companion.species} is already with you. Use /buddy card to see details.`,
-      }
+function getXpBar(current: number, needed: number): string {
+  const filled = Math.floor((current / needed) * 10)
+  return '█'.repeat(filled) + '░'.repeat(10 - filled)
+}
+
+function formatXpEvents(events: Array<{ type: string; level?: number; stage?: number }>): string[] {
+  const msgs: string[] = []
+  for (const e of events) {
+    if (e.type === 'level_up') {
+      msgs.push(`\n  ⬆️ Level up! You are now level ${e.level}!`)
+    }
+    if (e.type === 'evolution') {
+      msgs.push(`\n  ✨ Your companion evolved to stage ${e.stage}!`)
     }
   }
+  return msgs
+}
 
-  // Generate initial companion data
+function handleHatch() {
+  const existing = getGlobalConfig().companion
+  if (existing && getCompanion()) {
+    return { type: 'text', value: 'You already have a companion! Use /buddy card to see details.' }
+  }
+
   const userId = companionUserId()
   const { bones, inspirationSeed } = roll(userId)
-  const speciesName = SPECIES_NAMES[bones.species] || bones.species
   const face = renderFace(bones)
   const rarityStars = RARITY_STARS[bones.rarity]
-  const rarityColor = RARITY_COLORS[bones.rarity]
   const shiny = bones.shiny ? ' ✨ SHINY' : ''
+  const speciesName = SPECIES_NAMES[bones.species] || bones.species
 
-  // Save minimal companion data to config
   saveGlobalConfig(current => ({
     ...current,
-    companion: {
-      name: speciesName,
-      personality: 'curious',
-      hatchedAt: Date.now(),
-    },
+    companion: { name: speciesName, personality: 'curious', hatchedAt: Date.now() },
   }))
+
+  // Award hatch XP
+  const events = addXp(XP_REWARDS.BUDDY_HATCH)
+  trackBuddyInteraction()
+
+  const xpMsgs = formatXpEvents(events)
+  checkOnBuddyHatch()
 
   const result = [
     `🎉 A new companion has appeared!`,
@@ -99,54 +94,105 @@ function handleHatch(): { type: 'text'; value: string } {
     ``,
     `Rarity: ${rarityStars} (${bones.rarity})${shiny}`,
     `Species: ${speciesName}`,
-    `Eye: ${bones.eye}`,
-    `Hat: ${bones.hat}`,
+    `Eye: ${bones.eye}  Hat: ${bones.hat}`,
+    `+${XP_REWARDS.BUDDY_HATCH} XP for hatching!`,
+    ...xpMsgs,
     ``,
     `You can interact with it using:`,
-    `  /buddy pet     — pet your companion`,
-    `  /buddy card    — view full stats`,
+    `  /buddy pet     — pet (+5 XP)`,
+    `  /buddy feed    — feed (+15 XP)`,
+    `  /buddy play    — play (+20 XP)`,
+    `  /buddy card    — view stats & level`,
     `  /buddy mute    — hide companion`,
   ].join('\n')
-
-  checkOnBuddyHatch()
 
   return { type: 'text', value: result }
 }
 
-function handlePet(): { type: 'text'; value: string } {
+function handlePet() {
   const companion = getCompanion()
-  if (!companion) {
-    return {
-      type: 'text',
-      value: `You don't have a companion yet! Use /buddy hatch to get one.`,
-    }
-  }
+  if (!companion) return { type: 'text', value: `You don't have a companion yet! Use /buddy hatch to get one.` }
 
+  const events = addXp(XP_REWARDS.BUDDY_PET)
+  trackBuddyInteraction()
   checkOnBuddyPet()
+
+  const xpMsgs = formatXpEvents(events)
+  const reaction = getPetReaction(companion.species)
 
   return {
     type: 'text',
-    value: `You pet ${companion.name}! ${companion.name} seems happy. ${getPetReaction(companion.species)}`,
+    value: [
+      `You pet ${companion.name}! ${companion.name} seems happy. ${reaction}`,
+      `+${XP_REWARDS.BUDDY_PET} XP`,
+      ...xpMsgs,
+    ].join('\n'),
   }
 }
 
-function handleCard(): { type: 'text'; value: string } {
+function handleFeed() {
   const companion = getCompanion()
-  if (!companion) {
-    return {
-      type: 'text',
-      value: `You don't have a companion yet! Use /buddy hatch to get one.`,
-    }
+  if (!companion) return { type: 'text', value: `You don't have a companion yet! Use /buddy hatch to get one.` }
+
+  const count = incrementFeed()
+  const events = addXp(XP_REWARDS.BUDDY_FEED)
+  trackBuddyInteraction()
+
+  const xpMsgs = formatXpEvents(events)
+  const foods = ['a juicy berry 🫐', 'a tiny cookie 🍪', 'some fresh grass 🌿', 'a glowing snack ✨', 'a warm bowl of soup 🥣']
+  const food = foods[count % foods.length]
+
+  return {
+    type: 'text',
+    value: [
+      `You feed ${companion.name} ${food}. Yum!`,
+      `+${XP_REWARDS.BUDDY_FEED} XP`,
+      ...xpMsgs,
+    ].join('\n'),
   }
+}
+
+function handlePlay() {
+  const companion = getCompanion()
+  if (!companion) return { type: 'text', value: `You don't have a companion yet! Use /buddy hatch to get one.` }
+
+  const count = incrementPlay()
+  const events = addXp(XP_REWARDS.BUDDY_PLAY)
+  trackBuddyInteraction()
+
+  const xpMsgs = formatXpEvents(events)
+  const games = ['hide and seek 🙈', 'tag 🏃', 'puzzle 🧩', 'fetch 🎾', 'a dance-off 💃']
+  const game = games[count % games.length]
+
+  return {
+    type: 'text',
+    value: [
+      `You play ${game} with ${companion.name}! So much fun!`,
+      `+${XP_REWARDS.BUDDY_PLAY} XP`,
+      ...xpMsgs,
+    ].join('\n'),
+  }
+}
+
+function handleCard() {
+  const companion = getCompanion()
+  if (!companion) return { type: 'text', value: `You don't have a companion yet! Use /buddy hatch to get one.` }
 
   const face = renderFace(companion)
   const rarityStars = RARITY_STARS[companion.rarity]
-  const rarityColor = RARITY_COLORS[companion.rarity]
   const shiny = companion.shiny ? ' ✨' : ''
   const speciesName = SPECIES_NAMES[companion.species] || companion.species
+  const level = getLevel()
+  const xp = getXp()
+  const xpNext = getXpForNextLevel()
+  const stage = getEvolutionStage()
+  const evolvedSpecies = stage > 0 ? getEvolvedSpecies(companion.species, stage) : null
+  const xpBar = getXpBar(xp, xpNext)
 
   const stats = Object.entries(companion.stats)
-    .map(([name, value]) => `  ${name.padEnd(12)} ${'█'.repeat(Math.floor(value / 10))}${'░'.repeat(10 - Math.floor(value / 10))} ${value}`)
+    .map(([name, value]) =>
+      `  ${name.padEnd(12)} ${'█'.repeat(Math.floor(value / 10))}${'░'.repeat(10 - Math.floor(value / 10))} ${value}`
+    )
     .join('\n')
 
   const result = [
@@ -158,8 +204,10 @@ function handleCard(): { type: 'text'; value: string } {
     ``,
     `${companion.name}`,
     `${rarityStars} ${companion.rarity}${shiny}`,
-    speciesName,
+    evolvedSpecies ? `Evolved: ${speciesName} → ${evolvedSpecies}` : speciesName,
     `Eye: ${companion.eye}  Hat: ${companion.hat}`,
+    ``,
+    `Level ${level}  ${xpBar}  ${xp}/${xpNext} XP`,
     ``,
     `Stats:`,
     stats,
@@ -170,19 +218,13 @@ function handleCard(): { type: 'text'; value: string } {
   return { type: 'text', value: result }
 }
 
-function handleMute(): { type: 'text'; value: string } {
-  saveGlobalConfig(current => ({
-    ...current,
-    companionMuted: true,
-  }))
+function handleMute() {
+  saveGlobalConfig(current => ({ ...current, companionMuted: true }))
   return { type: 'text', value: 'Companion muted. Use /buddy unmute to show again.' }
 }
 
-function handleUnmute(): { type: 'text'; value: string } {
-  saveGlobalConfig(current => ({
-    ...current,
-    companionMuted: false,
-  }))
+function handleUnmute() {
+  saveGlobalConfig(current => ({ ...current, companionMuted: false }))
   return { type: 'text', value: 'Companion unmuted! Your buddy is back.' }
 }
 
@@ -194,6 +236,12 @@ function getPetReaction(species: string): string {
     octopus: ['Tentacles wiggle happily! 🐙'],
     robot: ['Beep boop! 🤖'],
     ghost: ['A warm flicker... 👻'],
+    goose: ['Honk! 🪿', 'Proud hiss.'],
+    penguin: ['Happy waddle! 🐧'],
+    axolotl: ['Gills flutter! 🦎'],
+    capybara: ['Chill nod. 🦫'],
+    rabbit: ['Nose twitches! 🐰'],
+    turtle: ['Slow blink. 🐢'],
   }
   const pool = reactions[species] || ['Seems happy!']
   return pool[Math.floor(Math.random() * pool.length)]

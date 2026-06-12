@@ -141,6 +141,7 @@ import bridgeKick from './commands/bridge-kick.js'
 import version from './commands/version.js'
 import summary from './commands/summary/index.js'
 import achievements from './commands/achievements/index.js'
+import mystats from './commands/mystats/index.js'
 import {
   resetLimits,
   resetLimitsNonInteractive,
@@ -290,6 +291,7 @@ const COMMANDS = memoize((): Command[] => [
   memory,
   mobile,
   model,
+  mystats,
   outputStyle,
   remoteEnv,
   plugin,

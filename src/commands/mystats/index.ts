@@ -1,0 +1,10 @@
+import type { Command } from '../../commands.js'
+
+const mystatsCmd = {
+  name: 'mystats',
+  description: 'View your coding statistics and usage dashboard',
+  aliases: ['stats', 'dashboard'],
+  load: () => import('./mystats.js'),
+} satisfies Command
+
+export default mystatsCmd

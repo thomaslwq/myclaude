@@ -274,6 +274,34 @@ export type GlobalConfig = {
   unlockedAchievements?: string[]
   achievementCounters?: Record<string, number>
 
+  // BUDDY evolution state
+  buddyState?: {
+    xp: number
+    level: number
+    evolutionStage: number
+    feedCount: number
+    playCount: number
+  }
+
+  // Usage stats (for /mystats)
+  usageStats?: {
+    firstUsedAt: number
+    totalSessions: number
+    totalCommands: number
+    totalCommits: number
+    totalReviews: number
+    totalChatMessages: number
+    totalPluginsInstalled: number
+    totalSkillsUsed: number
+    totalBuddyInteractions: number
+    lastActiveDate: string
+    consecutiveDays: number
+    languagesUsed: string[]
+  }
+
+  // Smart tips already shown
+  shownTips?: string[]
+
   // Feedback survey tracking
   feedbackSurveyState?: {
     lastShownTime?: number
