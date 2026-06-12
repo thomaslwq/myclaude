@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.8] - 2026-06-12
+
+### Changed
+- Updated package.json readme field with full English content for npm display
+
 ## [0.1.7] - 2026-06-12
 
 ### Fixed
