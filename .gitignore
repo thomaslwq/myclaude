@@ -20,3 +20,6 @@ coverage/
 
 # npm publish
 *.tgz
+
+# npm credentials
+.npmrc

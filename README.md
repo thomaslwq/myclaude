@@ -1,6 +1,36 @@
-# myclaude
+# @funnycode/myclaude
 
 An open-source AI coding assistant in your terminal — powered by Claude.
+
+```bash
+npx @funnycode/myclaude
+```
+
+---
+
+## Features
+
+- **AI Chat** — Code writing, refactoring, debugging, and explanation via natural language
+- **80+ Slash Commands** — `/commit`, `/review`, `/test`, `/doc`, `/config`, `/doctor` and more
+- **File Operations** — Edit, write, create, and search files with AI guidance
+- **Git Integration** — Automatic commit messages, branch management, PR creation
+- **MCP Support** — Model Context Protocol for extensible tool integrations
+- **Plugin System** — Install and manage plugins from marketplaces
+- **Agent Mode** — Multi-step autonomous task execution
+- **Skills System** — Extend capabilities with reusable skills
+- **Terminal UI** — React Ink-based interface with syntax highlighting, themes, and Vim mode
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- **Node.js >= 18** (works with Bun too)
+- **Git** (for some features)
+- **Anthropic API key** or compatible provider
+
+### Install & Run
 
 ```bash
 npx @funnycode/myclaude
@@ -9,32 +39,11 @@ npx @funnycode/myclaude
 Or install globally:
 
 ```bash
-npm install -g @thomaslwq/myclaude
-npx @thomaslwq/myclaude
+npm install -g @funnycode/myclaude
+npx @funnycode/myclaude
 ```
 
----
-
-## Features
-
-- **Natural Language Coding** — Write, refactor, debug, and explain code by chatting with AI
-- **Slash Commands** — 80+ built-in commands: `/commit`, `/review`, `/test`, `/doc`, and more
-- **Git Integration** — Automatic commit messages, PR creation, branch management
-- **MCP Support** — Extensible tool integrations via Model Context Protocol
-- **Plugin System** — Extend with community plugins
-- **Terminal UI** — Beautiful React Ink-based interface with syntax highlighting
-
----
-
-## Quick Start
-
-### 1. Install
-
-```bash
-npm install -g @thomaslwq/myclaude
-```
-
-### 2. Set your API key
+### Set API Key
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -42,42 +51,112 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export MYCLAUDE_API_KEY=sk-ant-...
 ```
 
-### 3. Run
-
-```bash
-myclaude
-```
-
 ---
 
 ## Usage
 
 ```bash
-myclaude                      # Start interactive REPL
-myclaude -p "explain this project"  # Run with a prompt
-myclaude --version            # Show version
-myclaude --help               # Show help
+npx @funnycode/myclaude                        # Start interactive REPL
+npx @funnycode/myclaude -p "explain this project"  # Run with a prompt
+npx @funnycode/myclaude --version              # Show version
+npx @funnycode/myclaude --help                 # Show help
 ```
 
-### Common Commands
+---
 
+## Slash Commands
+
+### Core
+| Command | Description |
+|---------|-------------|
+| `/help` | Show help |
+| `/clear` | Clear conversation |
+| `/exit` | Exit |
+| `/resume` | Resume a previous session |
+| `/rewind` | Rewind conversation |
+| `/rename` | Rename current session |
+| `/config` | Configure settings |
+| `/doctor` | Diagnose and verify installation |
+
+### Code & Git
 | Command | Description |
 |---------|-------------|
 | `/commit` | Generate a git commit message |
-| `/review` | Review code changes |
-| `/test` | Generate and run tests |
-| `/doc` | Generate documentation |
-| `/config` | Configure settings |
-| `/doctor` | Diagnose installation |
+| `/diff` | Show git diff |
+| `/branch` | Switch/create branches |
+| `/plan` | Create an implementation plan |
+
+### AI & Model
+| Command | Description |
+|---------|-------------|
 | `/model` | Change AI model |
-| `/clear` | Clear conversation |
-| `/cost` | Show usage statistics |
+| `/effort` | Set effort level |
+| `/fast` | Toggle fast mode |
+| `/brief` | Toggle brief mode |
+| `/output-style` | Set output style |
+
+### Files & Context
+| Command | Description |
+|---------|-------------|
+| `/add-dir` | Add directory to context |
+| `/context` | Show current context |
+| `/files` | File operations |
+| `/copy` | Copy content |
+
+### MCP & Plugins
+| Command | Description |
+|---------|-------------|
+| `/mcp` | Manage MCP servers |
+| `/plugin` | Manage plugins and marketplaces |
+| `/reload-plugins` | Reload all plugins |
+| `/hooks` | Manage hooks |
+
+### System
+| Command | Description |
+|---------|-------------|
+| `/status` | Show authentication and session status |
+| `/stats` | Show usage statistics |
+| `/cost` | Show cost information |
+| `/color` | Set color theme |
+| `/theme` | Set UI theme |
+| `/keybindings` | Configure keybindings |
+| `/vim` | Toggle Vim mode |
+| `/terminal-setup` | Terminal setup |
+| `/memory` | Manage AI memory |
+| `/skills` | Manage skills |
+| `/sandbox` | Toggle sandbox mode |
+| `/session` | Session management |
+| `/tag` | Tag current session |
+| `/export` | Export session |
+| `/upgrade` | Check for updates |
+
+---
+
+## Verified Working Features
+
+The following features have been tested and confirmed working:
+
+- ✅ Interactive REPL (chat with AI)
+- ✅ Print mode (`-p` flag)
+- ✅ Model switching (`/model`)
+- ✅ Slash commands (most)
+- ✅ MCP server add/remove/list
+- ✅ Plugin installation
+- ✅ Git commit generation
+- ✅ File editing and creation
+- ✅ Skills system
+- ✅ Vim mode
+- ✅ Config management
+- ✅ Doctor diagnostics
+- ✅ Dark/light themes
+- ✅ Keybinding customization
+- ✅ API key authentication (with any Anthropic-compatible provider)
 
 ---
 
 ## Environment Variables
 
-You can use either `MYCLAUDE_*` or `CLAUDE_CODE_*` names.  
+Supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` names.  
 `CLAUDE_CODE_*` takes priority if both are set.
 
 | Variable | Description |
@@ -86,7 +165,7 @@ You can use either `MYCLAUDE_*` or `CLAUDE_CODE_*` names.
 | `ANTHROPIC_BASE_URL` / `MYCLAUDE_BASE_URL` | Custom API base URL |
 | `MYCLAUDE_MODEL` | Model override |
 | `MYCLAUDE_SIMPLE` | Simple mode (no TUI) |
-| `MYCLAUDE_BRIEF` | Brief mode (shorter output) |
+| `MYCLAUDE_BRIEF` | Brief mode |
 | `MYCLAUDE_DISABLE_THINKING` | Disable thinking |
 | `MYCLAUDE_PROACTIVE` | Proactive mode |
 | `MYCLAUDE_USE_BEDROCK` | Use AWS Bedrock |
@@ -96,6 +175,42 @@ You can use either `MYCLAUDE_*` or `CLAUDE_CODE_*` names.
 | `MYCLAUDE_SYNTAX_HIGHLIGHT` | Syntax highlight theme |
 | `MYCLAUDE_IDLE_THRESHOLD_MINUTES` | Idle timeout (default: 75) |
 | `MYCLAUDE_EFFORT_LEVEL` | Effort level |
+
+---
+
+## Contributing
+
+Contributions via MR (Merge Request) are welcome! 
+
+### Development
+
+```bash
+git clone https://github.com/thomaslwq/myclaude.git
+cd myclaude
+bun install
+bun run dev
+```
+
+### Build
+
+```bash
+bun run build    # Build to dist/myclaude.js
+```
+
+### Guidelines
+
+- Fork the repo and create a feature branch
+- Keep changes focused and minimal
+- Test your changes before submitting
+- Open a MR against the `main` branch
+
+---
+
+## Links
+
+- **GitHub**: [https://github.com/thomaslwq/myclaude](https://github.com/thomaslwq/myclaude)
+- **npm**: [https://www.npmjs.com/package/@funnycode/myclaude](https://www.npmjs.com/package/@funnycode/myclaude)
+- **Gitee**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
 
 ---
 
