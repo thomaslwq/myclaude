@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.6] - 2026-06-12
+
+### Fixed
+- Fixed README.md content: changed from Chinese to English as the default document
+
 ## [0.1.5] - 2026-06-12
 
 ### Changed
