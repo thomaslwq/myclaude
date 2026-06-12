@@ -1,7 +1,7 @@
 # @funnycode/myclaude
 
-**myclaude** — 一款开源的 AI 编程助手，运行在你的终端中。  
-本项目是 Claude Code 的 fork/rebrand，致力于提供独立、开放的 AI 编码体验。
+**myclaude** — An open-source AI coding assistant that runs in your terminal.  
+This project is a fork/rebrand of Claude Code, committed to providing an independent, open AI coding experience.
 
 ```bash
 npx @funnycode/myclaude
@@ -9,226 +9,226 @@ npx @funnycode/myclaude
 
 ---
 
-## 特性
+## Features
 
-- **AI 对话** — 通过自然语言编写、重构、调试和解释代码
-- **80+ 斜杠命令** — `/commit`, `/review`, `/plan`, `/test`, `/doctor` 等
-- **文件操作** — 在 AI 指导下编辑、写入、创建和搜索文件
-- **Git 集成** — 自动生成提交信息、管理分支、创建 PR
-- **MCP 支持** — Model Context Protocol 可扩展工具集成
-- **插件系统** — 安装和管理来自市场的插件
-- **Agent 模式** — 多步自主任务执行
-- **技能系统** — 通过可复用技能扩展能力
-- **终端 UI** — React Ink 界面，支持语法高亮、主题和 Vim 模式
-- **多模型支持** — Anthropic、AWS Bedrock、Google Vertex AI、Microsoft Foundry
+- **AI Chat** — Write, refactor, debug, and explain code via natural language
+- **80+ Slash Commands** — `/commit`, `/review`, `/plan`, `/test`, `/doctor` and more
+- **File Operations** — Edit, write, create, and search files with AI guidance
+- **Git Integration** — Automatic commit messages, branch management, PR creation
+- **MCP Support** — Model Context Protocol for extensible tool integrations
+- **Plugin System** — Install and manage plugins from marketplaces
+- **Agent Mode** — Multi-step autonomous task execution
+- **Skills System** — Extend capabilities with reusable skills
+- **Terminal UI** — React Ink interface with syntax highlighting, themes, and Vim mode
+- **Multi-Model Support** — Anthropic, AWS Bedrock, Google Vertex AI, Microsoft Foundry
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 环境要求
+### Prerequisites
 
-- **Node.js >= 18**（也可以用 Bun）
-- **Git**（部分功能需要）
-- **Anthropic API 密钥** 或兼容的 AI 提供商
+- **Node.js >= 18** (works with Bun too)
+- **Git** (for some features)
+- **Anthropic API key** or compatible provider
 
-### 安装 & 运行
+### Install & Run
 
 ```bash
 npx @funnycode/myclaude
 ```
 
-或全局安装：
+Or install globally:
 
 ```bash
 npm install -g @funnycode/myclaude
 myclaude
 ```
 
-### 设置 API Key
+### Set API Key
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-# 或使用 myclaude 别名：
+# Or use the myclaude alias:
 export MYCLAUDE_API_KEY=sk-ant-...
 ```
 
 ---
 
-## 使用方式
+## Usage
 
 ```bash
-npx @funnycode/myclaude                        # 启动交互式 REPL
-npx @funnycode/myclaude -p "解释这个项目"       # 直接运行 prompt
-npx @funnycode/myclaude --version              # 显示版本
-npx @funnycode/myclaude --help                 # 显示帮助
+npx @funnycode/myclaude                        # Start interactive REPL
+npx @funnycode/myclaude -p "explain this project"  # Run with a prompt
+npx @funnycode/myclaude --version              # Show version
+npx @funnycode/myclaude --help                 # Show help
 ```
 
 ---
 
-## 斜杠命令
+## Slash Commands
 
-### 核心
-| 命令 | 描述 |
-|------|------|
-| `/help` | 显示帮助 |
-| `/clear` | 清除对话 |
-| `/exit` | 退出 |
-| `/resume` | 恢复之前的会话 |
-| `/rewind` | 回退对话 |
-| `/rename` | 重命名当前会话 |
-| `/config` | 配置设置 |
-| `/doctor` | 诊断和验证安装 |
+### Core
+| Command | Description |
+|---------|-------------|
+| `/help` | Show help |
+| `/clear` | Clear conversation |
+| `/exit` | Exit |
+| `/resume` | Resume a previous session |
+| `/rewind` | Rewind conversation |
+| `/rename` | Rename current session |
+| `/config` | Configure settings |
+| `/doctor` | Diagnose and verify installation |
 
-### 代码 & Git
-| 命令 | 描述 |
-|------|------|
-| `/commit` | 生成 Git 提交信息 |
-| `/diff` | 显示 Git 差异 |
-| `/branch` | 切换/创建分支 |
-| `/plan` | 创建实施计划 |
-| `/review` | 审查代码 |
+### Code & Git
+| Command | Description |
+|---------|-------------|
+| `/commit` | Generate a git commit message |
+| `/diff` | Show git diff |
+| `/branch` | Switch/create branches |
+| `/plan` | Create an implementation plan |
+| `/review` | Review code |
 
-### AI & 模型
-| 命令 | 描述 |
-|------|------|
-| `/model` | 切换 AI 模型 |
-| `/effort` | 设置努力级别 |
-| `/fast` | 切换快速模式 |
-| `/brief` | 切换简报模式 |
-| `/output-style` | 设置输出风格 |
+### AI & Model
+| Command | Description |
+|---------|-------------|
+| `/model` | Change AI model |
+| `/effort` | Set effort level |
+| `/fast` | Toggle fast mode |
+| `/brief` | Toggle brief mode |
+| `/output-style` | Set output style |
 
-### 文件 & 上下文
-| 命令 | 描述 |
-|------|------|
-| `/add-dir` | 添加目录到上下文 |
-| `/context` | 显示当前上下文 |
-| `/files` | 文件操作 |
-| `/copy` | 复制内容 |
+### Files & Context
+| Command | Description |
+|---------|-------------|
+| `/add-dir` | Add directory to context |
+| `/context` | Show current context |
+| `/files` | File operations |
+| `/copy` | Copy content |
 
-### MCP & 插件
-| 命令 | 描述 |
-|------|------|
-| `/mcp` | 管理 MCP 服务器 |
-| `/plugin` | 管理插件和市场 |
-| `/reload-plugins` | 重新加载所有插件 |
-| `/hooks` | 管理钩子 |
+### MCP & Plugins
+| Command | Description |
+|---------|-------------|
+| `/mcp` | Manage MCP servers |
+| `/plugin` | Manage plugins and marketplaces |
+| `/reload-plugins` | Reload all plugins |
+| `/hooks` | Manage hooks |
 
-### 系统
-| 命令 | 描述 |
-|------|------|
-| `/status` | 显示认证和会话状态 |
-| `/stats` | 显示使用统计 |
-| `/cost` | 显示费用信息 |
-| `/color` | 设置颜色主题 |
-| `/theme` | 设置 UI 主题 |
-| `/keybindings` | 配置按键绑定 |
-| `/vim` | 切换 Vim 模式 |
-| `/terminal-setup` | 终端设置 |
-| `/memory` | 管理 AI 记忆 |
-| `/skills` | 管理技能 |
-| `/sandbox` | 切换沙盒模式 |
-| `/session` | 会话管理 |
-| `/tag` | 标记当前会话 |
-| `/export` | 导出会话 |
-| `/upgrade` | 检查更新 |
-| `/feedback` | 提交反馈 |
-| `/summary` | 生成会话摘要 |
-| `/thinkback` | 回溯思考过程 |
-
----
-
-## 已确认可用的功能
-
-以下功能已经过测试并确认可用：
-
-- ✅ 交互式 REPL（与 AI 对话）
-- ✅ 打印模式（`-p` 参数）
-- ✅ 模型切换（`/model`）
-- ✅ 大多数斜杠命令
-- ✅ MCP 服务器添加/删除/列表
-- ✅ 插件安装
-- ✅ Git 提交信息生成
-- ✅ 文件编辑和创建
-- ✅ 技能系统
-- ✅ Vim 模式
-- ✅ 配置管理
-- ✅ Doctor 诊断
-- ✅ 深色/浅色主题
-- ✅ 按键绑定自定义
-- ✅ API 密钥认证（兼容任何 Anthropic API 提供商）
-- ✅ 多模型提供商（Bedrock / Vertex / Foundry）
+### System
+| Command | Description |
+|---------|-------------|
+| `/status` | Show authentication and session status |
+| `/stats` | Show usage statistics |
+| `/cost` | Show cost information |
+| `/color` | Set color theme |
+| `/theme` | Set UI theme |
+| `/keybindings` | Configure keybindings |
+| `/vim` | Toggle Vim mode |
+| `/terminal-setup` | Terminal setup |
+| `/memory` | Manage AI memory |
+| `/skills` | Manage skills |
+| `/sandbox` | Toggle sandbox mode |
+| `/session` | Session management |
+| `/tag` | Tag current session |
+| `/export` | Export session |
+| `/upgrade` | Check for updates |
+| `/feedback` | Submit feedback |
+| `/summary` | Generate session summary |
+| `/thinkback` | Think-back review |
 
 ---
 
-## 环境变量
+## Verified Working Features
 
-支持 `MYCLAUDE_*` 和 `CLAUDE_CODE_*` 两种命名方式。  
-两者同时设置时，`CLAUDE_CODE_*` 优先。
+The following features have been tested and confirmed working:
 
-| 变量 | 描述 |
-|------|------|
-| `ANTHROPIC_API_KEY` / `MYCLAUDE_API_KEY` | API 密钥（必填） |
-| `ANTHROPIC_BASE_URL` / `MYCLAUDE_BASE_URL` | 自定义 API 地址 |
-| `MYCLAUDE_MODEL` | 模型覆盖 |
-| `MYCLAUDE_SIMPLE` | 简洁模式（无 TUI） |
-| `MYCLAUDE_BRIEF` | 简报模式 |
-| `MYCLAUDE_DISABLE_THINKING` | 禁用思考 |
-| `MYCLAUDE_PROACTIVE` | 主动模式 |
-| `MYCLAUDE_USE_BEDROCK` | 使用 AWS Bedrock |
-| `MYCLAUDE_USE_VERTEX` | 使用 Google Vertex AI |
-| `MYCLAUDE_USE_FOUNDRY` | 使用 Microsoft Foundry |
-| `MYCLAUDE_DISABLE_AUTO_MEMORY` | 禁用自动记忆 |
-| `MYCLAUDE_SYNTAX_HIGHLIGHT` | 语法高亮主题 |
-| `MYCLAUDE_IDLE_THRESHOLD_MINUTES` | 空闲超时（默认 75 分钟） |
-| `MYCLAUDE_EFFORT_LEVEL` | 努力级别 |
+- ✅ Interactive REPL (chat with AI)
+- ✅ Print mode (`-p` flag)
+- ✅ Model switching (`/model`)
+- ✅ Most slash commands
+- ✅ MCP server add/remove/list
+- ✅ Plugin installation
+- ✅ Git commit generation
+- ✅ File editing and creation
+- ✅ Skills system
+- ✅ Vim mode
+- ✅ Config management
+- ✅ Doctor diagnostics
+- ✅ Dark/light themes
+- ✅ Keybinding customization
+- ✅ API key authentication (with any Anthropic-compatible provider)
+- ✅ Multi-model providers (Bedrock / Vertex / Foundry)
 
 ---
 
-## 开发
+## Environment Variables
+
+Supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` names.  
+`CLAUDE_CODE_*` takes priority if both are set.
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` / `MYCLAUDE_API_KEY` | API key (required) |
+| `ANTHROPIC_BASE_URL` / `MYCLAUDE_BASE_URL` | Custom API base URL |
+| `MYCLAUDE_MODEL` | Model override |
+| `MYCLAUDE_SIMPLE` | Simple mode (no TUI) |
+| `MYCLAUDE_BRIEF` | Brief mode |
+| `MYCLAUDE_DISABLE_THINKING` | Disable thinking |
+| `MYCLAUDE_PROACTIVE` | Proactive mode |
+| `MYCLAUDE_USE_BEDROCK` | Use AWS Bedrock |
+| `MYCLAUDE_USE_VERTEX` | Use Google Vertex AI |
+| `MYCLAUDE_USE_FOUNDRY` | Use Microsoft Foundry |
+| `MYCLAUDE_DISABLE_AUTO_MEMORY` | Disable auto memory |
+| `MYCLAUDE_SYNTAX_HIGHLIGHT` | Syntax highlight theme |
+| `MYCLAUDE_IDLE_THRESHOLD_MINUTES` | Idle timeout (default: 75) |
+| `MYCLAUDE_EFFORT_LEVEL` | Effort level |
+
+---
+
+## Development
 
 ```bash
 git clone https://gitee.com/thomaslwq/myclaude.git
 cd myclaude
 bun install
-bun run dev        # 开发模式
-bun run build      # 构建到 dist/myclaude.js
-bun run version    # 验证 CLI 启动
+bun run dev        # Development mode
+bun run build      # Build to dist/myclaude.js
+bun run version    # Verify CLI boots
 ```
 
-### 构建产物
+### Build Output
 
-构建脚本会将 `src/entrypoints/cli.tsx` 打包为单文件 `dist/myclaude.js`，并注入版本号等编译时常量。
+The build script bundles `src/entrypoints/cli.tsx` into a single file `dist/myclaude.js`, injecting compile-time constants such as version number.
 
-### 目录结构
+### Directory Structure
 
 ```
 src/
-├── commands/     # 斜杠命令实现
-├── components/   # React Ink UI 组件
-├── services/     # 后端服务（API、MCP、分析）
-├── tools/        # 工具实现
-├── utils/        # 共享工具函数
-├── entrypoints/  # CLI 入口
-└── main.tsx      # TUI 主入口
+├── commands/     # Slash command implementations
+├── components/   # React Ink UI components
+├── services/     # Backend services (API, MCP, analytics)
+├── tools/        # Tool implementations
+├── utils/        # Shared utilities
+├── entrypoints/  # CLI entry points
+└── main.tsx      # TUI main entry
 ```
 
 ---
 
-## 贡献
+## Contributing
 
-欢迎提交 PR 参与贡献！
+Pull requests are welcome!
 
-### 指南
+### Guidelines
 
-- Fork 仓库并创建功能分支
-- 保持改动聚焦且最小化
-- 提交前测试你的改动
-- 向 `main` 分支发起 PR
+- Fork the repo and create a feature branch
+- Keep changes focused and minimal
+- Test your changes before submitting
+- Open a PR against the `main` branch
 
 ---
 
-## 相关链接
+## Links
 
 - **Gitee**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
 - **GitHub**: [https://github.com/thomaslwq/myclaude](https://github.com/thomaslwq/myclaude)
@@ -236,6 +236,6 @@ src/
 
 ---
 
-## 许可证
+## License
 
 MIT
