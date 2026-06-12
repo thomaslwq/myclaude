@@ -3,7 +3,7 @@
 **myclaude** — 开源的 AI 编程助手，运行在你的终端中。  
 本项目是 Claude Code 的 fork/rebrand，致力于提供独立、开放的 AI 编码体验。
 
-![myclaude](docs/funnycode.png)
+![myclaude](https://raw.githubusercontent.com/thomaslwq/myclaude/main/docs/funnycode.png)
 
 ```bash
 npx @funnycode/myclaude
