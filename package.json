@@ -1,6 +1,6 @@
 {
   "name": "@funnycode/myclaude",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": false,
   "description": "An open-source AI coding assistant in your terminal - powered by Claude",
   "readme": "# @funnycode/myclaude\n\n**myclaude** — An open-source AI coding assistant that runs in your terminal.\nThis project is a fork/rebrand of Claude Code, committed to providing an independent, open AI coding experience.\n\n## Quick Start\n\n- Run: `npx @funnycode/myclaude`\n- Requires: Node.js >= 18 and an Anthropic API key\n- Set: `export ANTHROPIC_API_KEY=sk-ant-...`\n\n## Features\n\n- AI Chat, 80+ Slash Commands, File Operations, Git Integration\n- MCP Support, Plugin System, Agent Mode, Skills System\n- React Ink Terminal UI with themes, Vim mode, syntax highlighting\n- Multi-Model: Anthropic, AWS Bedrock, Google Vertex AI, Microsoft Foundry\n\n## Links\n\n- Gitee: https://gitee.com/thomaslwq/myclaude\n- GitHub: https://github.com/thomaslwq/myclaude\n- npm: https://www.npmjs.com/package/@funnycode/myclaude\n\n## License\n\nMIT",
