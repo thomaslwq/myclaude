@@ -3,7 +3,7 @@
 An open-source AI coding assistant in your terminal — powered by Claude.
 
 ```bash
-npx @thomaslwq/myclaude
+npx @funnycode/myclaude
 ```
 
 Or install globally:
