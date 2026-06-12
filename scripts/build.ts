@@ -14,6 +14,7 @@ const ROOT = resolve(import.meta.dir, '..')
 const ENTRY = resolve(ROOT, 'src/entrypoints/cli.tsx')
 const DIST = resolve(ROOT, 'dist')
 const OUTFILE = resolve(DIST, 'myclaude.js')
+const OUTFILE_NEW = resolve(DIST, 'myclaude-new.js')
 const TMP_OUT = resolve(DIST, 'myclaude_tmp.js')
 const BUILD_OUT = resolve(DIST, 'myclaude_bundle.js')
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'))
@@ -92,13 +93,18 @@ const injected = readFileSync(TMP_MACRO, 'utf8')
 
 writeFileSync(TMP_MACRO, injected)
 
-// Copy to destination and clean up
-try { unlinkSync(OUTFILE) } catch {}
-copyFileSync(TMP_MACRO, OUTFILE)
+// Write final output (use different filename to avoid antivirus lock)
+const FINAL_OUT = resolve(DIST, 'myclaude.mjs')
+writeFileSync(FINAL_OUT, readFileSync(TMP_MACRO))
 
 // Clean up temp files
 try { unlinkSync(BUILD_OUT) } catch {}
 try { unlinkSync(TMP_OUT) } catch {}
 
-console.log(`\nBuild complete: ${OUTFILE}`)
-console.log(`  Size: ${(readFileSync(OUTFILE).length / 1024 / 1024).toFixed(2)} MB`)
+console.log(`\nBuild complete: ${FINAL_OUT}`)
+console.log(`  Size: ${(readFileSync(FINAL_OUT).length / 1024 / 1024).toFixed(2)} MB`)
+
+// Also write to myclaude.js for the bin entry (use copyFileSync which might work for different names)
+try { copyFileSync(FINAL_OUT, OUTFILE) } catch (e) {
+  console.log(`Note: could not write ${OUTFILE} (${e.message})`)
+}
