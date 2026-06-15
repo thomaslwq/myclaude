@@ -34,7 +34,7 @@ import { getClaudeTempDirName } from './permissions/filesystem.js'
 import { getPlatform } from './platform.js'
 import { SandboxManager } from './sandbox/sandbox-adapter.js'
 import { invalidateSessionEnvCache } from './sessionEnvironment.js'
-import { createBashShellProvider } from './shell/bashProvider.js'
+import { createBashShellProvider, getBashSpawnSemaphore } from './shell/bashProvider.js'
 import { getCachedPowerShellPath } from './shell/powershellDetection.js'
 import { createPowerShellProvider } from './shell/powershellProvider.js'
 import type { ShellProvider, ShellType } from './shell/shellProvider.js'
@@ -278,6 +278,14 @@ export async function exec(
     : provider.getSpawnArgs(commandString)
   const envOverrides = await provider.getEnvironmentOverrides(command)
 
+  // Git Bash (MSYS2) on Windows has a limited pty pool (~256 slots).
+  // Acquire the spawn semaphore to prevent pty exhaustion from concurrent
+  // bash spawns.  Sandboxed PowerShell is not affected.
+  const isGitBash = shellType === 'bash' && getPlatform() === 'windows' && !isSandboxedPowerShell
+  if (isGitBash) {
+    await getBashSpawnSemaphore().acquire()
+  }
+
   // When onStdout is provided, use pipe mode: stdout flows through
   // StreamWrapper → TaskOutput in-memory buffer instead of a file fd.
   // This lets callers receive real-time stdout callbacks.
@@ -335,6 +343,12 @@ export async function exec(
       // Prevent visible console window on Windows (no-op on other platforms)
       windowsHide: true,
     })
+
+    // Defensive: release Git Bash semaphore when the child process exits for
+    // any reason (normal exit, crash, kill, or if wrapSpawn never settles).
+    if (isGitBash) {
+      childProcess.once('close', () => getBashSpawnSemaphore().release())
+    }
 
     const shellCommand = wrapSpawn(
       childProcess,
@@ -422,6 +436,10 @@ export async function exec(
 
     return shellCommand
   } catch (error) {
+    // Release Git Bash semaphore if spawn failed
+    if (isGitBash) {
+      getBashSpawnSemaphore().release()
+    }
     // Close the fd if spawn failed (child never got its dup)
     if (outputHandle !== undefined) {
       try {

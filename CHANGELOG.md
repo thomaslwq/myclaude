@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.21] - 2026-06-17
+
+### Fixed
+- Fixed `/achievements` command not working — missing `type` and `supportsNonInteractive` fields in command registration (fixes #3)
+- Fixed `/mystats` command same missing fields issue for consistency
+- Fixed Git Bash "Could not fork child process: There are no available terminals(-1)" error on Windows (fixes #2)
+  - Added MSYS2 environment variables (`MSYS2_ARG_CONV_EXCL`, `CHERE_INVOKING`) to reduce pty consumption per fork
+  - Added spawn concurrency semaphore limiting to 24 concurrent Git Bash processes to prevent pty pool exhaustion
+  - Propagated `MSYSTEM` environment to child processes
+
+## [0.1.20] - 2026-06-15
+
+### Added
+- Created CLAUDE.md project instructions for AI assistant context (fixes #1)
+- Added performance-optimized project settings in .claude/settings.json (fixes #4)
+
 ## [0.1.8] - 2026-06-12
 
 ### Changed

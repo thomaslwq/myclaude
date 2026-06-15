@@ -25,6 +25,48 @@ import { windowsPathToPosixPath } from '../windowsPaths.js'
 import type { ShellProvider } from './shellProvider.js'
 
 /**
+ * Semaphore to limit concurrent Git Bash (MSYS2) spawns on Windows.
+ * MSYS2 has a limited pty pool (~256 slots); each bash.exe spawn consumes
+ * one slot via the Cygwin fork() emulation.  When the pool is exhausted,
+ * fork() fails with "Could not fork child process: There are no available
+ * terminals(-1)".  This semaphore caps concurrent in-flight spawns so the
+ * pool never empties, even under heavy model-driven parallelism.
+ *
+ * Exported so Shell.ts can acquire/release around the actual spawn call.
+ */
+export interface SpawnSemaphore {
+  acquire(): Promise<void>
+  release(): void
+}
+
+const BASH_SPAWN_SEMAPHORE: SpawnSemaphore = createSpawnSemaphore(
+  getPlatform() === 'windows' ? 24 : Infinity,
+)
+
+function createSpawnSemaphore(maxConcurrent: number): SpawnSemaphore {
+  let active = 0
+  const queue: Array<() => void> = []
+  return {
+    async acquire(): Promise<void> {
+      if (active >= maxConcurrent) {
+        await new Promise<void>(resolve => queue.push(resolve))
+      }
+      active++
+    },
+    release(): void {
+      active--
+      const next = queue.shift()
+      if (next) next()
+    },
+  }
+}
+
+/** Export the singleton semaphore for use by Shell.ts at spawn time. */
+export function getBashSpawnSemaphore(): SpawnSemaphore {
+  return BASH_SPAWN_SEMAPHORE
+}
+
+/**
  * Returns a shell command to disable extended glob patterns for security.
  * Extended globs (bash extglob, zsh EXTENDED_GLOB) can be exploited via
  * malicious filenames that expand after our security validation.
@@ -245,6 +287,26 @@ export async function createBashShellProvider(
         // Safe to set unconditionally — non-zsh shells ignore TMPPREFIX.
         env.TMPPREFIX = posixJoin(posixTmpDir, 'zsh')
       }
+
+      // MSYS2/Git Bash on Windows: reduce pty/resource consumption per fork.
+      // MSYS2's Cygwin-based fork() emulation allocates one pty per process.
+      // When the pty pool (~256 slots) is exhausted, fork() fails with
+      // "Could not fork child process: There are no available terminals(-1)".
+      //
+      //   MSYS2_ARG_CONV_EXCL="*"  — skip automatic POSIX→Win32 path
+      //     conversion on every argument (heavy per-fork overhead).
+      //   CHERE_INVOKING=1          — prevent cd ~ on startup (avoids
+      //     extra filesystem access in the fork chain).
+      //   MSYSTEM=<detected>        — ensure MSYS2 subsystem identity
+      //     is propagated to child processes so they don't re-probe.
+      if (getPlatform() === 'windows') {
+        if (!env.MSYS2_ARG_CONV_EXCL) env.MSYS2_ARG_CONV_EXCL = '*'
+        if (!env.CHERE_INVOKING) env.CHERE_INVOKING = '1'
+        if (!env.MSYSTEM && process.env.MSYSTEM) {
+          env.MSYSTEM = process.env.MSYSTEM
+        }
+      }
+
       // Apply session env vars set via /env (child processes only, not the REPL)
       for (const [key, value] of getSessionEnvVars()) {
         env[key] = value
