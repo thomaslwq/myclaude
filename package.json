@@ -1,6 +1,6 @@
 {
   "name": "@funnycode/myclaude",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "private": false,
   "description": "An open-source AI coding assistant in your terminal - powered by Claude",
   "license": "MIT",
@@ -26,7 +26,7 @@
     "version": "bun run ./src/dev-entry.ts --version"
   },
   "bin": {
-    "myclaude": "./bin/myclaude.cjs"
+    "myclaude": "bin/myclaude.cjs"
   },
   "files": [
     "dist/",
@@ -116,6 +116,10 @@
     "@ant/computer-use-swift": "file:./shims/ant-computer-use-swift",
     "color-diff-napi": "file:./shims/color-diff-napi",
     "modifiers-napi": "file:./shims/modifiers-napi",
+    "node-domexception": "file:./shims/node-domexception",
     "url-handler-napi": "file:./shims/url-handler-napi"
+  },
+  "overrides": {
+    "node-domexception": "file:./shims/node-domexception"
   }
 }

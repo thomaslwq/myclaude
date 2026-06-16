@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.22] - 2026-06-17
+
+### Added
+- `/feedback` command now submits issues to the myclaude GitHub repo (fixes #8)
+  - GitHub Issues URL redirected from `anthropics/claude-code` to `thomaslwq/myclaude`
+- Claude Code config compatibility: myclaude now explicitly supports reading Claude Code's global configuration (`~/.claude/settings.json`, skills, MCPs, plugins) — both tools share the same config directory (fixes #7)
+- Added `node-domexception` shim package to suppress npm deprecation warning during install (fixes #5)
+
+### Fixed
+- Git Bash fork issue on Windows — semaphore-based spawn concurrency limit prevents MSYS2 pty pool exhaustion (#6, already deployed in v0.1.21)
+- npm `node-domexception@1.0.0` deprecated warning eliminated via local shim override
+
 ## [0.1.21] - 2026-06-17
 
 ### Fixed

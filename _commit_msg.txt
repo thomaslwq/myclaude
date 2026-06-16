@@ -1,0 +1,9 @@
+chore: bump to 0.1.22, fix issues #5 #6 #7 #8 
+ 
+- fix #5: suppress node-domexception deprecation warning via local shim override 
+- fix #6: Git Bash fork semaphore (already deployed in v0.1.21) 
+- fix #7: document Claude Code config compatibility (shared ~/.claude) 
+- fix #8: redirect /feedback GitHub Issues URL to thomaslwq/myclaude 
+- update CHANGELOG and version to 0.1.22 
+ 
+Co-Authored-By: AtomCode (deepseek-v4-flash) <noreply@atomgit.com> 
