@@ -232,6 +232,7 @@ The following features have been tested and confirmed working:
 - ✅ Keybinding customization
 - ✅ API key authentication (with any Anthropic-compatible provider)
 - ✅ Multi-model providers (Bedrock / Vertex / Foundry)
+- ✅ Claude Code config compatibility — reads `~/.claude/settings.json`, skills, MCPs, plugins, and hooks shared with Claude Code
 
 ---
 
