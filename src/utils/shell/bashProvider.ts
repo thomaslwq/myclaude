@@ -40,7 +40,7 @@ export interface SpawnSemaphore {
 }
 
 const BASH_SPAWN_SEMAPHORE: SpawnSemaphore = createSpawnSemaphore(
-  getPlatform() === 'windows' ? 24 : Infinity,
+  getPlatform() === 'windows' ? 8 : Infinity,
 )
 
 function createSpawnSemaphore(maxConcurrent: number): SpawnSemaphore {
@@ -241,10 +241,21 @@ export async function createBashShellProvider(
 
     getSpawnArgs(commandString: string): string[] {
       const skipLoginShell = lastSnapshotFilePath !== undefined
-      if (skipLoginShell) {
-        logForDebugging('Spawning shell without login (-l flag skipped)')
+      // Git Bash on Windows: skip login shell (-l) to reduce per-fork overhead.
+      // Login shells source /etc/profile and ~/.bashrc, which fork additional
+      // sub-processes and consume extra MSYS2 pty slots — the very resource
+      // we're trying to conserve to avoid "no available terminals" errors.
+      const onWindows = getPlatform() === 'windows'
+      if (skipLoginShell || onWindows) {
+        if (!onWindows) {
+          logForDebugging('Spawning shell without login (-l flag skipped)')
+        }
       }
-      return ['-c', ...(skipLoginShell ? [] : ['-l']), commandString]
+      return [
+        '-c',
+        ...(skipLoginShell || onWindows ? [] : ['-l']),
+        commandString,
+      ]
     },
 
     async getEnvironmentOverrides(

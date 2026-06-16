@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.23] - 2026-06-17
+
+### Fixed
+- **Git Bash "no available terminals" fork error** — enhanced Windows spawn reliability (fixes #6)
+  - Reduced spawn semaphore concurrency from 24 → 8 to prevent MSYS2 pty pool exhaustion under heavy parallelism
+  - Skip login shell (`-l` flag) on Git Bash/Windows to reduce per-fork startup overhead
+  - Added automatic retry with exponential backoff (500ms, 1s, 2s) when pty exhaustion is detected
+  - Better error detection: identifies "no available terminals", "cannot fork", and "resource temporarily unavailable" errors
+  - Shared cleanup path ensures semaphore is always released, preventing deadlocks
+
 ## [0.1.22] - 2026-06-17
 
 ### Added

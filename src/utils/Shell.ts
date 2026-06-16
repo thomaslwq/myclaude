@@ -282,6 +282,22 @@ export async function exec(
   // Acquire the spawn semaphore to prevent pty exhaustion from concurrent
   // bash spawns.  Sandboxed PowerShell is not affected.
   const isGitBash = shellType === 'bash' && getPlatform() === 'windows' && !isSandboxedPowerShell
+
+  // Git Bash on MSYS2: retry on pty exhaustion with exponential backoff.
+  // Each bash process internally forks multiple times for pipes, subshells,
+  // etc., consuming many pty slots per top-level spawn.  Even with the
+  // semaphore, a burst of heavy commands can exhaust the ~256-slot pool.
+  const MAX_GITBASH_RETRIES = 3
+  const GITBASH_RETRY_BASE_MS = 500
+  function isGitBashPtyExhaustion(err: unknown): boolean {
+    const msg = errorMessage(err).toLowerCase()
+    return (
+      msg.includes('no available terminals') ||
+      msg.includes('cannot fork') ||
+      msg.includes('resource temporarily unavailable')
+    )
+  }
+
   if (isGitBash) {
     await getBashSpawnSemaphore().acquire()
   }
@@ -436,11 +452,98 @@ export async function exec(
 
     return shellCommand
   } catch (error) {
-    // Release Git Bash semaphore if spawn failed
-    if (isGitBash) {
+    // Git Bash pty exhaustion: retry with exponential backoff instead of
+    // immediately returning a failed command.  The semaphore limits top-level
+    // concurrency, but each bash process also forks internally for pipes,
+    // subshells, etc., consuming multiple pty slots per spawn.  A retry
+    // after a brief delay lets other in-flight processes release slots.
+    if (isGitBash && isGitBashPtyExhaustion(error)) {
       getBashSpawnSemaphore().release()
+      for (let retry = 1; retry <= MAX_GITBASH_RETRIES; retry++) {
+        const delay = GITBASH_RETRY_BASE_MS * Math.pow(2, retry - 1)
+        logForDebugging(
+          `Git Bash pty exhausted, retry ${retry}/${MAX_GITBASH_RETRIES} in ${delay}ms`,
+        )
+        await new Promise(resolve => setTimeout(resolve, delay))
+        if (outputHandle !== undefined) {
+          try { await outputHandle.close() } catch { /* already closed */ }
+          outputHandle = undefined
+        }
+        taskOutput.clear()
+        const retryTaskOutput = new TaskOutput(taskId, onProgress ?? null, !usePipeMode)
+        if (!usePipeMode) {
+          const O_NOFOLLOW = fsConstants.O_NOFOLLOW ?? 0
+          try {
+            outputHandle = await open(
+              taskOutput.path,
+              process.platform === 'win32'
+                ? 'w'
+                : fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_APPEND | O_NOFOLLOW,
+            )
+          } catch { /* will fail below */ }
+        }
+        await getBashSpawnSemaphore().acquire()
+        try {
+          const childProcess = spawn(spawnBinary, shellArgs, {
+            env: {
+              ...subprocessEnv(),
+              SHELL: shellType === 'bash' ? binShell : undefined,
+              GIT_EDITOR: 'true',
+              CLAUDECODE: '1',
+              ...envOverrides,
+            },
+            cwd,
+            stdio: usePipeMode
+              ? ['pipe', 'pipe', 'pipe']
+              : ['pipe', outputHandle?.fd, outputHandle?.fd],
+            detached: provider.detached,
+            windowsHide: true,
+          })
+          childProcess.once('close', () => getBashSpawnSemaphore().release())
+          const retryCmd = wrapSpawn(childProcess, abortSignal, commandTimeout, retryTaskOutput, shouldAutoBackground)
+          if (outputHandle !== undefined) {
+            try { await outputHandle.close() } catch { }
+          }
+          if (childProcess.stdout && onStdout) {
+            childProcess.stdout.on('data', (chunk: string | Buffer) => {
+              onStdout(typeof chunk === 'string' ? chunk : chunk.toString())
+            })
+          }
+          void retryCmd.result.then(async result => {
+            if (shouldUseSandbox) SandboxManager.cleanupAfterCommand()
+            if (result && !preventCwdChanges && !result.backgroundTaskId) {
+              try {
+                let newCwd = readFileSync(nativeCwdFilePath, { encoding: 'utf8' }).trim()
+                if (getPlatform() === 'windows') newCwd = posixPathToWindowsPath(newCwd)
+                if (newCwd.normalize('NFC') !== cwd) {
+                  setCwd(newCwd, cwd)
+                  invalidateSessionEnvCache()
+                  void onCwdChangedForHooks(cwd, newCwd)
+                }
+              } catch { logEvent('tengu_shell_set_cwd', { success: false }) }
+            }
+            try { unlinkSync(nativeCwdFilePath) } catch { }
+          })
+          return retryCmd
+        } catch (retryError) {
+          getBashSpawnSemaphore().release()
+          if (!isGitBashPtyExhaustion(retryError)) {
+            logForDebugging(`Git Bash retry ${retry} failed with non-pty error: ${errorMessage(retryError)}`)
+            break
+          }
+          if (retry === MAX_GITBASH_RETRIES) {
+            logForDebugging(`Git Bash all ${MAX_GITBASH_RETRIES} retries exhausted, giving up`)
+          }
+        }
+      }
+    } else {
+      // Not a pty exhaustion error — normal error path
+      if (isGitBash) {
+        getBashSpawnSemaphore().release()
+      }
     }
-    // Close the fd if spawn failed (child never got its dup)
+
+    // Shared cleanup for all failure paths
     if (outputHandle !== undefined) {
       try {
         await outputHandle.close()
