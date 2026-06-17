@@ -25,7 +25,7 @@ import { toError } from '../utils/errors.js'
 import { execFileNoThrow } from '../utils/execFileNoThrow.js'
 import { logError } from '../utils/log.js'
 import { extractTextContent } from '../utils/messages.js'
-import { getDefaultOpusModel } from '../utils/model/model.js'
+import { getDefaultOpusModel, getDefaultSonnetModel } from '../utils/model/model.js'
 import {
   getProjectsDir,
   getSessionFilesWithMtime,
@@ -37,14 +37,16 @@ import { countCharInString } from '../utils/stringUtils.js'
 import { asSystemPrompt } from '../utils/systemPromptType.js'
 import { escapeXmlAttr as escapeHtml } from '../utils/xml.js'
 
-// Model for facet extraction and summarization (Opus - best quality)
+// Model for facet extraction and summarization (Sonnet - good quality, widely available)
+// Using Sonnet by default since Opus may not be available on all API keys.
+// Users with Opus access can run `/model opus` before `/insights` for better quality.
 function getAnalysisModel(): string {
-  return getDefaultOpusModel()
+  return getDefaultSonnetModel()
 }
 
-// Model for narrative insights (Opus - best quality)
+// Model for narrative insights (Sonnet - good quality, widely available)
 function getInsightsModel(): string {
-  return getDefaultOpusModel()
+  return getDefaultSonnetModel()
 }
 
 // ============================================================================
