@@ -98,9 +98,6 @@ npx @funnycode/myclaude --help                 # 查看帮助
 |------|------|
 | `/model` | 切换 AI 模型 |
 | `/effort` | 设置努力级别 |
-| `/fast` | 切换快速模式 |
-| `/brief` | 切换简报模式 |
-| `/output-style` | 设置输出风格 |
 
 ### 文件和上下文
 | 命令 | 说明 |

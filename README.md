@@ -98,9 +98,6 @@ npx @funnycode/myclaude --help                 # Show help
 |---------|-------------|
 | `/model` | Change AI model |
 | `/effort` | Set effort level |
-| `/fast` | Toggle fast mode |
-| `/brief` | Toggle brief mode |
-| `/output-style` | Set output style |
 
 ### Files & Context
 | Command | Description |
