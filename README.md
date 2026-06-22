@@ -134,13 +134,9 @@ npx @funnycode/myclaude --help                 # Show help
 | `/terminal-setup` | Terminal setup |
 | `/memory` | Manage AI memory |
 | `/skills` | Manage skills |
-| `/sandbox` | Toggle sandbox mode |
-| `/session` | Session management |
 | `/tag` | Tag current session |
 | `/export` | Export session |
-| `/upgrade` | Check for updates |
 | `/feedback` | Submit feedback (opens GitHub Issues) |
-| `/thinkback` | Think-back review |
 
 ---
 

@@ -134,13 +134,9 @@ npx @funnycode/myclaude --help                 # 查看帮助
 | `/terminal-setup` | 终端设置 |
 | `/memory` | 管理 AI 记忆 |
 | `/skills` | 管理技能 |
-| `/sandbox` | 切换沙盒模式 |
-| `/session` | 会话管理 |
 | `/tag` | 标记当前会话 |
 | `/export` | 导出会话 |
-| `/upgrade` | 检查更新 |
 | `/feedback` | 提交反馈（跳转 GitHub Issues） |
-| `/thinkback` | 回溯思考过程 |
 
 ---
 
