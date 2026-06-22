@@ -3,7 +3,7 @@
 ## Getting Started
 
 ```bash
-git clone https://gitee.com/thomaslwq/myclaude.git
+git clone https://github.com/thomaslwq/myclaude.git
 cd myclaude
 bun install
 bun run dev

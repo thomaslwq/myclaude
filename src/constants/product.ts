@@ -1,4 +1,4 @@
-export const PRODUCT_URL = 'https://gitee.com/thomaslwq/myclaude'
+export const PRODUCT_URL = 'https://github.com/thomaslwq/myclaude'
 
 // Claude Code Remote session URLs
 export const CLAUDE_AI_BASE_URL = 'https://claude.ai'

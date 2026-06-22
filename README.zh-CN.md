@@ -142,8 +142,7 @@ npx @funnycode/myclaude --help                 # 查看帮助
 | `/tag` | 标记当前会话 |
 | `/export` | 导出会话 |
 | `/upgrade` | 检查更新 |
-| `/feedback` | 提交反馈 |
-| `/summary` | 生成会话摘要 |
+| `/feedback` | 提交反馈（跳转 GitHub Issues） |
 | `/thinkback` | 回溯思考过程 |
 
 ---
@@ -260,17 +259,17 @@ myclaude 内置了一个终端电子宠物。每只宠物都根据你的用户 I
 ## 开发
 
 ```bash
-git clone https://gitee.com/thomaslwq/myclaude.git
+git clone https://github.com/thomaslwq/myclaude.git
 cd myclaude
 bun install
 bun run dev        # 开发模式
-bun run build      # 构建到 dist/myclaude.js
+bun run build      # 构建到 dist/myclaude.mjs
 bun run version    # 验证 CLI 启动
 ```
 
 ### 构建产物
 
-构建脚本会将 `src/entrypoints/cli.tsx` 打包为单文件 `dist/myclaude.js`，并注入版本号等编译时常量。
+构建脚本会将 `src/entrypoints/cli.tsx` 打包为单文件 `dist/myclaude.mjs`，并注入版本号等编译时常量。
 
 ### 目录结构
 
@@ -316,8 +315,8 @@ src/
 
 ## 相关链接
 
-- **Gitee**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
 - **GitHub**: [https://github.com/thomaslwq/myclaude](https://github.com/thomaslwq/myclaude)
+- **Gitee**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)（镜像）
 - **npm**: [https://www.npmjs.com/package/@funnycode/myclaude](https://www.npmjs.com/package/@funnycode/myclaude)
 
 ---

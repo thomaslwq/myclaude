@@ -142,8 +142,7 @@ npx @funnycode/myclaude --help                 # Show help
 | `/tag` | Tag current session |
 | `/export` | Export session |
 | `/upgrade` | Check for updates |
-| `/feedback` | Submit feedback |
-| `/summary` | Generate session summary |
+| `/feedback` | Submit feedback (opens GitHub Issues) |
 | `/thinkback` | Think-back review |
 
 ---
@@ -263,17 +262,17 @@ Supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` names.
 ## Development
 
 ```bash
-git clone https://gitee.com/thomaslwq/myclaude.git
+git clone https://github.com/thomaslwq/myclaude.git
 cd myclaude
 bun install
 bun run dev        # Development mode
-bun run build      # Build to dist/myclaude.js
+bun run build      # Build to dist/myclaude.mjs
 bun run version    # Verify CLI boots
 ```
 
 ### Build Output
 
-The build script bundles `src/entrypoints/cli.tsx` into a single file `dist/myclaude.js`, injecting compile-time constants such as version number.
+The build script bundles `src/entrypoints/cli.tsx` into a single file `dist/myclaude.mjs`, injecting compile-time constants such as version number.
 
 ### Directory Structure
 
@@ -319,8 +318,8 @@ Pull requests are welcome!
 
 ## Links
 
-- **Gitee**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude)
 - **GitHub**: [https://github.com/thomaslwq/myclaude](https://github.com/thomaslwq/myclaude)
+- **Gitee**: [https://gitee.com/thomaslwq/myclaude](https://gitee.com/thomaslwq/myclaude) (mirror)
 - **npm**: [https://www.npmjs.com/package/@funnycode/myclaude](https://www.npmjs.com/package/@funnycode/myclaude)
 
 ---
