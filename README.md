@@ -89,7 +89,7 @@ npx @funnycode/myclaude --help                 # Show help
 |---------|-------------|
 | `/commit` | Generate a git commit message |
 | `/diff` | Show git diff |
-| `/branch` | Switch/create branches |
+| `/branch` | Create a conversation branch (fork) |
 | `/plan` | Create an implementation plan |
 | `/review` | Review code |
 
