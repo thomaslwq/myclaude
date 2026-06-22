@@ -1,7 +1,0 @@
-fix: enable /tag and /keybindings for external users, remove non-functional commands from README
-
-- /tag: removed USER_TYPE === 'ant' gate
-- /keybindings: removed isEnabled gate and early-return check
-- README: removed /sandbox, /session, /upgrade, /thinkback
-
-Co-Authored-By: AtomCode (deepseek-v4-flash) <noreply@atomgit.com>
