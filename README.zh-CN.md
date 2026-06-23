@@ -223,6 +223,41 @@ myclaude 内置了一个终端电子宠物。每只宠物都根据你的用户 I
 - ✅ API 密钥认证（兼容任何 Anthropic API 提供商）
 - ✅ 多模型提供商（Bedrock / Vertex / Foundry）
 
+## 内置集成
+
+### CodeGraph — 语义代码智能
+
+[CodeGraph](https://github.com/colbymchenry/codegraph) 提供精确的代码上下文，让 AI 更快更准确地完成编辑。
+
+**配置方法：**
+```bash
+# 1. 安装 CodeGraph CLI（一次性）
+npm i -g @colbymchenry/codegraph
+
+# 2. 在项目中初始化
+cd your-project
+codegraph init
+
+# 3. 在 myclaude 中启用插件
+/plugin enable codegraph
+```
+
+启用后，CodeGraph 的 MCP 服务器会自动启动，在每轮会话中提供语义代码智能。
+
+### ECC — 跨平台代理操作系统
+
+[ECC](https://github.com/affaan-m/ECC) 是一个跨 harness 的代理生态系统，包含 200+ 技能、代理、hooks 和规则。
+
+ECC 已预注册为市场源，无需手动添加。
+
+```bash
+# 浏览可用的 ECC 插件
+/plugin
+
+# 从 ECC 市场安装插件
+/plugin install <插件名>@ecc
+```
+
 ---
 
 ## 环境变量
