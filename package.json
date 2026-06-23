@@ -30,6 +30,7 @@
   },
   "files": [
     "dist/",
+    "seed/",
     "bin/",
     "LICENSE",
     "README.md",

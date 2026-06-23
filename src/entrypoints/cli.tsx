@@ -1,4 +1,10 @@
 import { feature } from 'bun:bundle';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+
+// Set seed marketplace directory for ECC before any plugin code runs
+const __dirname = join(fileURLToPath(import.meta.url), '..');
+process.env.CLAUDE_CODE_PLUGIN_SEED_DIR = join(__dirname, '../../seed');
 
 // Apply MYCLAUDE_* env var aliases before any code reads them
 import { applyEnvAliases } from '../utils/envCompat.js'
