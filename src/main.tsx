@@ -79,7 +79,9 @@ const coordinatorModeModule = feature('COORDINATOR_MODE') ? require('./coordinat
 /* eslint-disable @typescript-eslint/no-require-imports */
 const assistantModule = feature('KAIROS') ? require('./assistant/index.js') as typeof import('./assistant/index.js') : null;
 const kairosGate = feature('KAIROS') ? require('./assistant/gate.js') as typeof import('./assistant/gate.js') : null;
-import { relative, resolve } from 'path';
+import { relative, resolve, join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import { isAnalyticsDisabled } from 'src/services/analytics/config.js';
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js';
 import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from 'src/services/analytics/index.js';
@@ -207,6 +209,19 @@ import { getTmuxInstallInstructions, isTmuxAvailable, parsePRReference } from '.
 
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
 profileCheckpoint('main_tsx_imports_loaded');
+
+// ── Seed marketplace setup ──
+// Set CLAUDE_CODE_PLUGIN_SEED_DIR so the canonical registerSeedMarketplaces()
+// can find the bundled seed directory (ECC, etc.) without relying on fragile
+// relative-path-from-__dirname calculations in individual marketplace modules.
+if (!process.env.CLAUDE_CODE_PLUGIN_SEED_DIR) {
+  const __filename_main = fileURLToPath(import.meta.url);
+  const __dirname_main = dirname(__filename_main);
+  const candidateSeed = join(__dirname_main, '..', 'seed');
+  if (existsSync(candidateSeed)) {
+    process.env.CLAUDE_CODE_PLUGIN_SEED_DIR = candidateSeed;
+  }
+}
 
 /**
  * Log managed settings keys to Statsig for analytics.
@@ -1929,9 +1944,9 @@ async function run(): Promise<CommanderCommand> {
     if (process.env.CLAUDE_CODE_ENTRYPOINT !== 'local-agent') {
       initBuiltinPlugins();
       initBundledSkills();
-      // Register seed marketplaces (ECC etc.) in the background —
-      // file I/O is non-blocking and runs concurrently with setup.
-      initSeedMarketplaces().catch(() => {});
+      // Register ECC built-in commands and skills directly.
+      // Fast (file reads only) — no marketplace/plugin pipeline needed.
+      initSeedMarketplaces().catch((err) => { logError(err); });
     }
     const setupPromise = setup(preSetupCwd, permissionMode, allowDangerouslySkipPermissions, worktreeEnabled, worktreeName, tmuxEnabled, sessionId ? validateUuid(sessionId) : undefined, worktreePRNumber, messagingSocketPath);
     const commandsPromise = worktreeEnabled ? null : getCommands(preSetupCwd);

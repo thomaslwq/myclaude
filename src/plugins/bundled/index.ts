@@ -16,7 +16,7 @@
 
 import { registerBuiltinPlugin } from '../builtinPlugins.js'
 import { isCodeGraphInstalled } from './codegraphCheck.js'
-import { ensureEccMarketplaceRegistered } from './eccMarketplace.js'
+import { initEccBuiltin } from './eccBuiltin.js'
 
 /**
  * Initialize built-in plugins. Called during CLI startup.
@@ -47,11 +47,10 @@ export function initBuiltinPlugins(): void {
 }
 
 /**
- * Register seed marketplaces during startup.
- * This runs after initBuiltinPlugins() to ensure third-party
- * marketplaces like ECC are available without manual setup.
+ * Initialize ECC built-in content during startup.
+ * Registers all 76 commands and 246 skills directly as bundled skills,
+ * bypassing the marketplace/plugin installation pipeline entirely.
  */
 export async function initSeedMarketplaces(): Promise<void> {
-  // ECC — cross-harness agent operating system
-  await ensureEccMarketplaceRegistered()
+  await initEccBuiltin()
 }
