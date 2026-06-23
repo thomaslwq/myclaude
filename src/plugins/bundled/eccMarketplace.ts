@@ -1,59 +1,41 @@
-import { getFsImplementation } from '../../utils/fsOperations.js'
 import { logForDebugging } from '../../utils/debug.js'
-import { join } from 'path'
-import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
+import {
+  addMarketplaceSource,
+  loadKnownMarketplacesConfig,
+} from '../../utils/plugins/marketplaceManager.js'
 
 /**
- * ECC Marketplace source URL.
+ * ECC Marketplace git URL.
  */
 const ECC_MARKETPLACE_URL = 'https://github.com/affaan-m/ECC.git'
 
 /**
- * Known marketplaces config file path.
- */
-function getKnownMarketplacesFile(): string {
-  const homeDir = process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
-    || join(process.env.HOME || process.env.USERPROFILE || '~', '.claude', 'plugins')
-  return join(homeDir, 'known_marketplaces.json')
-}
-
-/**
- * Ensure the ECC marketplace is registered in known_marketplaces.json.
- * This is a no-op if already present. Runs synchronously during startup.
+ * Ensure the ECC marketplace is registered and its content is cached.
+ * Uses the official addMarketplaceSource() API which handles cloning,
+ * validation, and config persistence.
+ *
+ * This runs once at startup (fire-and-forget, non-blocking).
+ * Subsequent runs are no-ops since addMarketplaceSource detects
+ * existing entries.
  */
 export async function ensureEccMarketplaceRegistered(): Promise<boolean> {
-  const fs = getFsImplementation()
-  const configFile = getKnownMarketplacesFile()
-
   try {
-    // Read existing config
-    let config: Record<string, unknown> = {}
-    try {
-      const content = await fs.readFile(configFile, { encoding: 'utf-8' })
-      config = jsonParse(content) as Record<string, unknown>
-    } catch {
-      // File doesn't exist yet — will create with just ECC
+    // Skip if already registered — avoids unnecessary git clone
+    const existing = await loadKnownMarketplacesConfig()
+    if (existing['ecc']) {
+      logForDebugging('ECC marketplace already registered, skipping')
+      return true
     }
 
-    // Skip if ECC is already registered
-    if (config['ecc']) return false
-
-    // Add ECC marketplace entry with autoUpdate disabled
-    config['ecc'] = {
-      source: {
-        source: 'git',
-        url: ECC_MARKETPLACE_URL,
-      },
-      autoUpdate: false,
-      lastUpdated: new Date().toISOString(),
-    }
-
-    // Write back
-    await fs.writeFile(configFile, jsonStringify(config, null, 2), {
-      encoding: 'utf-8',
+    // Register via the standard marketplace API — handles clone + config
+    const result = await addMarketplaceSource({
+      source: 'git',
+      url: ECC_MARKETPLACE_URL,
     })
 
-    logForDebugging('Registered ECC marketplace in known_marketplaces.json')
+    logForDebugging(
+      `ECC marketplace registered as '${result.name}' (materialized: ${!result.alreadyMaterialized})`,
+    )
     return true
   } catch (error) {
     logForDebugging(`Failed to register ECC marketplace: ${error}`, {

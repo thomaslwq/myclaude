@@ -246,9 +246,7 @@ codegraph init
 
 ### ECC — 跨平台代理操作系统
 
-[ECC](https://github.com/affaan-m/ECC) 是一个跨 harness 的代理生态系统，包含 200+ 技能、代理、hooks 和规则。
-
-ECC 已预注册为市场源，无需手动添加。
+[ECC](https://github.com/affaan-m/ECC) 是一个跨 harness 的代理生态系统，包含 200+ 技能、代理、hooks 和规则。**开箱即用** — 可直接浏览和安装插件：
 
 ```bash
 # 浏览可用的 ECC 插件
@@ -313,18 +311,6 @@ src/
 ├── entrypoints/   # CLI 入口
 └── main.tsx       # TUI 主入口
 ```
-
----
-
-## 路线图
-
-详见 [docs/ROADMAP.md](docs/ROADMAP.md)：
-
-- **P0** — 激活隐藏功能（BUDDY、Auto Memory）✅
-- **P1** — 成长系统（成就、技能推荐）
-- **P2** — 互动体验（多交互模式、节日事件）
-- **P3** — 扩展生态（插件市场、Skill Studio）
-- **P4** — 智能进化（个性化微调、离线模式）
 
 ---
 

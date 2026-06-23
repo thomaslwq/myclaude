@@ -225,9 +225,7 @@ Once enabled, CodeGraph's MCP server starts automatically and provides semantic 
 
 ### ECC — Agent Operating System
 
-[ECC](https://github.com/affaan-m/ECC) is a cross-harness agent ecosystem with 200+ skills, agents, hooks, and rules.
-
-ECC is pre-registered as a marketplace — no manual setup needed.
+[ECC](https://github.com/affaan-m/ECC) is a cross-harness agent ecosystem with 200+ skills, agents, hooks, and rules. **Pre-installed out of the box** — browse and install plugins immediately:
 
 ```bash
 # Browse available ECC plugins
@@ -318,18 +316,6 @@ src/
 ├── entrypoints/   # CLI entry points
 └── main.tsx       # TUI main entry
 ```
-
----
-
-## Roadmap
-
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the full iteration plan:
-
-- **P0** — Activate hidden features (BUDDY, Auto Memory) ✅
-- **P1** — Growth system (Achievements, skill recommendations)
-- **P2** — Interactive experience (multi-interaction, events)
-- **P3** — Extension ecosystem (plugin marketplace, Skill Studio)
-- **P4** — Intelligent evolution (personalized fine-tuning, offline mode)
 
 ---
 
