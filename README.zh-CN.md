@@ -246,15 +246,7 @@ codegraph init
 
 ### ECC — 跨平台代理操作系统
 
-[ECC](https://github.com/affaan-m/ECC) 是一个跨 harness 的代理生态系统，包含 200+ 技能、代理、hooks 和规则。**开箱即用** — 可直接浏览和安装插件：
-
-```bash
-# 浏览可用的 ECC 插件
-/plugin
-
-# 从 ECC 市场安装插件
-/plugin install <插件名>@ecc
-```
+[ECC](https://github.com/affaan-m/ECC) 是一个跨 harness 的代理生态系统，包含 200+ 技能、代理、hooks、规则和 MCP 服务器。**开箱即用** — 首次启动时自动安装所有 ECC 插件，无需手动配置。技能、代理和命令立即通过 `/` 命令可用。
 
 ---
 
