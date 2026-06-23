@@ -32,7 +32,7 @@ npx @funnycode/myclaude
 
 ### 环境要求
 
-- **Bun >= 1.3.5**（也可以用 Node.js >= 18）
+- **Bun >= 1.3.5**（也可以用 Node.js >= 20）
 - **Git**（部分功能需要）
 - **Anthropic API 密钥** 或兼容的 AI 提供商
 
