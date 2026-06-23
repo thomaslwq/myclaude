@@ -32,7 +32,7 @@ npx @funnycode/myclaude
 
 ### Prerequisites
 
-- **Node.js >= 18** (works with Bun too)
+- **Bun >= 1.3.5** (works with Node.js >= 18 too)
 - **Git** (for some features)
 - **Anthropic API key** or compatible provider
 
