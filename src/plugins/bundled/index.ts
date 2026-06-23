@@ -14,10 +14,44 @@
  * 2. Call registerBuiltinPlugin() with the plugin definition here
  */
 
+import { registerBuiltinPlugin } from '../builtinPlugins.js'
+import { isCodeGraphInstalled } from './codegraphCheck.js'
+import { ensureEccMarketplaceRegistered } from './eccMarketplace.js'
+
 /**
  * Initialize built-in plugins. Called during CLI startup.
  */
 export function initBuiltinPlugins(): void {
-  // No built-in plugins registered yet — this is the scaffolding for
-  // migrating bundled skills that should be user-toggleable.
+  // CodeGraph — semantic code intelligence MCP server
+  // Only shown in /plugin UI when the `codegraph` CLI is installed.
+  // Users can enable/disable via /plugin UI (default: disabled).
+  registerBuiltinPlugin({
+    name: 'codegraph',
+    description: 'Semantic code intelligence — surgical context, fewer tool calls',
+    version: '1.0.0',
+    defaultEnabled: false,
+    isAvailable: () => {
+      // Synchronous check first via a cached promise; kicks off async
+      // detection but returns false until the check completes.
+      // The /plugin UI re-evaluates isAvailable on each render.
+      void isCodeGraphInstalled().catch(() => {})
+      return false // Show only after async check confirms installation
+    },
+    mcpServers: {
+      'codegraph': {
+        command: 'codegraph',
+        args: ['mcp'],
+      },
+    },
+  })
+}
+
+/**
+ * Register seed marketplaces during startup.
+ * This runs after initBuiltinPlugins() to ensure third-party
+ * marketplaces like ECC are available without manual setup.
+ */
+export async function initSeedMarketplaces(): Promise<void> {
+  // ECC — cross-harness agent operating system
+  await ensureEccMarketplaceRegistered()
 }

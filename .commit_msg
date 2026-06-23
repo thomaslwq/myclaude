@@ -1,0 +1,8 @@
+feat: integrate CodeGraph as builtin MCP plugin and ECC as seed marketplace
+
+- Built-in plugin: codegraph (MCP server, default disabled, lazy-loaded)
+- Seed marketplace: ECC (affaan-m/ECC.git, autoUpdate disabled)
+- New files: src/plugins/bundled/codegraphCheck.ts, eccMarketplace.ts
+- Modified: src/plugins/bundled/index.ts, src/main.tsx
+
+Co-Authored-By: AtomCode (deepseek-v4-flash) <noreply@atomgit.com>
