@@ -215,6 +215,38 @@ Unlock achievements as you use myclaude. Track your progress with `/achievements
 
 ---
 
+## Built-in Integrations
+
+### CodeGraph — Semantic Code Intelligence
+
+[CodeGraph](https://github.com/colbymchenry/codegraph) provides surgical code context for faster, more accurate edits. myclaude auto-detects the `codegraph` CLI and enables it as a built-in plugin when available.
+
+**Setup:**
+```bash
+# 1. Install CodeGraph CLI (one-time)
+npm i -g @colbymchenry/codegraph
+
+# 2. Initialize in your project
+cd your-project
+codegraph init
+
+# 3. Enable the plugin in myclaude
+/plugin enable codegraph
+```
+
+Once enabled, CodeGraph's MCP server starts automatically and provides semantic code intelligence in every session.
+
+### ECC — Agent Operating System
+
+[ECC](https://github.com/affaan-m/ECC) is pre-configured as a marketplace source in myclaude. It provides a cross-harness agent ecosystem with 200+ skills, agents, hooks, rules, and MCP servers. ECC plugins are auto-registered at startup — no manual marketplace setup needed.
+
+```bash
+/plugin list          # See available ECC plugins
+/plugin enable <name> # Enable an ECC plugin
+```
+
+---
+
 ## Environment Variables
 
 Supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` names.
