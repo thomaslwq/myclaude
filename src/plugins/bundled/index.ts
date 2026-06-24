@@ -31,11 +31,13 @@ export function initBuiltinPlugins(): void {
     version: '1.0.0',
     defaultEnabled: false,
     isAvailable: () => {
-      // Synchronous check first via a cached promise; kicks off async
-      // detection but returns false until the check completes.
-      // The /plugin UI re-evaluates isAvailable on each render.
+      // The async check is kicked off eagerly at module load time in
+      // codegraphCheck.ts. By the time the user opens the /plugin UI,
+      // the check has likely completed. If it hasn't, we show the plugin
+      // anyway (it will just fail to start when used if codegraph isn't
+      // installed).
       void isCodeGraphInstalled().catch(() => {})
-      return false // Show only after async check confirms installation
+      return true
     },
     mcpServers: {
       'codegraph': {
