@@ -1,7 +1,6 @@
 # @funnycode/myclaude
 
-**myclaude** — 开源的 AI 编程助手，运行在你的终端中。  
-本项目是 Claude Code 的 fork/rebrand，致力于提供独立、开放的 AI 编码体验。
+**myclaude** — 开源的 AI 编程助手，运行在你的终端中。基于 Anthropic 的 Claude Code 构建，并扩展了虚拟伙伴、成就系统等特色功能。
 
 ![myclaude](https://raw.githubusercontent.com/thomaslwq/myclaude/main/docs/funnycode.png)
 
@@ -14,17 +13,20 @@ npx @funnycode/myclaude
 ## 功能特性
 
 - **AI 对话** — 通过自然语言编写、重构、调试和解释代码
+- **BUDDY 伙伴** — 终端电子宠物，与你一同成长。孵化、抚摸、喂食、玩耍、进化。18 个物种、5 级稀有度、闪光变异、经验值与进化系统
+- **成就系统** — 边编码边解锁 20+ 成就：连续使用、里程碑、探索发现
+- **里程碑系统** — 伙伴记忆系统，记录你的旅程
+- **事件日历** — 节假日彩蛋和特殊反应
 - **80+ 斜杠命令** — `/commit`、`/review`、`/plan`、`/doctor`、`/buddy`、`/achievements` 等
-- **BUDDY 伙伴** — 终端电子宠物，与你一同成长。孵化、抚摸、培养。18 个物种、5 级稀有度、闪光变异
-- **成就系统** — 边编码边解锁 20+ 成就：连续使用、里程牌、探索发现
 - **文件操作** — 在 AI 指导下编辑、写入、创建和搜索文件
-- **Git 集成** — 自动生成提交信息、管理分支、创建 PR
+- **Git 集成** — 自动生成提交信息、管理分支、差异对比、代码审查
 - **MCP 支持** — Model Context Protocol 可扩展工具集成
-- **插件系统** — 安装和管理市场插件
+- **插件系统** — 安装和管理市场插件（包括 ECC 生态系统）
 - **Agent 模式** — 多步自主任务执行
 - **技能系统** — 通过可复用技能扩展能力
 - **终端 UI** — React Ink 界面，支持语法高亮、主题和 Vim 模式
 - **多模型支持** — Anthropic、AWS Bedrock、Google Vertex AI、Microsoft Foundry
+- **Claude Code 兼容** — 可读取 `~/.claude/settings.json`、技能、MCP、插件和钩子，与 Claude Code 共享配置
 
 ---
 
@@ -118,7 +120,7 @@ npx @funnycode/myclaude --help                 # 查看帮助
 ### 伙伴 & 成就
 | 命令 | 说明 |
 |------|------|
-| `/buddy` | 管理终端伙伴（孵化、抚摸、卡片、静音） |
+| `/buddy` | 管理终端伙伴（孵化、抚摸、喂食、玩耍、卡片、静音、取消静音） |
 | `/achievements` | 查看已解锁的成就和进度 |
 
 ### 系统
@@ -146,9 +148,9 @@ myclaude 内置了一个终端电子宠物。每只宠物都根据你的用户 I
 
 ### 物种（共 18 种）
 
-🦆 鸭子 &nbsp; 🪿 鹅 &nbsp; 🫧 果冻 &nbsp; 🐱 猫 &nbsp; 🐉 龙  
-🐙 章鱼 &nbsp; 🦉 猫头鹰 &nbsp; 🐧 企鹅 &nbsp; 🐢 乌龟 &nbsp; 🐌 蜗牛  
-👻 幽灵 &nbsp; 🦎 六角恐龙 &nbsp; 🦫 水豚 &nbsp; 🌵 仙人掌 &nbsp; 🤖 机器人  
+🦆 鸭子 &nbsp; 🪿 鹅 &nbsp; 🫧 果冻 &nbsp; 🐱 猫 &nbsp; 🐉 龙
+🐙 章鱼 &nbsp; 🦉 猫头鹰 &nbsp; 🐧 企鹅 &nbsp; 🐢 乌龟 &nbsp; 🐌 蜗牛
+👻 幽灵 &nbsp; 🦎 六角恐龙 &nbsp; 🦫 水豚 &nbsp; 🌵 仙人掌 &nbsp; 🤖 机器人
 🐰 兔子 &nbsp; 🍄 蘑菇 &nbsp; 🐈 胖猫
 
 ### 稀有度系统
@@ -163,21 +165,32 @@ myclaude 内置了一个终端电子宠物。每只宠物都根据你的用户 I
 
 还有独立于稀有度的 **1% 闪光概率**——闪光伙伴会闪闪发光 ✨
 
-### 属性
+### 属性与进化
 
 每只伙伴有 5 项属性：`DEBUGGING`（调试）、`PATIENCE`（耐心）、`CHAOS`（混乱）、`WISDOM`（智慧）、`SNARK`（毒舌）——各有一项峰值属性和一项最低属性。
+
+伙伴通过互动获得经验值（XP）并提升等级（最高 50 级）。达到特定等级后，伙伴可以进化到新的形态。每个物种都有多个进化阶段和独特外观。
 
 ### 命令
 
 | 命令 | 说明 |
 |------|------|
 | `/buddy hatch` | 孵化一只伙伴 |
-| `/buddy pet` | 抚摸伙伴（爱心动画） |
-| `/buddy card` | 查看伙伴卡片（属性、稀有度） |
+| `/buddy pet` | 抚摸伙伴（+5 XP，爱心动画） |
+| `/buddy feed` | 喂食伙伴（+15 XP） |
+| `/buddy play` | 与伙伴玩耍（+20 XP） |
+| `/buddy card` | 查看伙伴卡片（属性、等级、里程碑） |
 | `/buddy mute` | 隐藏伙伴 |
 | `/buddy unmute` | 重新显示伙伴 |
 
-伙伴会对你对话的内容做出反应，通过气泡说话。每种物种都有不同的空闲动画和抚摸反应。
+伙伴会对你对话的内容做出反应，通过气泡说话。每种物种都有不同的动画和抚摸反应。特殊节日会触发独特的消息和反应。
+
+### 里程碑
+
+你的伙伴会记住你们共同的旅程——里程碑会被记录并显示在伙伴卡片上：
+
+🥚 首次孵化 &nbsp; 📝 首次 AI 提交 &nbsp; 🔍 首次代码审查
+⭐ 伙伴达到 5 级 &nbsp; 👑 伙伴达到 50 级 &nbsp; 🔥 连续 7/30 天使用
 
 ---
 
@@ -202,57 +215,9 @@ myclaude 内置了一个终端电子宠物。每只宠物都根据你的用户 I
 
 ---
 
-## 已确认可用的功能
-
-- ✅ 交互式 REPL（与 AI 对话）
-- ✅ 打印模式（`-p` 参数）
-- ✅ 模型切换（`/model`）
-- ✅ 大多数斜杠命令
-- ✅ MCP 服务器添加/删除/列表
-- ✅ 插件安装
-- ✅ Git 提交信息生成
-- ✅ 文件编辑和创建
-- ✅ 技能系统
-- ✅ BUDDY 伙伴（孵化、抚摸、卡片、静音）
-- ✅ 成就系统
-- ✅ Vim 模式
-- ✅ 配置管理
-- ✅ Doctor 诊断
-- ✅ 深色/浅色主题
-- ✅ 按键绑定自定义
-- ✅ API 密钥认证（兼容任何 Anthropic API 提供商）
-- ✅ 多模型提供商（Bedrock / Vertex / Foundry）
-
-## 内置集成
-
-### CodeGraph — 语义代码智能
-
-[CodeGraph](https://github.com/colbymchenry/codegraph) 提供精确的代码上下文，让 AI 更快更准确地完成编辑。
-
-**配置方法：**
-```bash
-# 1. 安装 CodeGraph CLI（一次性）
-npm i -g @colbymchenry/codegraph
-
-# 2. 在项目中初始化
-cd your-project
-codegraph init
-
-# 3. 在 myclaude 中启用插件
-/plugin enable codegraph
-```
-
-启用后，CodeGraph 的 MCP 服务器会自动启动，在每轮会话中提供语义代码智能。
-
-### ECC — 跨平台代理操作系统
-
-[ECC](https://github.com/affaan-m/ECC) 是一个跨 harness 的代理生态系统，包含 200+ 技能、代理、hooks、规则和 MCP 服务器。**开箱即用** — 首次启动时自动安装所有 ECC 插件，无需手动配置。技能、代理和命令立即通过 `/` 命令可用。
-
----
-
 ## 环境变量
 
-支持 `MYCLAUDE_*` 和 `CLAUDE_CODE_*` 两种命名方式。  
+支持 `MYCLAUDE_*` 和 `CLAUDE_CODE_*` 两种命名方式。
 两者同时设置时，`CLAUDE_CODE_*` 优先。
 
 | 变量名 | 说明 |
@@ -262,7 +227,7 @@ codegraph init
 | `MYCLAUDE_MODEL` | 模型覆盖 |
 | `MYCLAUDE_SIMPLE` | 简洁模式（无 TUI） |
 | `MYCLAUDE_BRIEF` | 简报模式 |
-| `MYCLAUDE_DISABLE_THINKING` | 禁用思考 |
+| `MYCLAUDE_DISABLE_THINKING` | 禁用扩展思考 |
 | `MYCLAUDE_PROACTIVE` | 主动模式 |
 | `MYCLAUDE_USE_BEDROCK` | 使用 AWS Bedrock |
 | `MYCLAUDE_USE_VERTEX` | 使用 Google Vertex AI |
@@ -294,12 +259,13 @@ bun run version    # 验证 CLI 启动
 ```
 src/
 ├── achievements/  # 成就系统（类型定义、存储、检查器）
-├── buddy/         # BUDDY 伙伴（精灵图、动画、类型）
+├── buddy/         # BUDDY 伙伴（精灵图、动画、进化、类型）
 ├── commands/      # 斜杠命令实现
 ├── components/    # React Ink UI 组件
+├── events/        # 事件日历（季节性彩蛋）
 ├── services/      # 后端服务（API、MCP、分析）
 ├── tools/         # 工具实现
-├── utils/         # 共享工具函数
+├── utils/         # 共享工具函数（envCompat、配置等）
 ├── entrypoints/   # CLI 入口
 └── main.tsx       # TUI 主入口
 ```

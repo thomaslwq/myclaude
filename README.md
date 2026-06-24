@@ -1,7 +1,6 @@
 # @funnycode/myclaude
 
-**myclaude** — An open-source AI coding assistant that runs in your terminal.  
-This project is a fork/rebrand of Claude Code, committed to providing an independent, open AI coding experience.
+**myclaude** — An open-source AI coding assistant that runs in your terminal, built on Anthropic's Claude Code with extended features including a virtual companion, achievements, and more.
 
 ![myclaude](https://raw.githubusercontent.com/thomaslwq/myclaude/main/docs/funnycode.png)
 
@@ -14,17 +13,20 @@ npx @funnycode/myclaude
 ## Features
 
 - **AI Chat** — Write, refactor, debug, and explain code via natural language
-- **80+ Slash Commands** — `/commit`, `/review`, `/plan`, `/doctor`, `/buddy`, `/achievements` and more
-- **BUDDY Companion** — A terminal pet that grows with you. Hatch, pet, and bond with your ASCII companion. 18 species, 5 rarity tiers, shiny variants.
+- **BUDDY Companion** — A terminal pet that grows with you. Hatch, pet, feed, play, and evolve your ASCII companion. 18 species, 5 rarity tiers, shiny variants, XP & evolution system.
 - **Achievements** — Unlock 20+ achievements as you code: streaks, milestones, discoveries.
+- **Milestones** — Companion memory system that remembers your journey.
+- **Event Calendar** — Seasonal easter eggs and special reactions for holidays.
+- **80+ Slash Commands** — `/commit`, `/review`, `/plan`, `/doctor`, `/buddy`, `/achievements` and more
 - **File Operations** — Edit, write, create, and search files with AI guidance
-- **Git Integration** — Automatic commit messages, branch management, PR creation
+- **Git Integration** — Automatic commit messages, branch management, diff, review
 - **MCP Support** — Model Context Protocol for extensible tool integrations
-- **Plugin System** — Install and manage plugins from marketplaces
+- **Plugin System** — Install and manage plugins from marketplaces (including ECC ecosystem)
 - **Agent Mode** — Multi-step autonomous task execution
 - **Skills System** — Extend capabilities with reusable skills
 - **Terminal UI** — React Ink interface with syntax highlighting, themes, and Vim mode
 - **Multi-Model Support** — Anthropic, AWS Bedrock, Google Vertex AI, Microsoft Foundry
+- **Claude Code Compatible** — Reads `~/.claude/settings.json`, skills, MCPs, plugins, and hooks shared with Claude Code
 
 ---
 
@@ -32,7 +34,7 @@ npx @funnycode/myclaude
 
 ### Prerequisites
 
-- **Bun >= 1.3.5** (works with Node.js >= 22.17 too)
+- **Bun >= 1.3.5** (Node.js >= 22.17 also works)
 - **Git** (for some features)
 - **Anthropic API key** or compatible provider
 
@@ -118,7 +120,7 @@ npx @funnycode/myclaude --help                 # Show help
 ### Companion & Achievements
 | Command | Description |
 |---------|-------------|
-| `/buddy` | Manage your terminal companion (hatch, pet, card, mute) |
+| `/buddy` | Manage your terminal companion (hatch, pet, feed, play, card, mute, unmute) |
 | `/achievements` | View unlocked achievements and progress |
 
 ### System
@@ -146,9 +148,9 @@ myclaude comes with a built-in virtual pet that lives in your terminal. Each pet
 
 ### Species (18 total)
 
-🦆 Duck &nbsp; 🪿 Goose &nbsp; 🫧 Blob &nbsp; 🐱 Cat &nbsp; 🐉 Dragon  
-🐙 Octopus &nbsp; 🦉 Owl &nbsp; 🐧 Penguin &nbsp; 🐢 Turtle &nbsp; 🐌 Snail  
-👻 Ghost &nbsp; 🦎 Axolotl &nbsp; 🦫 Capybara &nbsp; 🌵 Cactus &nbsp; 🤖 Robot  
+🦆 Duck &nbsp; 🪿 Goose &nbsp; 🫧 Blob &nbsp; 🐱 Cat &nbsp; 🐉 Dragon
+🐙 Octopus &nbsp; 🦉 Owl &nbsp; 🐧 Penguin &nbsp; 🐢 Turtle &nbsp; 🐌 Snail
+👻 Ghost &nbsp; 🦎 Axolotl &nbsp; 🦫 Capybara &nbsp; 🌵 Cactus &nbsp; 🤖 Robot
 🐰 Rabbit &nbsp; 🍄 Mushroom &nbsp; 🐈 Chonk
 
 ### Rarity System
@@ -163,21 +165,32 @@ myclaude comes with a built-in virtual pet that lives in your terminal. Each pet
 
 There's also a **1% shiny chance** independent of rarity — shiny companions sparkle ✨
 
-### Stats
+### Stats & Evolution
 
 Each companion has 5 attributes: `DEBUGGING`, `PATIENCE`, `CHAOS`, `WISDOM`, `SNARK` — with one peak stat and one dump stat.
+
+Companions gain XP through interaction and level up (max level 50). At certain levels, they evolve into new forms. Each species has multiple evolution stages with unique appearances.
 
 ### Commands
 
 | Command | Description |
 |---------|-------------|
 | `/buddy hatch` | Hatch a new companion |
-| `/buddy pet` | Pet your companion (hearts animation) |
-| `/buddy card` | View companion card with stats |
+| `/buddy pet` | Pet your companion (+5 XP, hearts animation) |
+| `/buddy feed` | Feed your companion (+15 XP) |
+| `/buddy play` | Play with your companion (+20 XP) |
+| `/buddy card` | View companion card with stats, level, and milestones |
 | `/buddy mute` | Hide companion from terminal |
 | `/buddy unmute` | Show companion again |
 
-The companion reacts to your conversation and occasionally comments via speech bubbles. Each species has custom idle animations and pet reactions.
+The companion reacts to your conversation and occasionally comments via speech bubbles. Each species has custom animations and pet reactions. Special events and holidays trigger unique messages and reactions.
+
+### Milestones
+
+Your companion remembers your journey together — milestones are tracked and displayed on the companion card:
+
+🥚 First companion hatched &nbsp; 📝 First AI commit &nbsp; 🔍 First code review
+⭐ Buddy reached level 5 &nbsp; 👑 Buddy reached level 50 &nbsp; 🔥 7/30 day streaks
 
 ---
 
@@ -202,62 +215,9 @@ Unlock achievements as you use myclaude. Track your progress with `/achievements
 
 ---
 
-## Built-in Integrations
-
-### CodeGraph — Semantic Code Intelligence
-
-[CodeGraph](https://github.com/colbymchenry/codegraph) provides surgical code context for faster, more accurate edits.
-
-**Setup:**
-```bash
-# 1. Install CodeGraph CLI (one-time)
-npm i -g @colbymchenry/codegraph
-
-# 2. Initialize in your project
-cd your-project
-codegraph init
-
-# 3. Enable the plugin in myclaude
-/plugin enable codegraph
-```
-
-Once enabled, CodeGraph's MCP server starts automatically and provides semantic code intelligence in every session.
-
-### ECC — Agent Operating System
-
-[ECC](https://github.com/affaan-m/ECC) is a cross-harness agent ecosystem with 200+ skills, agents, hooks, rules, and MCP servers. **Built-in out of the box** — all ECC plugins are auto-installed on first startup, no manual setup needed. Skills, agents, and commands are immediately available via `/` commands.
-
----
-
-## Verified Working Features
-
-The following features have been tested and confirmed working:
-
-- ✅ Interactive REPL (chat with AI)
-- ✅ Print mode (`-p` flag)
-- ✅ Model switching (`/model`)
-- ✅ Most slash commands
-- ✅ MCP server add/remove/list
-- ✅ Plugin installation
-- ✅ Git commit generation
-- ✅ File editing and creation
-- ✅ Skills system
-- ✅ BUDDY companion (hatch, pet, card, mute)
-- ✅ Achievements system
-- ✅ Vim mode
-- ✅ Config management
-- ✅ Doctor diagnostics
-- ✅ Dark/light themes
-- ✅ Keybinding customization
-- ✅ API key authentication (with any Anthropic-compatible provider)
-- ✅ Multi-model providers (Bedrock / Vertex / Foundry)
-- ✅ Claude Code config compatibility — reads `~/.claude/settings.json`, skills, MCPs, plugins, and hooks shared with Claude Code
-
----
-
 ## Environment Variables
 
-Supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` names.  
+Supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` names.
 `CLAUDE_CODE_*` takes priority if both are set.
 
 | Variable | Description |
@@ -267,7 +227,7 @@ Supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` names.
 | `MYCLAUDE_MODEL` | Model override |
 | `MYCLAUDE_SIMPLE` | Simple mode (no TUI) |
 | `MYCLAUDE_BRIEF` | Brief mode |
-| `MYCLAUDE_DISABLE_THINKING` | Disable thinking |
+| `MYCLAUDE_DISABLE_THINKING` | Disable extended thinking |
 | `MYCLAUDE_PROACTIVE` | Proactive mode |
 | `MYCLAUDE_USE_BEDROCK` | Use AWS Bedrock |
 | `MYCLAUDE_USE_VERTEX` | Use Google Vertex AI |
@@ -299,12 +259,13 @@ The build script bundles `src/entrypoints/cli.tsx` into a single file `dist/mycl
 ```
 src/
 ├── achievements/  # Achievement system (types, storage, checker)
-├── buddy/         # BUDDY companion (sprites, animations, types)
+├── buddy/         # BUDDY companion (sprites, animations, evolution, types)
 ├── commands/      # Slash command implementations
 ├── components/    # React Ink UI components
+├── events/        # Event calendar (seasonal easter eggs)
 ├── services/      # Backend services (API, MCP, analytics)
 ├── tools/         # Tool implementations
-├── utils/         # Shared utilities
+├── utils/         # Shared utilities (envCompat, config, etc.)
 ├── entrypoints/   # CLI entry points
 └── main.tsx       # TUI main entry
 ```
