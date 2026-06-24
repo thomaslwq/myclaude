@@ -238,11 +238,13 @@ codegraph init
 
 ### ECC — 跨平台代理操作系统
 
-[ECC](https://github.com/affaan-m/ECC) 在 myclaude 中预配置为市场插件源。它提供跨 harness 的代理生态系统，包含 200+ 技能、代理、hooks、规则和 MCP 服务器。ECC 插件在启动时自动注册，无需手动配置市场。
+[ECC](https://github.com/affaan-m/ECC) **内置**在 myclaude 中。它提供跨 harness 的代理生态系统，包含 76+ 命令和 246+ 技能，全部在启动时自动注册为 bundled skills——无需安装、无需配置市场、无需任何设置。启动后即可直接使用 `/` 命令。
+
+ECC 技能和命令在模块加载时从 `seed/marketplaces/ecc/` 同步加载，在 CLI 完成启动前即可用。
 
 ```bash
-/plugin list          # 查看可用的 ECC 插件
-/plugin enable <name> # 启用某个 ECC 插件
+/help                  # ECC 命令会出现在命令列表中
+/skills list           # 查看可用的 ECC 技能
 ```
 
 ---

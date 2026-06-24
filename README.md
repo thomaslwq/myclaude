@@ -238,11 +238,13 @@ Once enabled, CodeGraph's MCP server starts automatically and provides semantic 
 
 ### ECC — Agent Operating System
 
-[ECC](https://github.com/affaan-m/ECC) is pre-configured as a marketplace source in myclaude. It provides a cross-harness agent ecosystem with 200+ skills, agents, hooks, rules, and MCP servers. ECC plugins are auto-registered at startup — no manual marketplace setup needed.
+[ECC](https://github.com/affaan-m/ECC) is **built-in** to myclaude. It provides a cross-harness agent ecosystem with 76+ commands and 246+ skills, all automatically registered as bundled skills at startup — no installation, no marketplace setup, no configuration needed. Just start using `/` commands immediately.
+
+ECC skills and commands are loaded synchronously from `seed/marketplaces/ecc/` at module load time and available before the CLI finishes booting.
 
 ```bash
-/plugin list          # See available ECC plugins
-/plugin enable <name> # Enable an ECC plugin
+/help                  # ECC commands appear in the command list
+/skills list           # See available ECC skills
 ```
 
 ---
