@@ -243,8 +243,7 @@ Once enabled, CodeGraph's MCP server starts automatically and provides semantic 
 ECC skills and commands are loaded synchronously from `seed/marketplaces/ecc/` at module load time and available before the CLI finishes booting.
 
 ```bash
-/help                  # ECC commands appear in the command list
-/skills                # List all available skills (including ECC)
+/help                  # All commands (including ECC) appear in the help list
 ```
 
 ---

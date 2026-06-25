@@ -243,8 +243,7 @@ codegraph init
 ECC 技能和命令在模块加载时从 `seed/marketplaces/ecc/` 同步加载，在 CLI 完成启动前即可用。
 
 ```bash
-/help                  # ECC 命令会出现在命令列表中
-/skills                # 列出所有可用技能（包括 ECC）
+/help                  # 所有命令（包括 ECC）都会出现在帮助列表中
 ```
 
 ---
