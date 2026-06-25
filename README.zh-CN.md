@@ -243,8 +243,32 @@ codegraph init
 ECC 技能和命令在模块加载时从 `seed/marketplaces/ecc/` 同步加载，在 CLI 完成启动前即可用。
 
 ```bash
-/help                  # ECC 命令会出现在命令列表中
-/skills list           # 查看可用的 ECC 技能
+/help                  # 所有命令（包括 ECC）都会出现在帮助列表中
+```
+
+---
+
+## Git Flow 工作流
+
+内置的 Git Flow 命令，用于基于分支的开发工作流。
+
+| 命令 | 说明 |
+|------|------|
+| `/new-feature <name> [来源]` | 从 `main`（默认）或指定分支创建功能分支 |
+| `/finish-feature [目标]` | 合并当前功能分支到 `main`（默认）或指定分支 |
+| `/new-release <version> [来源]` | 从 `main`（默认）或指定分支创建发布分支 |
+| `/finish-release` | 合并当前发布分支到 `main` 和 `develop` |
+| `/new-hotfix <name> [来源]` | 从 `main`（默认）或指定分支创建热修复分支 |
+| `/finish-hotfix` | 合并当前热修复分支到 `main` 和 `develop` |
+
+**示例：**
+```bash
+/new-feature user-auth              # feature/user-auth 从 main 创建
+/new-feature api-rate-limit develop  # feature/api-rate-limit 从 develop 创建
+/finish-feature                      # 合并当前 feature/* 到 main
+/finish-feature develop              # 合并当前 feature/* 到 develop
+/new-release 1.2.0                   # release/1.2.0 从 main 创建
+/new-hotfix security-patch           # hotfix/security-patch 从 main 创建
 ```
 
 ---
