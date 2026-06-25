@@ -22,76 +22,81 @@ async function getCurrentBranch(): Promise<string> {
   return stdout
 }
 
+/**
+ * Parse args in format "<name> [from-branch]".
+ * Returns [name, fromBranch] where fromBranch defaults to 'main'.
+ */
+function parseNameAndFrom(
+  args: string,
+  defaultBranch: string,
+): { name: string; from: string } {
+  const parts = args.trim().split(/\s+/)
+  if (parts.length === 0 || !parts[0]) return { name: '', from: defaultBranch }
+  return { name: parts[0], from: parts[1] || defaultBranch }
+}
+
 // ── Individual call handlers ──
 
-/** /new-feature <name> */
+/** /new-feature <name> [from-branch] — default from main */
 const newFeature: LocalCommandCall = async (args) => {
-  const name = args.trim()
+  const { name, from } = parseNameAndFrom(args, 'main')
   if (!name) {
-    return { type: 'text', value: 'Usage: /new-feature <feature-name>\nExample: /new-feature user-auth' }
-  }
-
-  // Check develop branch exists
-  const { code: developExists } = await execFileNoThrow(gitExe(), ['rev-parse', '--verify', 'develop'], { preserveOutputOnError: false })
-  if (developExists !== 0) {
-    return { type: 'text', value: 'Error: No "develop" branch found. Git Flow requires a "develop" branch.\nCreate one with: git branch develop main' }
+    return { type: 'text', value: 'Usage: /new-feature <feature-name> [from-branch]\nExample: /new-feature user-auth' }
   }
 
   const branchName = `feature/${name}`
-  const { code, stderr } = await runGit(['checkout', '-b', branchName, 'develop'])
+  const { code, stderr } = await runGit(['checkout', '-b', branchName, from])
   if (code !== 0) {
     return { type: 'text', value: `Error creating feature branch: ${stderr}` }
   }
-  return { type: 'text', value: `✅ Created and switched to feature branch: ${branchName}\n\nRun /finish-feature when done to merge back to develop.` }
+  return { type: 'text', value: `✅ Created and switched to feature branch: ${branchName} (from ${from})\n\nRun /finish-feature when done to merge back.` }
 }
 
-/** /finish-feature */
-const finishFeature: LocalCommandCall = async () => {
+/** /finish-feature [target-branch] — default merge to main */
+const finishFeature: LocalCommandCall = async (args) => {
+  const target = args.trim() || 'main'
   const current = await getCurrentBranch()
   if (!current.startsWith('feature/')) {
     return { type: 'text', value: `Error: Current branch "${current}" is not a feature branch.\nSwitch to a feature/ branch first.` }
   }
 
-  // Check for uncommitted changes
   const { stdout: status } = await runGit(['status', '--porcelain'])
   if (status) {
     return { type: 'text', value: `You have uncommitted changes on "${current}". Please commit or stash them first.\n\n${status}` }
   }
 
-  // Merge back to develop
-  const { code: checkoutCode, stderr: checkoutErr } = await runGit(['checkout', 'develop'])
-  if (checkoutCode !== 0) return { type: 'text', value: `Error switching to develop: ${checkoutErr}` }
+  const { code: checkoutCode, stderr: checkoutErr } = await runGit(['checkout', target])
+  if (checkoutCode !== 0) return { type: 'text', value: `Error switching to ${target}: ${checkoutErr}` }
 
   const { code: mergeCode, stderr: mergeErr } = await runGit(['merge', '--no-ff', current])
   if (mergeCode !== 0) {
-    // Try to abort and go back
     await runGit(['checkout', current]).catch(() => {})
-    return { type: 'text', value: `Merge conflict! Resolve manually:\n  git merge --abort\n  git checkout ${current}\n\nError: ${mergeErr}` }
+    return { type: 'text', value: `Merge conflict on ${target}! Resolve manually:\n  git merge --abort\n  git checkout ${current}\n\nError: ${mergeErr}` }
   }
 
   const { stdout: branchDeleted } = await runGit(['branch', '-d', current])
   return {
     type: 'text',
-    value: `✅ Feature "${current}" merged into develop and deleted.\n${branchDeleted}`,
+    value: `✅ Feature "${current}" merged into ${target} and deleted.\n${branchDeleted}`,
   }
 }
 
-/** /new-release <version> */
+/** /new-release <version> [from-branch] — default from main */
 const newRelease: LocalCommandCall = async (args) => {
-  const version = args.trim()
+  const { name: version, from } = parseNameAndFrom(args, 'main')
   if (!version) {
-    return { type: 'text', value: 'Usage: /new-release <version>\nExample: /new-release 1.2.0' }
+    return { type: 'text', value: 'Usage: /new-release <version> [from-branch]\nExample: /new-release 1.2.0' }
   }
 
   const branchName = `release/${version}`
-  const { code, stderr } = await runGit(['checkout', '-b', branchName, 'develop'])
+  const { code, stderr } = await runGit(['checkout', '-b', branchName, from])
   if (code !== 0) {
     return { type: 'text', value: `Error creating release branch: ${stderr}` }
   }
-  return { type: 'text', value: `✅ Created and switched to release branch: ${branchName}\n\nRun /finish-release when ready to merge to main and develop.` }
+  return { type: 'text', value: `✅ Created and switched to release branch: ${branchName} (from ${from})\n\nRun /finish-release when ready to merge.` }
 }
 
-/** /finish-release */
+/** /finish-release — merges to main and develop, deletes branch */
 const finishRelease: LocalCommandCall = async () => {
   const current = await getCurrentBranch()
   if (!current.startsWith('release/')) {
@@ -103,11 +108,11 @@ const finishRelease: LocalCommandCall = async () => {
     return { type: 'text', value: `You have uncommitted changes on "${current}". Please commit or stash them first.\n\n${status}` }
   }
 
-  // Merge to main
   let mergeMainOk = true
   let mergeDevelopOk = true
   let output = ''
 
+  // Merge to main
   const { code: cm, stderr: cmErr } = await runGit(['checkout', 'main'])
   if (cm !== 0) return { type: 'text', value: `Error switching to main: ${cmErr}` }
 
@@ -143,22 +148,22 @@ const finishRelease: LocalCommandCall = async () => {
   return { type: 'text', value: output }
 }
 
-/** /new-hotfix <name> */
+/** /new-hotfix <name> [from-branch] — default from main */
 const newHotfix: LocalCommandCall = async (args) => {
-  const name = args.trim()
+  const { name, from } = parseNameAndFrom(args, 'main')
   if (!name) {
-    return { type: 'text', value: 'Usage: /new-hotfix <hotfix-name>\nExample: /new-hotfix security-patch-oauth' }
+    return { type: 'text', value: 'Usage: /new-hotfix <hotfix-name> [from-branch]\nExample: /new-hotfix security-patch-oauth' }
   }
 
   const branchName = `hotfix/${name}`
-  const { code, stderr } = await runGit(['checkout', '-b', branchName, 'main'])
+  const { code, stderr } = await runGit(['checkout', '-b', branchName, from])
   if (code !== 0) {
     return { type: 'text', value: `Error creating hotfix branch: ${stderr}` }
   }
-  return { type: 'text', value: `✅ Created and switched to hotfix branch: ${branchName}\n\nRun /finish-hotfix when done to merge back to main and develop.` }
+  return { type: 'text', value: `✅ Created and switched to hotfix branch: ${branchName} (from ${from})\n\nRun /finish-hotfix when done.` }
 }
 
-/** /finish-hotfix */
+/** /finish-hotfix — merges to main and develop (if exists), deletes branch */
 const finishHotfix: LocalCommandCall = async () => {
   const current = await getCurrentBranch()
   if (!current.startsWith('hotfix/')) {
@@ -218,8 +223,8 @@ const finishHotfix: LocalCommandCall = async () => {
 const newFeatureCmd: Command = {
   type: 'local',
   name: 'new-feature',
-  description: 'Start a new feature branch from develop',
-  argumentHint: '<feature-name>',
+  description: 'Create a feature branch from main (or specify a base)',
+  argumentHint: '<feature-name> [from-branch]',
   supportsNonInteractive: true,
   load: async () => ({ call: newFeature }),
 }
@@ -227,7 +232,8 @@ const newFeatureCmd: Command = {
 const finishFeatureCmd: Command = {
   type: 'local',
   name: 'finish-feature',
-  description: 'Merge current feature branch back to develop',
+  description: 'Merge current feature branch back to main (or specify target)',
+  argumentHint: '[target-branch]',
   supportsNonInteractive: true,
   load: async () => ({ call: finishFeature }),
 }
@@ -235,8 +241,8 @@ const finishFeatureCmd: Command = {
 const newReleaseCmd: Command = {
   type: 'local',
   name: 'new-release',
-  description: 'Start a new release branch from develop',
-  argumentHint: '<version>',
+  description: 'Create a release branch from main (or specify a base)',
+  argumentHint: '<version> [from-branch]',
   supportsNonInteractive: true,
   load: async () => ({ call: newRelease }),
 }
@@ -252,8 +258,8 @@ const finishReleaseCmd: Command = {
 const newHotfixCmd: Command = {
   type: 'local',
   name: 'new-hotfix',
-  description: 'Start a new hotfix branch from main',
-  argumentHint: '<hotfix-name>',
+  description: 'Create a hotfix branch from main (or specify a base)',
+  argumentHint: '<hotfix-name> [from-branch]',
   supportsNonInteractive: true,
   load: async () => ({ call: newHotfix }),
 }
