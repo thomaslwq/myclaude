@@ -152,6 +152,14 @@ import sandboxToggle from './commands/sandbox-toggle/index.js'
 import chrome from './commands/chrome/index.js'
 import stickers from './commands/stickers/index.js'
 import advisor from './commands/advisor.js'
+import {
+  newFeatureCmd,
+  finishFeatureCmd,
+  newReleaseCmd,
+  finishReleaseCmd,
+  newHotfixCmd,
+  finishHotfixCmd,
+} from './commands/git-flow/index.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
 import { logForDebugging } from './utils/debug.js'
@@ -306,6 +314,13 @@ const COMMANDS = memoize((): Command[] => [
   status,
   statusline,
   stickers,
+  // Git Flow
+  newFeatureCmd,
+  finishFeatureCmd,
+  newReleaseCmd,
+  finishReleaseCmd,
+  newHotfixCmd,
+  finishHotfixCmd,
   tag,
   theme,
   feedback,
