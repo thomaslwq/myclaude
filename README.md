@@ -244,7 +244,32 @@ ECC skills and commands are loaded synchronously from `seed/marketplaces/ecc/` a
 
 ```bash
 /help                  # ECC commands appear in the command list
-/skills list           # See available ECC skills
+/skills                # List all available skills (including ECC)
+```
+
+---
+
+## Git Flow Workflow
+
+Built-in Git Flow commands for branch-based development workflows.
+
+| Command | Description |
+|---------|-------------|
+| `/new-feature <name> [from]` | Create feature branch from `main` (default) or `[from]` |
+| `/finish-feature [target]` | Merge current feature branch to `main` (default) or `[target]` |
+| `/new-release <version> [from]` | Create release branch from `main` (default) or `[from]` |
+| `/finish-release` | Merge current release branch to `main` and `develop` |
+| `/new-hotfix <name> [from]` | Create hotfix branch from `main` (default) or `[from]` |
+| `/finish-hotfix` | Merge current hotfix branch to `main` and `develop` |
+
+**Examples:**
+```bash
+/new-feature user-auth              # feature/user-auth from main
+/new-feature api-rate-limit develop  # feature/api-rate-limit from develop
+/finish-feature                      # merge current feature/* to main
+/finish-feature develop              # merge current feature/* to develop
+/new-release 1.2.0                   # release/1.2.0 from main
+/new-hotfix security-patch           # hotfix/security-patch from main
 ```
 
 ---
