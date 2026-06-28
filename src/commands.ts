@@ -160,6 +160,7 @@ import {
   newHotfixCmd,
   finishHotfixCmd,
 } from './commands/git-flow/index.js'
+import frontendTdd from './commands/frontend-tdd.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
 import { logForDebugging } from './utils/debug.js'
@@ -321,6 +322,7 @@ const COMMANDS = memoize((): Command[] => [
   finishReleaseCmd,
   newHotfixCmd,
   finishHotfixCmd,
+  frontendTdd,
   tag,
   theme,
   feedback,
