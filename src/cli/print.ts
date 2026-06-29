@@ -1858,6 +1858,7 @@ function runHeadlessStreaming(
   // Abort the current operation when a 'now' priority message arrives.
   subscribeToCommandQueue(() => {
     if (abortController && getCommandsByMaxPriority('now').length > 0) {
+      logForDebugging('[print.ts] Interrupting turn due to priority command')
       abortController.abort('interrupt')
     }
   })
@@ -3935,6 +3936,7 @@ function runHeadlessStreaming(
                     structuredIO.injectControlResponse(response)
                   },
                   onInterrupt() {
+                    logForDebugging('[print.ts] Turn interrupted via bridge onInterrupt')
                     abortController?.abort()
                   },
                   onSetModel(model) {

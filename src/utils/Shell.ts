@@ -287,8 +287,8 @@ export async function exec(
   // Each bash process internally forks multiple times for pipes, subshells,
   // etc., consuming many pty slots per top-level spawn.  Even with the
   // semaphore, a burst of heavy commands can exhaust the ~256-slot pool.
-  const MAX_GITBASH_RETRIES = 3
-  const GITBASH_RETRY_BASE_MS = 500
+  const MAX_GITBASH_RETRIES = 5
+  const GITBASH_RETRY_BASE_MS = 1000
   function isGitBashPtyExhaustion(err: unknown): boolean {
     const msg = errorMessage(err).toLowerCase()
     return (

@@ -40,7 +40,7 @@ export interface SpawnSemaphore {
 }
 
 const BASH_SPAWN_SEMAPHORE: SpawnSemaphore = createSpawnSemaphore(
-  getPlatform() === 'windows' ? 8 : Infinity,
+  getPlatform() === 'windows' ? 4 : Infinity,
 )
 
 function createSpawnSemaphore(maxConcurrent: number): SpawnSemaphore {
