@@ -26,6 +26,7 @@ import {
 } from '../../services/mcp/xaaIdpLogin.js'
 import { parseEnvVars } from '../../utils/envUtils.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
+import { checkOnMcpAdd } from '../../achievements/checker.js'
 
 /**
  * Registers the `mcp add` subcommand on the given Commander command.
@@ -276,5 +277,7 @@ export function registerMcpAddCommand(mcp: Command): void {
       } catch (error) {
         cliError((error as Error).message)
       }
+      // Fire achievement: MCP server added
+      checkOnMcpAdd()
     })
 }

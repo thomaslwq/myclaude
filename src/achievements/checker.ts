@@ -15,6 +15,7 @@ import { getCompanion } from '../buddy/companion.js'
 import { addXp, XP_REWARDS } from '../buddy/evolution/index.js'
 import { addMilestone } from '../buddy/milestones.js'
 import { trackDailyLogin, trackCommit, trackReview, trackPluginInstall, trackSkillUse, trackBuddyInteraction, trackCommand } from '../stats/usageStats.js'
+import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 
 const NOTIFIED_KEY = 'achievement_notified'
 
@@ -130,16 +131,14 @@ export function checkOnConfigChange(): void {
 /** Called daily to check streak. */
 export function checkOnDailyUse(): void {
   trackDailyLogin()
-  const config =
-    typeof process !== 'undefined'
-      ? { lastSeenDate: process.env.__ACHIEVEMENT_LAST_SEEN__ }
-      : { lastSeenDate: undefined }
+  const config = getGlobalConfig()
   const today = new Date().toISOString().slice(0, 10)
-  const lastSeen = config.lastSeenDate
+  const lastSeen = config.achievementLastSeenDate
 
-  if (typeof process !== 'undefined') {
-    process.env.__ACHIEVEMENT_LAST_SEEN__ = today
-  }
+  saveGlobalConfig(current => ({
+    ...current,
+    achievementLastSeenDate: today,
+  }))
 
   if (lastSeen !== today) {
     const streak = incrementCounter('daily_streak')

@@ -208,6 +208,10 @@ export const init = memoize(async (): Promise<void> => {
       })
     }
 
+    // Fire daily use achievement check (streak tracking)
+    const { checkOnDailyUse } = await import('../achievements/checker.js')
+    checkOnDailyUse()
+
     logForDiagnosticsNoPII('info', 'init_completed', {
       duration_ms: Date.now() - initStartTime,
     })

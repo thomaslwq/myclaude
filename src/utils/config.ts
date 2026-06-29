@@ -273,6 +273,7 @@ export type GlobalConfig = {
   // Achievement system
   unlockedAchievements?: string[]
   achievementCounters?: Record<string, number>
+  achievementLastSeenDate?: string // ISO date (YYYY-MM-DD) for daily streak tracking
 
   // BUDDY evolution state
   buddyState?: {

@@ -2,6 +2,7 @@ import type { Command } from '../commands.js'
 import { getAttributionTexts } from '../utils/attribution.js'
 import { executeShellCommandsInPrompt } from '../utils/promptShellExecution.js'
 import { getUndercoverInstructions, isUndercover } from '../utils/undercover.js'
+import { checkOnCommit } from '../achievements/checker.js'
 
 const ALLOWED_TOOLS = [
   'Bash(git add:*)',
@@ -63,6 +64,9 @@ const command = {
   progressMessage: 'creating commit',
   source: 'builtin',
   async getPromptForCommand(_args, context) {
+    // Fire achievement: user is making a commit
+    checkOnCommit()
+
     const promptContent = getPromptContent()
     const finalContent = await executeShellCommandsInPrompt(
       promptContent,
