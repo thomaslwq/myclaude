@@ -1,0 +1,10 @@
+perf: skip shell snapshot on Windows and add performance tips to docs
+
+Issue #17 - Speed improvements:
+- Skip shell snapshot creation on Windows Git Bash to reduce startup
+  time and avoid consuming limited MSYS2 pty slots during startup
+- Add comprehensive Performance Tips section to CLAUDE.md with
+  actionable env vars for speed and startup time optimization
+- Document Windows-specific performance tips for Git Bash users
+
+Co-Authored-By: AtomCode (deepseek-v4-flash) <noreply@atomgit.com>

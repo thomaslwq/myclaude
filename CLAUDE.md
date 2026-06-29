@@ -42,6 +42,29 @@ Key perf env vars:
 
 ## Configuration
 
+## Performance Tips
+
+If myclaude feels slow:
+
+### Speed up responses
+- `MYCLAUDE_EFFORT_LEVEL=low` — Lower effort = faster but less thorough
+- `MYCLAUDE_DISABLE_THINKING=1` — Skip extended thinking for faster responses
+- `--bare` — Minimal mode: skip hooks, LSP, plugin sync, auto-memory, background prefetches
+
+### Reduce startup time
+- `MYCLAUDE_SIMPLE=1` — Skip most startup initialization (same as `--bare`)
+- `MYCLAUDE_DISABLE_AUTO_MEMORY=1` — Skip auto-memory loading at startup
+- `MYCLAUDE_DISABLE_BACKGROUND_TASKS=1` — Skip background task polling
+
+### Windows-specific
+- Set `MYCLAUDE_GIT_BASH_PATH` to point directly to your Git Bash binary if auto-detection is slow
+- Avoid running from network drives or slow filesystems
+- Use `MYCLAUDE_EFFORT_LEVEL=low` — especially impactful on Windows where process creation is slower
+
+### Diagnostics
+- Run with `--verbose` or set `MYCLAUDE_DEBUG=1` to see detailed timing information
+- Run `myclaude doctor` to check your environment for common issues
+
 - `.claude/settings.json` — Project-level settings (committed, team-shared)
 - `.claude/settings.local.json` — Local settings (gitignored, personal)
 - `~/.claude/settings.json` — User-global settings

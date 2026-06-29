@@ -138,7 +138,12 @@ export async function findSuitableShell(): Promise<string> {
 
 async function getShellConfigImpl(): Promise<ShellConfig> {
   const binShell = await findSuitableShell()
-  const provider = await createBashShellProvider(binShell)
+  // On Windows Git Bash, skip shell snapshot to avoid consuming MSYS2 pty
+  // slots during startup and to reduce per-command overhead. Without the
+  // snapshot, bash runs without -l (login shell) on Windows, which is fine
+  // since the shell environment is inherited from the parent process.
+  const isWindows = getPlatform() === 'windows'
+  const provider = await createBashShellProvider(binShell, { skipSnapshot: isWindows })
   return { provider }
 }
 
