@@ -197,6 +197,69 @@ codegraph init
 
 ---
 
+## 🔧 自定义模型
+
+myclaude 支持接入第三方模型（兼容 Anthropic API 格式的任意提供商）或本地模型。
+
+### 基本配置
+
+| 环境变量 | 说明 | 示例 |
+|---------|------|------|
+| `ANTHROPIC_BASE_URL` | 自定义 API 端点地址 | `https://your-api.example.com` |
+| `MYCLAUDE_MODEL` / `CLAUDE_CODE_MODEL` | 指定模型名称 | `claude-sonnet-4-20250514`、`gemini-2.5-pro` |
+
+> 支持 `MYCLAUDE_*` 或 `CLAUDE_CODE_*` 两种前缀，后者优先级更高，完全兼容 Claude Code 的环境变量命名。
+
+### 常见场景示例
+
+**使用代理/中转 API：**
+```bash
+export ANTHROPIC_BASE_URL=https://your-proxy.com/v1
+export ANTHROPIC_API_KEY=your-proxy-key
+export MYCLAUDE_MODEL=claude-sonnet-4-20250514
+npx @funnycode/myclaude
+```
+
+**使用 Ollama 本地模型（通过兼容层）：**
+```bash
+# 先启动 Ollama 并拉取模型
+# ollama pull llama3.2
+
+# 使用 llm-cluster 或 litellm 等工具提供 Anthropic 兼容接口
+export ANTHROPIC_BASE_URL=http://localhost:8000/v1
+export ANTHROPIC_API_KEY=sk-local
+export MYCLAUDE_MODEL=llama3.2
+npx @funnycode/myclaude
+```
+
+**使用 Google Vertex AI：**
+```bash
+export MYCLAUDE_USE_VERTEX=true
+export CLOUD_ML_REGION=us-central1
+gcloud auth application-default login
+npx @funnycode/myclaude
+```
+
+**使用 AWS Bedrock：**
+```bash
+export MYCLAUDE_USE_BEDROCK=true
+export AWS_REGION=us-east-1
+# AWS 凭证通过环境变量或 ~/.aws/credentials 配置
+npx @funnycode/myclaude
+```
+
+**使用 Microsoft Foundry：**
+```bash
+export MYCLAUDE_USE_FOUNDRY=true
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+export AZURE_OPENAI_API_KEY=your-azure-key
+npx @funnycode/myclaude
+```
+
+> 💡 运行时也可通过 `/model` 命令在支持的模型之间快速切换。
+
+---
+
 ## 🛠 开发
 
 ```bash

@@ -197,6 +197,69 @@ Use `MYCLAUDE_*` or `CLAUDE_CODE_*` (the latter takes priority).
 
 ---
 
+## 🔧 Custom Models
+
+myclaude supports third-party models (any provider compatible with the Anthropic API format) and local models.
+
+### Basic Configuration
+
+| Env Variable | What it does | Example |
+|--------------|-------------|---------|
+| `ANTHROPIC_BASE_URL` | Custom API endpoint | `https://your-api.example.com` |
+| `MYCLAUDE_MODEL` / `CLAUDE_CODE_MODEL` | Specify model name | `claude-sonnet-4-20250514`, `gemini-2.5-pro` |
+
+> Supports both `MYCLAUDE_*` and `CLAUDE_CODE_*` prefixes — the latter takes priority, fully compatible with Claude Code environment variable naming.
+
+### Common Scenarios
+
+**Using a proxy / relay API:**
+```bash
+export ANTHROPIC_BASE_URL=https://your-proxy.com/v1
+export ANTHROPIC_API_KEY=your-proxy-key
+export MYCLAUDE_MODEL=claude-sonnet-4-20250514
+npx @funnycode/myclaude
+```
+
+**Using Ollama local models (via compatibility layer):**
+```bash
+# First, start Ollama and pull a model
+# ollama pull llama3.2
+
+# Use tools like llm-cluster or litellm to provide an Anthropic-compatible endpoint
+export ANTHROPIC_BASE_URL=http://localhost:8000/v1
+export ANTHROPIC_API_KEY=sk-local
+export MYCLAUDE_MODEL=llama3.2
+npx @funnycode/myclaude
+```
+
+**Using Google Vertex AI:**
+```bash
+export MYCLAUDE_USE_VERTEX=true
+export CLOUD_ML_REGION=us-central1
+gcloud auth application-default login
+npx @funnycode/myclaude
+```
+
+**Using AWS Bedrock:**
+```bash
+export MYCLAUDE_USE_BEDROCK=true
+export AWS_REGION=us-east-1
+# AWS credentials via env vars or ~/.aws/credentials
+npx @funnycode/myclaude
+```
+
+**Using Microsoft Foundry:**
+```bash
+export MYCLAUDE_USE_FOUNDRY=true
+export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+export AZURE_OPENAI_API_KEY=your-azure-key
+npx @funnycode/myclaude
+```
+
+> 💘 At runtime, you can also use the `/model` command to quickly switch between supported models.
+
+---
+
 ## 🛠 Dev
 
 ```bash
