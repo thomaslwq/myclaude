@@ -73,11 +73,10 @@ echo ""
 MSWEA_CONFIG_DIR="$HOME/.config/mini-swe-agent"
 mkdir -p "$MSWEA_CONFIG_DIR"
 cat > "$MSWEA_CONFIG_DIR/.env" <<-EOF
-MSWEA_MODEL_NAME=$MODEL_NAME
+# Model name is passed via MSWEA_MODEL_NAME env var (from workflow secret)
 MSWEA_CONFIGURED=true
 EOF
-# Also export for the current session
-export MSWEA_MODEL_NAME="$MODEL_NAME"
+# Export for the current session
 export MSWEA_CONFIGURED="true"
 echo ">>> mini-swe-agent configured: model=$MODEL_NAME"
 echo ""
