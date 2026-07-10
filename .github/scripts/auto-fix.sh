@@ -68,6 +68,21 @@ echo "Found $ISSUE_COUNT issue(s) to process."
 echo ""
 
 # ---------------------------------------------------------------------------
+# Pre-configure mini-swe-agent (runs once, before processing issues)
+# ---------------------------------------------------------------------------
+MSWEA_CONFIG_DIR="$HOME/.config/mini-swe-agent"
+mkdir -p "$MSWEA_CONFIG_DIR"
+cat > "$MSWEA_CONFIG_DIR/.env" <<-EOF
+MSWEA_MODEL_NAME=$MODEL_NAME
+MSWEA_CONFIGURED=true
+EOF
+# Also export for the current session
+export MSWEA_MODEL_NAME="$MODEL_NAME"
+export MSWEA_CONFIGURED="true"
+echo ">>> mini-swe-agent configured: model=$MODEL_NAME"
+echo ""
+
+# ---------------------------------------------------------------------------
 # Step 2: Process each issue
 # ---------------------------------------------------------------------------
 for ISSUE_NUMBER in $ISSUE_NUMBERS; do
@@ -154,14 +169,9 @@ Instructions:
   echo "    (this may take a while — up to several minutes)"
   echo ""
 
-  # Pre-configure mini-swe-agent to avoid interactive setup prompt
-  MSWEA_CONFIG_DIR="$HOME/.config/mini-swe-agent"
-  mkdir -p "$MSWEA_CONFIG_DIR"
-  cat > "$MSWEA_CONFIG_DIR/.env" <<-EOF
-MSWEA_MODEL_NAME=$MODEL_NAME
-EOF
-  # Also set the env var for the current session
+  # Ensure the env vars are set for the current session
   export MSWEA_MODEL_NAME="$MODEL_NAME"
+  export MSWEA_CONFIGURED="true"
 
   # Redirect stderr to a temp file so we can capture errors without
   # mixing them into stdout
