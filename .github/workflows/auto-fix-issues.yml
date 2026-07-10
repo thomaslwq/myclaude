@@ -91,6 +91,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Set API environment variables (trim trailing newlines)
+        run: |
+          # Trim trailing whitespace from LLM_API_BASE using xargs
+          URL=$(echo "${{ secrets.LLM_API_BASE }}" | xargs)
+          if [ -n "$URL" ]; then
+            echo "OPENAI_API_BASE=$URL" >> "$GITHUB_ENV"
+            echo "ANTHROPIC_BASE_URL=$URL" >> "$GITHUB_ENV"
+          fi
+
       - name: Run auto-fix script
         id: auto-fix
         env:
