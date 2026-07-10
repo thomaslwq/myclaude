@@ -11,11 +11,22 @@
 #   3. The package is published to npm.
 #
 # Required repository secrets:
-#   - LLM_API_KEY          – API key for the LLM (Anthropic, OpenAI, etc.)
-#   - LLM_MODEL_NAME       – Model name, e.g. "claude-sonnet-4-20250514"
-#   - LLM_API_BASE         – (Optional) API base URL for the LLM provider
-#   - NPM_TOKEN            – npm automation token for publishing
-#   - GH_TOKEN             – (Optional) GitHub token with Issues + Contents write
+#   ┌─────────────────────────┬──────────────────────────────────────────────┐
+#   │ Secret                  │ 说明                                         │
+#   ├─────────────────────────┼──────────────────────────────────────────────┤
+#   │ LLM_API_KEY             │ 智谱 API key（GLM 模型使用）                  │
+#   │ LLM_MODEL_NAME          │ 模型名，如 "openai/glm-4.5" 或 "zai/glm-4.7" │
+#   │ LLM_API_BASE            │ API 地址，智谱为：                            │
+#   │                         │ https://open.bigmodel.cn/api/paas/v4/        │
+#   │ NPM_TOKEN               │ npm 发布 token                               │
+#   │ GH_TOKEN                │ GitHub token（可选，默认用 GITHUB_TOKEN）      │
+#   └─────────────────────────┴──────────────────────────────────────────────┘
+#
+#   ⚠️  LLM_API_KEY 会根据模型名前缀自动设置对应的环境变量：
+#      - zai/xxx → 设置 ZAI_API_KEY
+#      - openai/glm-xxx → 设置 OPENAI_API_KEY + OPENAI_API_BASE
+#      - claude/anthropic → 设置 ANTHROPIC_API_KEY
+#      - gpt/o1/o3 → 设置 OPENAI_API_KEY
 #
 # Required issue label:
 #   - "auto-fix" – only issues with this label are processed.
@@ -87,7 +98,7 @@ jobs:
         env:
           # LLM configuration
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'claude-sonnet-4-20250514' }}
+          LLM_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'openai/glm-4.5' }}
           LLM_API_BASE: ${{ secrets.LLM_API_BASE || '' }}
 
           # GitHub configuration
@@ -103,7 +114,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
           # mini-swe-agent environment (passed through to the agent)
-          MSWEA_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'claude-sonnet-4-20250514' }}
+          MSWEA_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'openai/glm-4.5' }}
         run: |
           bash .github/scripts/auto-fix.sh
 

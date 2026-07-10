@@ -26,7 +26,7 @@ set -euo pipefail
 ISSUE_LABEL="auto-fix"
 MAX_ISSUES="${MAX_ISSUES:-3}"
 DRY_RUN="${DRY_RUN:-false}"
-MODEL_NAME="${LLM_MODEL_NAME:-claude-sonnet-4-20250514}"
+MODEL_NAME="${LLM_MODEL_NAME:-openai/glm-4.5}"
 REPO="${GITHUB_REPOSITORY}"
 
 # Counters
@@ -102,31 +102,53 @@ Instructions:
 
   # Set up LLM API key for mini-swe-agent
   # mini-swe-agent uses LiteLLM, which reads provider-specific env vars
-  # We set ANTHROPIC_API_KEY as the default (works with Claude models)
-  # For other providers, the user can set the appropriate env var in the workflow
+  # We detect the provider from the model name prefix and set the right env var
   if [ -n "${LLM_API_KEY:-}" ]; then
     # Determine the provider from the model name
     case "$MODEL_NAME" in
+      zai/*)
+        # Z.AI (Zhipu AI global platform)
+        export ZAI_API_KEY="$LLM_API_KEY"
+        echo "  → Using Z.AI provider (ZAI_API_KEY)"
+        ;;
+      openai/glm*)
+        # Zhipu AI (中国站) via OpenAI-compatible endpoint
+        export OPENAI_API_KEY="$LLM_API_KEY"
+        if [ -n "${LLM_API_BASE:-}" ]; then
+          export OPENAI_API_BASE="$LLM_API_BASE"
+        fi
+        echo "  → Using Zhipu AI via OpenAI-compatible endpoint (OPENAI_API_KEY)"
+        ;;
+      glm*)
+        # Bare GLM model name without provider prefix — use OpenAI-compatible
+        export OPENAI_API_KEY="$LLM_API_KEY"
+        if [ -n "${LLM_API_BASE:-}" ]; then
+          export OPENAI_API_BASE="$LLM_API_BASE"
+        fi
+        echo "  → Using GLM model via OpenAI-compatible endpoint (OPENAI_API_KEY)"
+        ;;
       claude*|anthropic*)
         export ANTHROPIC_API_KEY="$LLM_API_KEY"
+        echo "  → Using Anthropic provider (ANTHROPIC_API_KEY)"
         ;;
       gpt*|o1*|o3*)
         export OPENAI_API_KEY="$LLM_API_KEY"
-        ;;
-      gemini*)
-        export GEMINI_API_KEY="$LLM_API_KEY"
+        echo "  → Using OpenAI provider (OPENAI_API_KEY)"
         ;;
       *)
         # Fallback: set both common env vars
         export ANTHROPIC_API_KEY="$LLM_API_KEY"
         export OPENAI_API_KEY="$LLM_API_KEY"
+        echo "  → Unknown provider, falling back to ANTHROPIC_API_KEY + OPENAI_API_KEY"
         ;;
     esac
   fi
 
   if [ -n "${LLM_API_BASE:-}" ]; then
+    # Also set provider-specific base URLs
     export OPENAI_API_BASE="$LLM_API_BASE"
     export ANTHROPIC_BASE_URL="$LLM_API_BASE"
+    echo "  → API base: $LLM_API_BASE"
   fi
 
   # Run mini-swe-agent
