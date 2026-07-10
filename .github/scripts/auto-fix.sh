@@ -105,12 +105,31 @@ $API_KEY_VAR=$API_KEY_VALUE
 EOF
 
 # Also set API base if provided
-# Note: OPENAI_API_BASE and ANTHROPIC_BASE_URL are already set by the
-# workflow step (via GITHUB_ENV, trimmed with xargs). We do NOT write
-# them to the .env file to avoid the override flag re-introducing
-# trailing newlines from the raw LLM_API_BASE variable.
+# Use Python to strip trailing whitespace (more reliable than shell tr/xargs)
 if [ -n "${LLM_API_BASE:-}" ]; then
-  echo "OPENAI_API_BASE and ANTHROPIC_BASE_URL already set by workflow step"
+  python3 -c "
+import os
+url = os.environ.get('LLM_API_BASE', '').strip()
+if url:
+    env_file = os.path.expanduser(os.path.join('~', '.config', 'mini-swe-agent', '.env'))
+    with open(env_file, 'a') as f:
+        f.write('OPENAI_API_BASE=' + url + '\n')
+        f.write('ANTHROPIC_BASE_URL=' + url + '\n')
+    # Also set for current process (will be inherited by mini subprocess)
+    os.environ['OPENAI_API_BASE'] = url
+    os.environ['ANTHROPIC_BASE_URL'] = url
+" || python -c "
+import os
+url = os.environ.get('LLM_API_BASE', '').strip()
+if url:
+    env_file = os.path.expanduser(os.path.join('~', '.config', 'mini-swe-agent', '.env'))
+    with open(env_file, 'a') as f:
+        f.write('OPENAI_API_BASE=' + url + '\n')
+        f.write('ANTHROPIC_BASE_URL=' + url + '\n')
+    os.environ['OPENAI_API_BASE'] = url
+    os.environ['ANTHROPIC_BASE_URL'] = url
+"
+  echo "  → API base URL configured via Python"
 fi
 
 # Export for the current session
