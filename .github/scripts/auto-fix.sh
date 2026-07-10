@@ -104,20 +104,20 @@ MSWEA_CONFIGURED=true
 $API_KEY_VAR=$API_KEY_VALUE
 EOF
 
-# Also set API base if provided (already trimmed by workflow step)
+# Also set API base if provided
+# Note: OPENAI_API_BASE and ANTHROPIC_BASE_URL are already set by the
+# workflow step (via GITHUB_ENV, trimmed with xargs). We do NOT write
+# them to the .env file to avoid the override flag re-introducing
+# trailing newlines from the raw LLM_API_BASE variable.
 if [ -n "${LLM_API_BASE:-}" ]; then
-  echo "OPENAI_API_BASE=$LLM_API_BASE" >> "$MSWEA_CONFIG_DIR/.env"
-  echo "ANTHROPIC_BASE_URL=$LLM_API_BASE" >> "$MSWEA_CONFIG_DIR/.env"
+  echo "OPENAI_API_BASE and ANTHROPIC_BASE_URL already set by workflow step"
 fi
 
 # Export for the current session
 export MSWEA_MODEL_NAME="$MODEL_NAME"
 export MSWEA_CONFIGURED="true"
 export "$API_KEY_VAR"="$API_KEY_VALUE"
-if [ -n "${LLM_API_BASE:-}" ]; then
-  export OPENAI_API_BASE="$LLM_API_BASE"
-  export ANTHROPIC_BASE_URL="$LLM_API_BASE"
-fi
+# OPENAI_API_BASE and ANTHROPIC_BASE_URL already set by workflow step
 echo ">>> mini-swe-agent configured: model=$MODEL_NAME, key=$API_KEY_VAR"
 echo ""
 
