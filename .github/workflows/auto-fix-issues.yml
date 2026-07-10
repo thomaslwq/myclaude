@@ -1,0 +1,117 @@
+# =============================================================================
+# Auto-Fix Issues with mini-swe-agent
+# =============================================================================
+# This workflow runs every hour, fetches open issues labeled "auto-fix" from
+# this repository, and uses mini-swe-agent (https://github.com/SWE-agent/mini-swe-agent)
+# to autonomously resolve them.
+#
+# If a fix is produced:
+#   1. The changes are committed and pushed to the default branch.
+#   2. The package version is bumped (patch), a git tag is created.
+#   3. The package is published to npm.
+#
+# Required repository secrets:
+#   - LLM_API_KEY          – API key for the LLM (Anthropic, OpenAI, etc.)
+#   - LLM_MODEL_NAME       – Model name, e.g. "claude-sonnet-4-20250514"
+#   - LLM_API_BASE         – (Optional) API base URL for the LLM provider
+#   - NPM_TOKEN            – npm automation token for publishing
+#   - GH_TOKEN             – (Optional) GitHub token with Issues + Contents write
+#
+# Required issue label:
+#   - "auto-fix" – only issues with this label are processed.
+# =============================================================================
+
+name: Auto-Fix Issues
+
+on:
+  schedule:
+    # Every hour at minute 0
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      max_issues:
+        description: 'Maximum number of issues to process'
+        required: false
+        default: '3'
+      dry_run:
+        description: 'Dry run (do not commit/push/publish)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: auto-fix-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  auto-fix:
+    runs-on: ubuntu-latest
+    # Prevent concurrent runs on the same branch from stepping on each other
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # We need the full history to push tags and create commits
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install mini-swe-agent
+        run: |
+          pip install --pre mini-swe-agent
+          echo "mini-swe-agent version:"
+          mini --version 2>/dev/null || echo "(version check skipped)"
+
+      - name: Set up Node.js (for npm publish)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org/'
+          # NPM_TOKEN is used for authentication
+          scope: '@funnycode'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run auto-fix script
+        id: auto-fix
+        env:
+          # LLM configuration
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'claude-sonnet-4-20250514' }}
+          LLM_API_BASE: ${{ secrets.LLM_API_BASE || '' }}
+
+          # GitHub configuration
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+          # Workflow configuration
+          MAX_ISSUES: ${{ github.event.inputs.max_issues || '3' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+
+          # npm configuration
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+          # mini-swe-agent environment (passed through to the agent)
+          MSWEA_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'claude-sonnet-4-20250514' }}
+        run: |
+          bash .github/scripts/auto-fix.sh
+
+      - name: Upload trajectory artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mini-swe-agent-trajectories
+          path: ~/.mini-swe-agent/**/last_mini_run.traj.json
+          retention-days: 7
+          if-no-files-found: ignore
