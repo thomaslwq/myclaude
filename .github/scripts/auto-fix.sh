@@ -106,8 +106,10 @@ EOF
 
 # Also set API base if provided
 if [ -n "${LLM_API_BASE:-}" ]; then
-  echo "OPENAI_API_BASE=$LLM_API_BASE" >> "$MSWEA_CONFIG_DIR/.env"
-  echo "ANTHROPIC_BASE_URL=$LLM_API_BASE" >> "$MSWEA_CONFIG_DIR/.env"
+  # Trim trailing whitespace/newlines from the URL
+  LLM_API_BASE_CLEAN="$(echo "$LLM_API_BASE" | tr -d '\n\r')"
+  echo "OPENAI_API_BASE=$LLM_API_BASE_CLEAN" >> "$MSWEA_CONFIG_DIR/.env"
+  echo "ANTHROPIC_BASE_URL=$LLM_API_BASE_CLEAN" >> "$MSWEA_CONFIG_DIR/.env"
 fi
 
 # Export for the current session
@@ -115,8 +117,9 @@ export MSWEA_MODEL_NAME="$MODEL_NAME"
 export MSWEA_CONFIGURED="true"
 export "$API_KEY_VAR"="$API_KEY_VALUE"
 if [ -n "${LLM_API_BASE:-}" ]; then
-  export OPENAI_API_BASE="$LLM_API_BASE"
-  export ANTHROPIC_BASE_URL="$LLM_API_BASE"
+  LLM_API_BASE_CLEAN="$(echo "$LLM_API_BASE" | tr -d '\n\r')"
+  export OPENAI_API_BASE="$LLM_API_BASE_CLEAN"
+  export ANTHROPIC_BASE_URL="$LLM_API_BASE_CLEAN"
 fi
 echo ">>> mini-swe-agent configured: model=$MODEL_NAME, key=$API_KEY_VAR"
 echo ""
