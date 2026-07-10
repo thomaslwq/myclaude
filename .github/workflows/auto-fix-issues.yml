@@ -28,8 +28,6 @@
 #      - claude/anthropic → 设置 ANTHROPIC_API_KEY
 #      - gpt/o1/o3 → 设置 OPENAI_API_KEY
 #
-# Required issue label:
-#   - "auto-fix" – only issues with this label are processed.
 # =============================================================================
 
 name: Auto-Fix Issues

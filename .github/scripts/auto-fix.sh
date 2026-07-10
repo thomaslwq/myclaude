@@ -23,7 +23,6 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-ISSUE_LABEL="auto-fix"
 MAX_ISSUES="${MAX_ISSUES:-3}"
 DRY_RUN="${DRY_RUN:-false}"
 MODEL_NAME="${LLM_MODEL_NAME:-openai/glm-4.5}"
@@ -45,22 +44,21 @@ echo "Dry run:     $DRY_RUN"
 echo "=============================================="
 
 # ---------------------------------------------------------------------------
-# Step 1: Fetch open issues with the target label
+# Step 1: Fetch open issues
 # ---------------------------------------------------------------------------
 echo ""
-echo ">>> Fetching open issues labeled '$ISSUE_LABEL' ..."
+echo ">>> Fetching open issues ..."
 
 # Use gh CLI to list issues (pre-installed on GitHub Actions runners)
 ISSUES_JSON=$(gh issue list \
   --repo "$REPO" \
-  --label "$ISSUE_LABEL" \
   --state open \
   --json number,title,body,url \
   --limit "$MAX_ISSUES" \
   --jq '.[]')
 
 if [ -z "$ISSUES_JSON" ]; then
-  echo "No open issues with label '$ISSUE_LABEL' found. Exiting."
+  echo "No open issues found. Exiting."
   exit 0
 fi
 
