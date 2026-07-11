@@ -18,7 +18,6 @@ mkdirSync(DIST, { recursive: true })
 const OUTFILE = resolve(DIST, 'myclaude.js')
 const OUTFILE_NEW = resolve(DIST, 'myclaude-new.js')
 const TMP_OUT = resolve(DIST, 'myclaude_tmp.js')
-const BUILD_OUT = resolve(DIST, 'myclaude_bundle.js')
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'))
 
 // Packages excluded from bundle (dynamically imported at runtime)
@@ -68,7 +67,7 @@ console.log(`  Output: ${OUTFILE}`)
 const result = spawnSync('bun', [
   'build', ENTRY,
   '--target=node',
-  `--outfile=${BUILD_OUT}`,
+  `--outdir=${DIST}`,
   ...EXTERNAL.flatMap(pkg => ['--external', pkg]),
 ], { stdio: 'inherit', cwd: ROOT })
 
@@ -76,6 +75,9 @@ if (result.status !== 0) {
   console.error('Build failed')
   process.exit(result.status ?? 1)
 }
+
+// The output file is named after the entry point in the outdir
+const BUILD_OUT = resolve(DIST, 'cli.js')
 
 const { tmpdir } = await import('os')
 const TMP_MACRO = join(tmpdir(), 'myclaude_macro_' + Date.now() + '.js')
