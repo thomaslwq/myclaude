@@ -672,13 +672,30 @@ The agent trajectory log has been saved as a workflow artifact."`,
 
     // Bump patch version
     log.step('Bumping version and publishing to npm...');
-    runCmd('npm version patch -m "chore: release v%s [auto-fix]"', { ignoreError: true });
+    const versionResult = runCmd('npm version patch -m "chore: release v%s [auto-fix]"', { ignoreError: true });
+    if (versionResult.exitCode !== 0) {
+      log.error(`npm version patch failed: ${versionResult.stderr.slice(0, 300)}`);
+      log.info('Trying with --force-git-tag...');
+      const versionResult2 = runCmd('npm version patch --force-git-tag -m "chore: release v%s [auto-fix]"', { ignoreError: true });
+      if (versionResult2.exitCode !== 0) {
+        log.error(`npm version patch (force) also failed: ${versionResult2.stderr.slice(0, 300)}`);
+      } else {
+        log.info(`  Version bumped: ${versionResult2.stdout}`);
+      }
+    }
 
     // Push commit and tag
-    runCmd('git push origin "$(git branch --show-current)"', { ignoreError: true });
-    runCmd('git push origin --tags', { ignoreError: true });
+    const pushResult = runCmd('git push origin "$(git branch --show-current)"', { ignoreError: true });
+    if (pushResult.exitCode !== 0) {
+      log.error(`git push failed: ${pushResult.stderr.slice(0, 300)}`);
+    }
+    const tagResult = runCmd('git push origin --tags', { ignoreError: true });
+    if (tagResult.exitCode !== 0) {
+      log.error(`git push tags failed: ${tagResult.stderr.slice(0, 300)}`);
+    }
 
     // Publish to npm
+    log.step('Publishing to npm...');
     const publishResult = runCmd('npm publish --access public', { ignoreError: true });
     if (publishResult.exitCode === 0) {
       const newVersion = runCmd('node -e "console.log(require(\'./package.json\').version)"', { ignoreError: true }).stdout;
