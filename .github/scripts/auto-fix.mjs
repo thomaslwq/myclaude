@@ -131,6 +131,8 @@ async function callLLM(messages, options = {}) {
 
   // Detect provider and set appropriate env vars
   const modelPrefix = model.split('/')[0];
+  const modelName = model.split('/').pop() || model;  // e.g. "glm-4.7-flash"
+
   switch (modelPrefix) {
     case 'zai':
       apiKey = apiKey || process.env.ZAI_API_KEY || '';
@@ -148,6 +150,10 @@ async function callLLM(messages, options = {}) {
     default:
       // openai/glm-xxx, glm-xxx, or custom
       apiKey = apiKey || process.env.OPENAI_API_KEY || '';
+      // GLM / Zhipu models default to /v4 path
+      if (!apiBase && modelName.startsWith('glm')) {
+        apiBase = 'https://open.bigmodel.cn/api/paas/v4';
+      }
       break;
   }
 
