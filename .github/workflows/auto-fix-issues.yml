@@ -1,9 +1,12 @@
 # =============================================================================
-# Auto-Fix Issues with mini-swe-agent
+# Auto-Fix Issues — Autonomous Issue Resolution Agent
 # =============================================================================
 # This workflow runs every hour, fetches open issues labeled "auto-fix" from
-# this repository, and uses mini-swe-agent (https://github.com/SWE-agent/mini-swe-agent)
-# to autonomously resolve them.
+# this repository, and uses an LLM-powered agent to autonomously resolve them.
+#
+# Design (inspired by mini-swe-agent):
+#   An agent loop where the LLM has tool-use capabilities (read file, edit
+#   file, run commands) to explore and fix the codebase autonomously.
 #
 # If a fix is produced:
 #   1. The changes are committed and pushed to the default branch.
@@ -14,20 +17,12 @@
 #   ┌─────────────────────────┬──────────────────────────────────────────────┐
 #   │ Secret                  │ 说明                                         │
 #   ├─────────────────────────┼──────────────────────────────────────────────┤
-#   │ LLM_API_KEY             │ 智谱 API key（GLM 模型使用）                  │
-#   │ LLM_MODEL_NAME          │ 模型名，如 "openai/glm-4.5" 或 "zai/glm-4.7" │
-#   │ LLM_API_BASE            │ API 地址，智谱为：                            │
-#   │                         │ https://open.bigmodel.cn/api/paas/v4/        │
+#   │ LLM_API_KEY             │ 模型 API key                                 │
+#   │ LLM_MODEL_NAME          │ 模型名，如 "openai/glm-4.5" 或 "gpt-4o"     │
+#   │ LLM_API_BASE            │ API 地址（可选）                             │
 #   │ NPM_TOKEN               │ npm 发布 token                               │
-#   │ GH_TOKEN                │ GitHub token（可选，默认用 GITHUB_TOKEN）      │
+#   │ GH_TOKEN                │ GitHub token（可选，默认用 GITHUB_TOKEN）     │
 #   └─────────────────────────┴──────────────────────────────────────────────┘
-#
-#   ⚠️  LLM_API_KEY 会根据模型名前缀自动设置对应的环境变量：
-#      - zai/xxx → 设置 ZAI_API_KEY
-#      - openai/glm-xxx → 设置 OPENAI_API_KEY + OPENAI_API_BASE
-#      - claude/anthropic → 设置 ANTHROPIC_API_KEY
-#      - gpt/o1/o3 → 设置 OPENAI_API_KEY
-#
 # =============================================================================
 
 name: Auto-Fix Issues
@@ -47,6 +42,10 @@ on:
         required: false
         type: boolean
         default: false
+      model:
+        description: 'Override LLM model name'
+        required: false
+        default: ''
 
 concurrency:
   group: auto-fix-${{ github.ref }}
@@ -55,81 +54,64 @@ concurrency:
 jobs:
   auto-fix:
     runs-on: ubuntu-latest
-    # Prevent concurrent runs on the same branch from stepping on each other
     timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # We need the full history to push tags and create commits
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install mini-swe-agent
-        run: |
-          pip install --pre mini-swe-agent
-          echo "mini-swe-agent version:"
-          mini --version 2>/dev/null || echo "(version check skipped)"
-
-      - name: Set up Node.js (for npm publish)
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org/'
-          # NPM_TOKEN is used for authentication
           scope: '@funnycode'
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.5'
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile 2>/dev/null || bun install
 
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Set API environment variables (trim trailing newlines)
-        run: |
-          # Trim trailing whitespace from LLM_API_BASE using xargs
-          URL=$(echo "${{ secrets.LLM_API_BASE }}" | xargs)
-          if [ -n "$URL" ]; then
-            echo "OPENAI_API_BASE=$URL" >> "$GITHUB_ENV"
-            echo "ANTHROPIC_BASE_URL=$URL" >> "$GITHUB_ENV"
-          fi
-
-      - name: Run auto-fix script
+      - name: Run auto-fix agent
         id: auto-fix
         env:
           # LLM configuration
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'openai/glm-4.5' }}
+          LLM_MODEL_NAME: ${{ inputs.model || secrets.LLM_MODEL_NAME || 'openai/glm-4.5' }}
           LLM_API_BASE: ${{ secrets.LLM_API_BASE || '' }}
 
           # GitHub configuration
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
 
           # Workflow configuration
           MAX_ISSUES: ${{ github.event.inputs.max_issues || '3' }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          COST_LIMIT: '3.0'
 
           # npm configuration
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-          # mini-swe-agent environment (passed through to the agent)
-          MSWEA_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'openai/glm-4.5' }}
         run: |
-          bash .github/scripts/auto-fix.sh
+          node .github/scripts/auto-fix.mjs
 
-      - name: Upload trajectory artifacts
+      - name: Upload agent trajectory logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mini-swe-agent-trajectories
-          path: ~/.mini-swe-agent/**/last_mini_run.traj.json
+          name: auto-fix-agent-logs
+          path: |
+            /tmp/auto-fix-*.log
           retention-days: 7
           if-no-files-found: ignore
