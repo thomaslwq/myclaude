@@ -150,14 +150,10 @@ async function callLLM(messages, options = {}) {
     default:
       // openai/glm-xxx, glm-xxx, or custom
       apiKey = apiKey || process.env.OPENAI_API_KEY || '';
-      // GLM / Zhipu models: ensure the base URL has the /v4 path
+      // GLM / Zhipu models: use the correct Z.AI platform endpoint
+      // (old open.bigmodel.cn was migrated to api.z.ai)
       if (modelName.startsWith('glm')) {
-        const base = (apiBase || 'https://api.z.ai').replace(/\/+$/, '');
-        if (!base.includes('/v4') && !base.includes('/chat/completions')) {
-          apiBase = base + '/api/paas/v4';
-        } else {
-          apiBase = base;
-        }
+        apiBase = 'https://api.z.ai/api/paas/v4';
       }
       break;
   }
