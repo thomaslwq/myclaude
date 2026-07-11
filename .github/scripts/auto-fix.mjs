@@ -6,7 +6,7 @@
  *
  * Design (inspired by mini-swe-agent):
  *   An LLM-powered agent loop that:
- *   1. Fetches open issues labeled "auto-fix" from the repository
+ *   1. Fetches all open issues from the repository
  *   2. For each issue, enters a tool-use loop:
  *      a. LLM decides next action (read_file | edit_file | run_command | submit)
  *      b. Action is executed in the sandbox (the repo checkout)
@@ -50,7 +50,7 @@ const CONFIG = {
   dryRun:           process.env.DRY_RUN === 'true',
   costLimit:        parseFloat(process.env.COST_LIMIT || '3.0'),
   npmToken:         process.env.NODE_AUTH_TOKEN || '',
-  issueLabel:       'auto-fix',
+  // No label filter — process ALL open issues
 };
 
 // ── Logger ───────────────────────────────────────────────────────────────────
@@ -521,15 +521,15 @@ async function main() {
   }
 
   // ── Step 1: Fetch open issues labeled "auto-fix" ──
-  log.step('Fetching open issues labeled "auto-fix"...');
+  log.step('Fetching all open issues...');
 
   const issuesResult = runCmd(
-    `gh issue list --repo "${CONFIG.repository}" --state open --label "${CONFIG.issueLabel}" --json number,title,body,url --limit ${CONFIG.maxIssues} --jq '.'`,
+    `gh issue list --repo "${CONFIG.repository}" --state open --json number,title,body,url --limit ${CONFIG.maxIssues} --jq '.'`,
     { timeout: 30000, ignoreError: true }
   );
 
   if (issuesResult.exitCode !== 0 || !issuesResult.stdout || issuesResult.stdout === '[]') {
-    log.info('No open issues with label "auto-fix" found. Exiting.');
+    log.info('No open issues found. Exiting.');
     return;
   }
 

@@ -1,8 +1,8 @@
 # =============================================================================
 # Auto-Fix Issues — Autonomous Issue Resolution Agent
 # =============================================================================
-# This workflow runs every hour, fetches open issues labeled "auto-fix" from
-# this repository, and uses an LLM-powered agent to autonomously resolve them.
+# This workflow runs every hour, fetches all open issues from this repository,
+# and uses an LLM-powered agent to autonomously resolve them.
 #
 # Design (inspired by mini-swe-agent):
 #   An agent loop where the LLM has tool-use capabilities (read file, edit
