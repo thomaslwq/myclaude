@@ -236,7 +236,7 @@ async function callLLM(messages, options = {}) {
  */
 async function runAgentLoop(issueNumber, issueTitle, issueBody) {
   const MAX_ITERATIONS = 30;
-  const MAX_TOOL_CALLS = 50;
+  const MAX_TOOL_CALLS = 60;
 
   let iteration = 0;
   let toolCallCount = 0;
@@ -285,13 +285,13 @@ You operate in a loop. In each iteration, you output a single action in JSON for
    \`{"action": "abort", "params": {"reason": "why it cannot be fixed"}}\`
 
 ### Rules:
-- Always read the relevant files FIRST before making changes.
+- **BE DECISIVE**: Read the relevant files, make the fix, and submit.
+- Start by reading the file(s) most likely related to the issue. Don't browse the entire project.
 - Use edit_file for small, targeted changes. Use write_file only when rewriting a whole file.
 - After editing, run the tests to verify.
-- Cost limit: ~$${CONFIG.costLimit} per issue. Be efficient.
 - DO NOT modify node_modules, dist/, .git/ directories.
 - DO NOT create new files unless absolutely necessary.
-- If you need to see the project structure first, use project_structure action.
+- If you need to see the project structure first, use project_structure action once.
 
 ### Project info:
 Repository: ${CONFIG.repository}
@@ -612,7 +612,7 @@ Summary: ${result.summary}`;
         runCmd('git pull --rebase origin "$(git branch --show-current)" 2>/dev/null || true', { ignoreError: true });
         runCmd('git push origin "$(git branch --show-current)"', { ignoreError: true });
 
-        // Add success comment on issue
+        // Add success comment on issue and close it
         runCmd(
           `gh issue comment ${number} --repo "${CONFIG.repository}" --body "✅ **Fixed!** 🤖
 
@@ -623,6 +623,7 @@ This issue has been automatically resolved by the Auto-Fix Agent (model: \`${CON
 The fix was committed in \`$(git rev-parse --short HEAD)\`."`,
           { ignoreError: true }
         );
+        runCmd(`gh issue close ${number} --repo "${CONFIG.repository}"`, { ignoreError: true });
 
         log.info(`✅ Issue #${number}: Successfully committed and pushed.`);
       }
