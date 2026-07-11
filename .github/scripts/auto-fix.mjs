@@ -152,7 +152,7 @@ async function callLLM(messages, options = {}) {
       apiKey = apiKey || process.env.OPENAI_API_KEY || '';
       // GLM / Zhipu models: ensure the base URL has the /v4 path
       if (modelName.startsWith('glm')) {
-        const base = (apiBase || 'https://open.bigmodel.cn').replace(/\/+$/, '');
+        const base = (apiBase || 'https://api.z.ai').replace(/\/+$/, '');
         if (!base.includes('/v4') && !base.includes('/chat/completions')) {
           apiBase = base + '/api/paas/v4';
         } else {
