@@ -285,12 +285,16 @@ You operate in a loop. In each iteration, you output a single action in JSON for
    \`{"action": "abort", "params": {"reason": "why it cannot be fixed"}}\`
 
 ### Rules:
-- **BE DECISIVE**: Read the relevant files, make the fix, and submit.
-- Start by reading the file(s) most likely related to the issue. Don't browse the entire project.
+- **TDD (Test-Driven Development)**: Always follow Red-Green-Refactor:
+  1. **Red**: First write a test that reproduces the bug. The test MUST fail initially.
+  2. **Green**: Then implement the minimum code to make the test pass.
+  3. **Refactor**: Clean up while keeping the test green.
+- Start by reading the relevant source files and test files to understand the codebase.
 - Use edit_file for small, targeted changes. Use write_file only when rewriting a whole file.
-- After editing, run the tests to verify.
+- After editing, run the tests to verify (bun test).
+- If the test suite is large, run only the relevant test file: bun test path/to/test.ts.
 - DO NOT modify node_modules, dist/, .git/ directories.
-- DO NOT create new files unless absolutely necessary.
+- DO NOT create new files unless absolutely necessary (test files are the exception).
 - If you need to see the project structure first, use project_structure action once.
 
 ### Project info:
