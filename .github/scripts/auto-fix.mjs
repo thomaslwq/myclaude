@@ -157,7 +157,20 @@ async function callLLM(messages, options = {}) {
 
   // Ensure API base has the correct path
   const base = apiBase.replace(/\/+$/, '');
-  const endpoint = base.includes('/v1') ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
+
+  // Build the correct endpoint URL:
+  //   - If base already contains /chat/completions → use as-is
+  //   - If base has a version path (/v1, /v2, /v4, etc.) → append /chat/completions
+  //   - Otherwise → append /v1/chat/completions
+  let endpoint;
+  if (base.includes('/chat/completions')) {
+    endpoint = base;
+  } else if (/\/v\d/.test(base)) {
+    // e.g. https://open.bigmodel.cn/api/paas/v4 → /chat/completions
+    endpoint = `${base}/chat/completions`;
+  } else {
+    endpoint = `${base}/v1/chat/completions`;
+  }
 
   const payload = {
     model,
