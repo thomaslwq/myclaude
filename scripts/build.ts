@@ -6,13 +6,15 @@
  * Dynamically imported optional packages are excluded from the bundle.
  */
 
-const { readFileSync, writeFileSync, unlinkSync, copyFileSync } = await import('fs')
-const { spawnSync } = await import('child_process')
-const { resolve, join } = await import('path')
+import { readFileSync, writeFileSync, unlinkSync, copyFileSync, mkdirSync } from 'fs'
+import { spawnSync } from 'child_process'
+import { resolve, join } from 'path'
 
 const ROOT = resolve(import.meta.dir, '..')
 const ENTRY = resolve(ROOT, 'src/entrypoints/cli.tsx')
 const DIST = resolve(ROOT, 'dist')
+// Ensure dist directory exists (it's gitignored, may not exist on CI)
+mkdirSync(DIST, { recursive: true })
 const OUTFILE = resolve(DIST, 'myclaude.js')
 const OUTFILE_NEW = resolve(DIST, 'myclaude-new.js')
 const TMP_OUT = resolve(DIST, 'myclaude_tmp.js')
