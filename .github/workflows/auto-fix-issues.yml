@@ -77,9 +77,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Override Tencent mirror (missing packages) with official registry
-          bun install --frozen-lockfile --registry=https://registry.npmjs.org 2>/dev/null \
-            || bun install --registry=https://registry.npmjs.org
+          # Use npm instead of bun to avoid Tencent mirror issues (bun.lock
+          # has baked-in mirror URLs that --registry can't override).
+          npm ci 2>/dev/null || npm install
 
       - name: Configure Git
         run: |
