@@ -53,7 +53,7 @@ globalThis.MACRO = {
   PACKAGE_URL: ${JSON.stringify(pkg.name)},
   NATIVE_PACKAGE_URL: ${JSON.stringify(pkg.name)},
   VERSION_CHANGELOG: '',
-  ISSUES_EXPLAINER: 'file an issue at ' + ${JSON.stringify(pkg.bugs?.url || pkg.repository?.url || '')},
+  ISSUES_EXPLAINER: 'file an issue at ' + ${JSON.stringify(process.env.MYCLAUDE_REPOSITORY_URL || pkg.bugs?.url || pkg.repository?.url || '')},
   FEEDBACK_CHANNEL: 'github',
 };
 `
