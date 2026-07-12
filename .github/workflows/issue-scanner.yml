@@ -1,0 +1,118 @@
+# =============================================================================
+# Issue Scanner — Autonomous Issue Generation Agent
+# =============================================================================
+# This workflow runs every hour and does two things:
+#
+# 1. REPOSITORY SCAN:
+#    - Analyzes the codebase for code quality issues, potential bugs, security
+#      vulnerabilities, outdated dependencies, and untested modules.
+#    - Uses an LLM-powered agent to review source files and identify issues.
+#    - Creates GitHub issues for significant findings.
+#
+# 2. COMPETITOR / MARKET RESEARCH:
+#    - Queries the LLM for the latest features and optimizations in similar
+#      code agent tools (Claude Code, Cursor, Copilot, Aider, etc.).
+#    - Identifies feature gaps and opportunities for myclaude.
+#    - Creates GitHub issues for actionable improvements.
+#
+# Required repository secrets:
+#   ┌─────────────────────────┬──────────────────────────────────────────────┐
+#   │ Secret                  │ 说明                                         │
+#   ├─────────────────────────┼──────────────────────────────────────────────┤
+#   │ LLM_API_KEY             │ 模型 API key                                 │
+#   │ LLM_MODEL_NAME          │ 模型名，如 "openai/gpt-4o" 或 "glm-4.5"     │
+#   │ LLM_API_BASE            │ API 地址（可选）                             │
+#   │ GH_TOKEN                │ GitHub token（可选，默认用 GITHUB_TOKEN）     │
+#   └─────────────────────────┴──────────────────────────────────────────────┘
+# =============================================================================
+
+name: Issue Scanner
+
+on:
+  schedule:
+    # Every hour at minute 30 (offset from auto-fix to avoid resource contention)
+    - cron: '30 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log findings without creating issues)'
+        required: false
+        type: boolean
+        default: false
+      max_issues:
+        description: 'Maximum number of issues to create'
+        required: false
+        default: '5'
+      scan_only:
+        description: 'Only run codebase scan (skip competitor research)'
+        required: false
+        type: boolean
+        default: false
+      research_only:
+        description: 'Only run competitor research (skip codebase scan)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: issue-scanner-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.5'
+
+      - name: Install dependencies
+        run: |
+          npm install --no-audit --no-fund
+
+      - name: Run issue scanner
+        id: scan
+        env:
+          # LLM configuration
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'openai/gpt-4o' }}
+          LLM_API_BASE: ${{ secrets.LLM_API_BASE || '' }}
+
+          # GitHub configuration
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+          # Workflow configuration
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          MAX_ISSUES: ${{ github.event.inputs.max_issues || '5' }}
+          SCAN_DEPTH: '4'
+          MAX_FILES: '30'
+        run: |
+          node .github/scripts/issue-scanner.mjs
+
+      - name: Upload scanner logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-scanner-logs
+          path: |
+            /tmp/issue-scanner-*.log
+          retention-days: 7
+          if-no-files-found: ignore
