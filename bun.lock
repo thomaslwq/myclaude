@@ -5,80 +5,83 @@
     "": {
       "name": "@anthropic-ai/claude-code",
       "dependencies": {
-        "@alcalzone/ansi-tokenize": "*",
+        "@alcalzone/ansi-tokenize": "0.3.0",
+        "@anthropic-ai/claude-agent-sdk": "^0.3.207",
+        "@anthropic-ai/mcpb": "2.1.2",
+        "@anthropic-ai/sandbox-runtime": "0.0.44",
+        "@anthropic-ai/sdk": "0.80.0",
+        "@aws-sdk/client-bedrock-runtime": "3.1020.0",
+        "@commander-js/extra-typings": "14.0.0",
+        "@growthbook/growthbook": "1.6.5",
+        "@modelcontextprotocol/sdk": "1.29.0",
+        "@opentelemetry/api": "1.9.1",
+        "@opentelemetry/api-logs": "0.214.0",
+        "@opentelemetry/core": "2.6.1",
+        "@opentelemetry/resources": "2.6.1",
+        "@opentelemetry/sdk-logs": "0.214.0",
+        "@opentelemetry/sdk-metrics": "2.6.1",
+        "@opentelemetry/sdk-trace-base": "2.6.1",
+        "@opentelemetry/semantic-conventions": "1.40.0",
+        "ajv": "8.18.0",
+        "asciichart": "1.5.25",
+        "auto-bind": "5.0.1",
+        "axios": "1.14.0",
+        "bidi-js": "1.0.3",
+        "chalk": "5.6.2",
+        "chokidar": "5.0.0",
+        "cli-boxes": "4.0.1",
+        "code-excerpt": "4.0.0",
+        "diff": "8.0.4",
+        "emoji-regex": "10.6.0",
+        "env-paths": "4.0.0",
+        "execa": "9.6.1",
+        "figures": "6.1.0",
+        "fuse.js": "7.1.0",
+        "get-east-asian-width": "1.5.0",
+        "google-auth-library": "10.6.2",
+        "highlight.js": "11.11.1",
+        "https-proxy-agent": "8.0.0",
+        "ignore": "7.0.5",
+        "indent-string": "5.0.0",
+        "ink": "6.8.0",
+        "jsonc-parser": "3.3.1",
+        "lodash-es": "4.17.23",
+        "lru-cache": "11.2.7",
+        "marked": "17.0.5",
+        "p-map": "7.0.4",
+        "picomatch": "4.0.4",
+        "proper-lockfile": "4.1.2",
+        "qrcode": "1.5.4",
+        "react": "19.2.4",
+        "react-reconciler": "0.33.0",
+        "semver": "7.7.4",
+        "shell-quote": "1.8.3",
+        "signal-exit": "4.1.0",
+        "stack-utils": "2.0.6",
+        "strip-ansi": "7.2.0",
+        "supports-hyperlinks": "4.4.0",
+        "tree-kill": "1.2.2",
+        "type-fest": "5.5.0",
+        "undici": "7.24.6",
+        "usehooks-ts": "3.1.1",
+        "vscode-jsonrpc": "8.2.1",
+        "vscode-languageserver-protocol": "3.17.5",
+        "vscode-languageserver-types": "3.17.5",
+        "wrap-ansi": "10.0.0",
+        "ws": "8.20.0",
+        "xss": "1.0.15",
+        "yaml": "2.8.3",
+        "zod": "4.3.6",
+      },
+      "optionalDependencies": {
         "@ant/claude-for-chrome-mcp": "file:./shims/ant-claude-for-chrome-mcp",
         "@ant/computer-use-input": "file:./shims/ant-computer-use-input",
         "@ant/computer-use-mcp": "file:./shims/ant-computer-use-mcp",
         "@ant/computer-use-swift": "file:./shims/ant-computer-use-swift",
-        "@anthropic-ai/claude-agent-sdk": "*",
-        "@anthropic-ai/mcpb": "*",
-        "@anthropic-ai/sandbox-runtime": "*",
-        "@anthropic-ai/sdk": "*",
-        "@aws-sdk/client-bedrock-runtime": "*",
-        "@commander-js/extra-typings": "*",
-        "@growthbook/growthbook": "*",
-        "@modelcontextprotocol/sdk": "*",
-        "@opentelemetry/api": "*",
-        "@opentelemetry/api-logs": "*",
-        "@opentelemetry/core": "*",
-        "@opentelemetry/resources": "*",
-        "@opentelemetry/sdk-logs": "*",
-        "@opentelemetry/sdk-metrics": "*",
-        "@opentelemetry/sdk-trace-base": "*",
-        "@opentelemetry/semantic-conventions": "*",
-        "ajv": "*",
-        "asciichart": "*",
-        "auto-bind": "*",
-        "axios": "*",
-        "bidi-js": "*",
-        "chalk": "*",
-        "chokidar": "*",
-        "cli-boxes": "*",
-        "code-excerpt": "*",
         "color-diff-napi": "file:./shims/color-diff-napi",
-        "diff": "*",
-        "emoji-regex": "*",
-        "env-paths": "*",
-        "execa": "*",
-        "figures": "*",
-        "fuse.js": "*",
-        "get-east-asian-width": "*",
-        "google-auth-library": "*",
-        "highlight.js": "*",
-        "https-proxy-agent": "*",
-        "ignore": "*",
-        "indent-string": "*",
-        "ink": "*",
-        "jsonc-parser": "*",
-        "lodash-es": "*",
-        "lru-cache": "*",
-        "marked": "*",
         "modifiers-napi": "file:./shims/modifiers-napi",
-        "p-map": "*",
-        "picomatch": "*",
-        "proper-lockfile": "*",
-        "qrcode": "*",
-        "react": "*",
-        "react-reconciler": "*",
-        "semver": "*",
-        "shell-quote": "*",
-        "signal-exit": "*",
-        "stack-utils": "*",
-        "strip-ansi": "*",
-        "supports-hyperlinks": "*",
-        "tree-kill": "*",
-        "type-fest": "*",
-        "undici": "*",
+        "node-domexception": "file:./shims/node-domexception",
         "url-handler-napi": "file:./shims/url-handler-napi",
-        "usehooks-ts": "*",
-        "vscode-jsonrpc": "*",
-        "vscode-languageserver-protocol": "*",
-        "vscode-languageserver-types": "*",
-        "wrap-ansi": "*",
-        "ws": "*",
-        "xss": "*",
-        "yaml": "*",
-        "zod": "*",
       },
     },
   },
@@ -93,7 +96,23 @@
 
     "@ant/computer-use-swift": ["@ant/computer-use-swift@file:shims/ant-computer-use-swift", {}],
 
-    "@anthropic-ai/claude-agent-sdk": ["@anthropic-ai/claude-agent-sdk@0.2.88", "https://mirrors.cloud.tencent.com/npm/@anthropic-ai/claude-agent-sdk/-/claude-agent-sdk-0.2.88.tgz", { "dependencies": { "@anthropic-ai/sdk": "^0.74.0", "@modelcontextprotocol/sdk": "^1.27.1" }, "optionalDependencies": { "@img/sharp-darwin-arm64": "^0.34.2", "@img/sharp-darwin-x64": "^0.34.2", "@img/sharp-linux-arm": "^0.34.2", "@img/sharp-linux-arm64": "^0.34.2", "@img/sharp-linux-x64": "^0.34.2", "@img/sharp-linuxmusl-arm64": "^0.34.2", "@img/sharp-linuxmusl-x64": "^0.34.2", "@img/sharp-win32-arm64": "^0.34.2", "@img/sharp-win32-x64": "^0.34.2" }, "peerDependencies": { "zod": "^4.0.0" } }, "sha512-hm9AYD8UGpGouOlmWB6kMRjIUCMtO13N3HDsviu7/htOXJZ/KKypgEd5yW04Ro6421SwX4KfQNrwayJ6R227+g=="],
+    "@anthropic-ai/claude-agent-sdk": ["@anthropic-ai/claude-agent-sdk@0.3.207", "", { "optionalDependencies": { "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.3.207", "@anthropic-ai/claude-agent-sdk-darwin-x64": "0.3.207", "@anthropic-ai/claude-agent-sdk-linux-arm64": "0.3.207", "@anthropic-ai/claude-agent-sdk-linux-arm64-musl": "0.3.207", "@anthropic-ai/claude-agent-sdk-linux-x64": "0.3.207", "@anthropic-ai/claude-agent-sdk-linux-x64-musl": "0.3.207", "@anthropic-ai/claude-agent-sdk-win32-arm64": "0.3.207", "@anthropic-ai/claude-agent-sdk-win32-x64": "0.3.207" }, "peerDependencies": { "@anthropic-ai/sdk": ">=0.93.0", "@modelcontextprotocol/sdk": "^1.29.0", "zod": "^4.0.0" } }, "sha512-y0PkQRmQBi96MHiN5Xzfq+GaddxCZCqI/cXEQBLYBLXGa4i1nDSlulQqkMBj2RorrrSGQJ6Wdw+uhu6OfHNPzA=="],
+
+    "@anthropic-ai/claude-agent-sdk-darwin-arm64": ["@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.207", "", { "os": "darwin", "cpu": "arm64" }, "sha512-08xSo1FDx8h0aLhL5tvcRxa2SMmcUV3aDWeZiEJVTclyiDAs61BgTjAxCg+SZcu1CndjJO8cfO0yM5dhamxz3g=="],
+
+    "@anthropic-ai/claude-agent-sdk-darwin-x64": ["@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.207", "", { "os": "darwin", "cpu": "x64" }, "sha512-1o7K4EYqyCixZ/oeOZSh7AzSy6TM86xoOuf4VuORjPSS31hBnoqY0NGZd27+2VDs9LGtsdksmsTqcNGx9xd1hA=="],
+
+    "@anthropic-ai/claude-agent-sdk-linux-arm64": ["@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.207", "", { "os": "linux", "cpu": "arm64" }, "sha512-X4uezYOifDiNTTmmugfRCdg3nNamrr1LFRY9hg30vWYTShL+bbN+nfC3KaFfSYCl4GTtsEEUbYdOTC2F3bBpcA=="],
+
+    "@anthropic-ai/claude-agent-sdk-linux-arm64-musl": ["@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.207", "", { "os": "linux", "cpu": "arm64" }, "sha512-oPj+g2DslhH4Y9nCTs7al4t9wZv78FZwLFQwOCg99BXuz1o0ZOpKmxyvR7J9eBR+GPszeMMS8gYplQTiZC9o2w=="],
+
+    "@anthropic-ai/claude-agent-sdk-linux-x64": ["@anthropic-ai/claude-agent-sdk-linux-x64@0.3.207", "", { "os": "linux", "cpu": "x64" }, "sha512-Kg6BPH8Ee0ny/oEUWJmvT1jCRBne4jVpRSOMsJcYp1Fav1rMEgpU219oJJs+LWwx4ifuuLtNWedqJNnVw7mnKg=="],
+
+    "@anthropic-ai/claude-agent-sdk-linux-x64-musl": ["@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.207", "", { "os": "linux", "cpu": "x64" }, "sha512-uRv+D5oG/7EYr41FAJ9IPo2pZYBe2ZMaA6nSHCeizsgPxCSMtl5bNppmU21+jZJvo4hivObEgkGFERAhdGqygg=="],
+
+    "@anthropic-ai/claude-agent-sdk-win32-arm64": ["@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.207", "", { "os": "win32", "cpu": "arm64" }, "sha512-9fWpUzfkXlPAg2tf8JpQe7w9avFaomAUbfAwyAmykQgSIf66LwaJjvI5hNqhNqczRKyfsXPn3ei2S5HKlmFP+Q=="],
+
+    "@anthropic-ai/claude-agent-sdk-win32-x64": ["@anthropic-ai/claude-agent-sdk-win32-x64@0.3.207", "", { "os": "win32", "cpu": "x64" }, "sha512-YPjVT0q6aXEM2MgN4CI6/9fqiTXwETji+4NoPOzCYuqAkhXZqp30Jsk7/NHqYGNNSfURKrsuAoliKB0rsbpbjg=="],
 
     "@anthropic-ai/mcpb": ["@anthropic-ai/mcpb@2.1.2", "https://mirrors.cloud.tencent.com/npm/@anthropic-ai/mcpb/-/mcpb-2.1.2.tgz", { "dependencies": { "@inquirer/prompts": "^6.0.1", "commander": "^13.1.0", "fflate": "^0.8.2", "galactus": "^1.0.0", "ignore": "^7.0.5", "node-forge": "^1.3.2", "pretty-bytes": "^5.6.0", "zod": "^3.25.67", "zod-to-json-schema": "^3.24.6" }, "bin": { "mcpb": "dist/cli/cli.js" } }, "sha512-goRbBC8ySo7SWb7tRzr+tL6FxDc4JPTRCdgfD2omba7freofvjq5rom1lBnYHZHo6Mizs1jAHJeN53aZbDoy8A=="],
 
@@ -174,38 +193,6 @@
     "@growthbook/growthbook": ["@growthbook/growthbook@1.6.5", "https://mirrors.cloud.tencent.com/npm/@growthbook/growthbook/-/growthbook-1.6.5.tgz", { "dependencies": { "dom-mutator": "^0.6.0" } }, "sha512-mUaMsgeUTpRIUOTn33EUXHRK6j7pxBjwqH4WpQyq+pukjd1AIzWlEa6w7i6bInJUcweGgP2beXZmaP6b6UPn7A=="],
 
     "@hono/node-server": ["@hono/node-server@1.19.12", "https://mirrors.cloud.tencent.com/npm/@hono/node-server/-/node-server-1.19.12.tgz", { "peerDependencies": { "hono": "^4" } }, "sha512-txsUW4SQ1iilgE0l9/e9VQWmELXifEFvmdA1j6WFh/aFPj99hIntrSsq/if0UWyGVkmrRPKA1wCeP+UCr1B9Uw=="],
-
-    "@img/sharp-darwin-arm64": ["@img/sharp-darwin-arm64@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-darwin-arm64/-/sharp-darwin-arm64-0.34.5.tgz", { "optionalDependencies": { "@img/sharp-libvips-darwin-arm64": "1.2.4" }, "os": "darwin", "cpu": "arm64" }, "sha512-imtQ3WMJXbMY4fxb/Ndp6HBTNVtWCUI0WdobyheGf5+ad6xX8VIDO8u2xE4qc/fr08CKG/7dDseFtn6M6g/r3w=="],
-
-    "@img/sharp-darwin-x64": ["@img/sharp-darwin-x64@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-darwin-x64/-/sharp-darwin-x64-0.34.5.tgz", { "optionalDependencies": { "@img/sharp-libvips-darwin-x64": "1.2.4" }, "os": "darwin", "cpu": "x64" }, "sha512-YNEFAF/4KQ/PeW0N+r+aVVsoIY0/qxxikF2SWdp+NRkmMB7y9LBZAVqQ4yhGCm/H3H270OSykqmQMKLBhBJDEw=="],
-
-    "@img/sharp-libvips-darwin-arm64": ["@img/sharp-libvips-darwin-arm64@1.2.4", "https://mirrors.cloud.tencent.com/npm/@img/sharp-libvips-darwin-arm64/-/sharp-libvips-darwin-arm64-1.2.4.tgz", { "os": "darwin", "cpu": "arm64" }, "sha512-zqjjo7RatFfFoP0MkQ51jfuFZBnVE2pRiaydKJ1G/rHZvnsrHAOcQALIi9sA5co5xenQdTugCvtb1cuf78Vf4g=="],
-
-    "@img/sharp-libvips-darwin-x64": ["@img/sharp-libvips-darwin-x64@1.2.4", "https://mirrors.cloud.tencent.com/npm/@img/sharp-libvips-darwin-x64/-/sharp-libvips-darwin-x64-1.2.4.tgz", { "os": "darwin", "cpu": "x64" }, "sha512-1IOd5xfVhlGwX+zXv2N93k0yMONvUlANylbJw1eTah8K/Jtpi15KC+WSiaX/nBmbm2HxRM1gZ0nSdjSsrZbGKg=="],
-
-    "@img/sharp-libvips-linux-arm": ["@img/sharp-libvips-linux-arm@1.2.4", "https://mirrors.cloud.tencent.com/npm/@img/sharp-libvips-linux-arm/-/sharp-libvips-linux-arm-1.2.4.tgz", { "os": "linux", "cpu": "arm" }, "sha512-bFI7xcKFELdiNCVov8e44Ia4u2byA+l3XtsAj+Q8tfCwO6BQ8iDojYdvoPMqsKDkuoOo+X6HZA0s0q11ANMQ8A=="],
-
-    "@img/sharp-libvips-linux-arm64": ["@img/sharp-libvips-linux-arm64@1.2.4", "https://mirrors.cloud.tencent.com/npm/@img/sharp-libvips-linux-arm64/-/sharp-libvips-linux-arm64-1.2.4.tgz", { "os": "linux", "cpu": "arm64" }, "sha512-excjX8DfsIcJ10x1Kzr4RcWe1edC9PquDRRPx3YVCvQv+U5p7Yin2s32ftzikXojb1PIFc/9Mt28/y+iRklkrw=="],
-
-    "@img/sharp-libvips-linux-x64": ["@img/sharp-libvips-linux-x64@1.2.4", "https://mirrors.cloud.tencent.com/npm/@img/sharp-libvips-linux-x64/-/sharp-libvips-linux-x64-1.2.4.tgz", { "os": "linux", "cpu": "x64" }, "sha512-tJxiiLsmHc9Ax1bz3oaOYBURTXGIRDODBqhveVHonrHJ9/+k89qbLl0bcJns+e4t4rvaNBxaEZsFtSfAdquPrw=="],
-
-    "@img/sharp-libvips-linuxmusl-arm64": ["@img/sharp-libvips-linuxmusl-arm64@1.2.4", "https://mirrors.cloud.tencent.com/npm/@img/sharp-libvips-linuxmusl-arm64/-/sharp-libvips-linuxmusl-arm64-1.2.4.tgz", { "os": "linux", "cpu": "arm64" }, "sha512-FVQHuwx1IIuNow9QAbYUzJ+En8KcVm9Lk5+uGUQJHaZmMECZmOlix9HnH7n1TRkXMS0pGxIJokIVB9SuqZGGXw=="],
-
-    "@img/sharp-libvips-linuxmusl-x64": ["@img/sharp-libvips-linuxmusl-x64@1.2.4", "https://mirrors.cloud.tencent.com/npm/@img/sharp-libvips-linuxmusl-x64/-/sharp-libvips-linuxmusl-x64-1.2.4.tgz", { "os": "linux", "cpu": "x64" }, "sha512-+LpyBk7L44ZIXwz/VYfglaX/okxezESc6UxDSoyo2Ks6Jxc4Y7sGjpgU9s4PMgqgjj1gZCylTieNamqA1MF7Dg=="],
-
-    "@img/sharp-linux-arm": ["@img/sharp-linux-arm@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-linux-arm/-/sharp-linux-arm-0.34.5.tgz", { "optionalDependencies": { "@img/sharp-libvips-linux-arm": "1.2.4" }, "os": "linux", "cpu": "arm" }, "sha512-9dLqsvwtg1uuXBGZKsxem9595+ujv0sJ6Vi8wcTANSFpwV/GONat5eCkzQo/1O6zRIkh0m/8+5BjrRr7jDUSZw=="],
-
-    "@img/sharp-linux-arm64": ["@img/sharp-linux-arm64@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-linux-arm64/-/sharp-linux-arm64-0.34.5.tgz", { "optionalDependencies": { "@img/sharp-libvips-linux-arm64": "1.2.4" }, "os": "linux", "cpu": "arm64" }, "sha512-bKQzaJRY/bkPOXyKx5EVup7qkaojECG6NLYswgktOZjaXecSAeCWiZwwiFf3/Y+O1HrauiE3FVsGxFg8c24rZg=="],
-
-    "@img/sharp-linux-x64": ["@img/sharp-linux-x64@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-linux-x64/-/sharp-linux-x64-0.34.5.tgz", { "optionalDependencies": { "@img/sharp-libvips-linux-x64": "1.2.4" }, "os": "linux", "cpu": "x64" }, "sha512-MEzd8HPKxVxVenwAa+JRPwEC7QFjoPWuS5NZnBt6B3pu7EG2Ge0id1oLHZpPJdn3OQK+BQDiw9zStiHBTJQQQQ=="],
-
-    "@img/sharp-linuxmusl-arm64": ["@img/sharp-linuxmusl-arm64@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-linuxmusl-arm64/-/sharp-linuxmusl-arm64-0.34.5.tgz", { "optionalDependencies": { "@img/sharp-libvips-linuxmusl-arm64": "1.2.4" }, "os": "linux", "cpu": "arm64" }, "sha512-fprJR6GtRsMt6Kyfq44IsChVZeGN97gTD331weR1ex1c1rypDEABN6Tm2xa1wE6lYb5DdEnk03NZPqA7Id21yg=="],
-
-    "@img/sharp-linuxmusl-x64": ["@img/sharp-linuxmusl-x64@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-linuxmusl-x64/-/sharp-linuxmusl-x64-0.34.5.tgz", { "optionalDependencies": { "@img/sharp-libvips-linuxmusl-x64": "1.2.4" }, "os": "linux", "cpu": "x64" }, "sha512-Jg8wNT1MUzIvhBFxViqrEhWDGzqymo3sV7z7ZsaWbZNDLXRJZoRGrjulp60YYtV4wfY8VIKcWidjojlLcWrd8Q=="],
-
-    "@img/sharp-win32-arm64": ["@img/sharp-win32-arm64@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-win32-arm64/-/sharp-win32-arm64-0.34.5.tgz", { "os": "win32", "cpu": "arm64" }, "sha512-WQ3AgWCWYSb2yt+IG8mnC6Jdk9Whs7O0gxphblsLvdhSpSTtmu69ZG1Gkb6NuvxsNACwiPV6cNSZNzt0KPsw7g=="],
-
-    "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.34.5", "https://mirrors.cloud.tencent.com/npm/@img/sharp-win32-x64/-/sharp-win32-x64-0.34.5.tgz", { "os": "win32", "cpu": "x64" }, "sha512-+29YMsqY2/9eFEiW93eqWnuLcWcufowXewwSNIT6UwZdUUCrM3oFjMWH/Z6/TMmb4hlFenmfAVbpWeup2jryCw=="],
 
     "@inquirer/checkbox": ["@inquirer/checkbox@3.0.1", "https://mirrors.cloud.tencent.com/npm/@inquirer/checkbox/-/checkbox-3.0.1.tgz", { "dependencies": { "@inquirer/core": "^9.2.1", "@inquirer/figures": "^1.0.6", "@inquirer/type": "^2.0.0", "ansi-escapes": "^4.3.2", "yoctocolors-cjs": "^2.1.2" } }, "sha512-0hm2nrToWUdD6/UHnel/UKGdk1//ke5zGUpHIvk5ZWmaKezlGxZkOJXNSWsdxO/rEqTkbB3lNC2J6nBElV2aAQ=="],
 
@@ -659,7 +646,7 @@
 
     "negotiator": ["negotiator@1.0.0", "https://mirrors.cloud.tencent.com/npm/negotiator/-/negotiator-1.0.0.tgz", {}, "sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg=="],
 
-    "node-domexception": ["node-domexception@1.0.0", "https://mirrors.cloud.tencent.com/npm/node-domexception/-/node-domexception-1.0.0.tgz", {}, "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ=="],
+    "node-domexception": ["node-domexception@file:shims/node-domexception", {}],
 
     "node-fetch": ["node-fetch@3.3.2", "https://mirrors.cloud.tencent.com/npm/node-fetch/-/node-fetch-3.3.2.tgz", { "dependencies": { "data-uri-to-buffer": "^4.0.0", "fetch-blob": "^3.1.4", "formdata-polyfill": "^4.0.10" } }, "sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA=="],
 
@@ -867,8 +854,6 @@
 
     "zod-to-json-schema": ["zod-to-json-schema@3.25.2", "https://mirrors.cloud.tencent.com/npm/zod-to-json-schema/-/zod-to-json-schema-3.25.2.tgz", { "peerDependencies": { "zod": "^3.25.28 || ^4" } }, "sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA=="],
 
-    "@anthropic-ai/claude-agent-sdk/@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.74.0", "https://mirrors.cloud.tencent.com/npm/@anthropic-ai/sdk/-/sdk-0.74.0.tgz", { "dependencies": { "json-schema-to-ts": "^3.1.1" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-srbJV7JKsc5cQ6eVuFzjZO7UR3xEPJqPamHFIe29bs38Ij2IripoAhC0S5NslNbaFUYqBKypmmpzMTpqfHEUDw=="],
-
     "@anthropic-ai/mcpb/zod": ["zod@3.25.76", "https://mirrors.cloud.tencent.com/npm/zod/-/zod-3.25.76.tgz", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "@anthropic-ai/sandbox-runtime/commander": ["commander@12.1.0", "https://mirrors.cloud.tencent.com/npm/commander/-/commander-12.1.0.tgz", {}, "sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA=="],
@@ -898,6 +883,8 @@
     "cliui/wrap-ansi": ["wrap-ansi@6.2.0", "https://mirrors.cloud.tencent.com/npm/wrap-ansi/-/wrap-ansi-6.2.0.tgz", { "dependencies": { "ansi-styles": "^4.0.0", "string-width": "^4.1.0", "strip-ansi": "^6.0.0" } }, "sha512-r6lPcBGxZXlIcymEu7InxDMhdW0KDxpLgoFLcguasxCaJ/SOIZwINatK9KY/tf+ZrlywOKU0UDj3ATXUBfxJXA=="],
 
     "external-editor/iconv-lite": ["iconv-lite@0.4.24", "https://mirrors.cloud.tencent.com/npm/iconv-lite/-/iconv-lite-0.4.24.tgz", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3" } }, "sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA=="],
+
+    "fetch-blob/node-domexception": ["node-domexception@1.0.0", "", {}, "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ=="],
 
     "form-data/mime-types": ["mime-types@2.1.35", "https://mirrors.cloud.tencent.com/npm/mime-types/-/mime-types-2.1.35.tgz", { "dependencies": { "mime-db": "1.52.0" } }, "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw=="],
 
