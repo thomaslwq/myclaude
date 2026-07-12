@@ -18,6 +18,8 @@ const IMAGE_PASTE_KEY = getPlatform() === 'windows' ? 'alt+v' : 'ctrl+v'
 // See: https://github.com/microsoft/terminal/issues/879#issuecomment-618801651
 // Node enabled VT mode in 24.2.0 / 22.17.0: https://github.com/nodejs/node/pull/58358
 // Bun enabled VT mode in 1.2.23: https://github.com/oven-sh/bun/pull/21161
+// Note: VT mode support requires Node 22.17.0+ or 24.2.0+ for Windows, or Bun 1.2.23+
+// For Node 18.x compatibility, VT mode is disabled on Windows
 const SUPPORTS_TERMINAL_VT_MODE =
   getPlatform() !== 'windows' ||
   (isRunningWithBun()
