@@ -299,7 +299,7 @@ async function callLLM(messages, options = {}) {
   } else {
     apiKey = apiKey || process.env.OPENAI_API_KEY || '';
     // For GLM models, use the z.ai platform
-    if (modelName.startsWith('glm') && !apiBase) {
+    if (modelName.startsWith('glm')) {
       apiBase = 'https://api.z.ai/api/paas/v4';
     }
   }
