@@ -135,7 +135,7 @@ const STAGING_OAUTH_CONFIG =
           'https://platform.staging.ant.dev/oauth/code/success?app=claude-code',
         MANUAL_REDIRECT_URL:
           'https://platform.staging.ant.dev/oauth/code/callback',
-        CLIENT_ID: '22422756-60c9-4084-8eb7-27705fd5cf9a',
+        CLIENT_ID: 'local-dev-a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         OAUTH_FILE_SUFFIX: '-staging-oauth',
         MCP_PROXY_URL: 'https://mcp-proxy-staging.anthropic.com',
         MCP_PROXY_PATH: '/v1/mcp/{server_id}',
@@ -166,7 +166,7 @@ function getLocalOauthConfig(): OauthConfig {
     CONSOLE_SUCCESS_URL: `${consoleBase}/buy_credits?returnUrl=/oauth/code/success%3Fapp%3Dclaude-code`,
     CLAUDEAI_SUCCESS_URL: `${consoleBase}/oauth/code/success?app=claude-code`,
     MANUAL_REDIRECT_URL: `${consoleBase}/oauth/code/callback`,
-    CLIENT_ID: '22422756-60c9-4084-8eb7-27705fd5cf9a',
+    CLIENT_ID: 'local-dev-a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     OAUTH_FILE_SUFFIX: '-local-oauth',
     MCP_PROXY_URL: 'http://localhost:8205',
     MCP_PROXY_PATH: '/v1/toolbox/shttp/mcp/{server_id}',
