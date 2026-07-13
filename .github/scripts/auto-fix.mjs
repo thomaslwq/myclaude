@@ -122,7 +122,7 @@ function getDiff() {
  * Supports both streaming and non-streaming.
  */
 async function callLLM(messages, options = {}) {
-  const { maxTokens = 8192, temperature = 0.3 } = options;
+  const { maxTokens = 1280000, temperature = 0.3 } = options;
 
   // Determine the correct API key env var based on model name prefix
   let apiKey = CONFIG.llmApiKey;
