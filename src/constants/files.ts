@@ -151,6 +151,6 @@ export function isBinaryContent(buffer: Buffer): boolean {
     }
   }
 
-  // If more than 10% non-printable, likely binary
-  return nonPrintable / checkSize > 0.1
+  // If more than 20% non-printable, likely binary
+  return nonPrintable / checkSize > 0.2
 }
