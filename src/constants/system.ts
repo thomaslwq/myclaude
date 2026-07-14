@@ -75,7 +75,7 @@ export function getAttributionHeader(fingerprint: string): string {
     return ''
   }
 
-  const version = `${MACRO.VERSION}.${fingerprint}`
+  const version = `${globalThis.MACRO?.VERSION || 'unknown'}.${fingerprint}`
   const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT ?? 'unknown'
 
   const cch = getFeatureValue_CACHED_MAY_BE_STALE('NATIVE_CLIENT_ATTESTATION', false) ? ' cch=00000;' : ''holder is overwritten by Bun's HTTP stack with attestation token

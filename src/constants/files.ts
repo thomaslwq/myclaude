@@ -115,7 +115,9 @@ export const BINARY_EXTENSIONS = new Set([
  * Check if a file path has a binary extension.
  */
 export function hasBinaryExtension(filePath: string): boolean {
-  const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
+  const dotIndex = filePath.lastIndexOf('.')
+  if (dotIndex < 0) return false
+  const ext = filePath.slice(dotIndex).toLowerCase()
   return BINARY_EXTENSIONS.has(ext)
 }
 

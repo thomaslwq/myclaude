@@ -1,4 +1,4 @@
-import { isBinaryContent, BINARY_EXTENSIONS } from '../constants/files.js'
+import { isBinaryContent, BINARY_EXTENSIONS, hasBinaryExtension } from '../constants/files.js'
 import { describe, it, expect } from 'bun:test'
 
 describe('isBinaryContent', () => {
@@ -70,5 +70,41 @@ describe('BINARY_EXTENSIONS', () => {
     expect(BINARY_EXTENSIONS.has('.txt')).toBe(false)
     expect(BINARY_EXTENSIONS.has('.md')).toBe(false)
     expect(BINARY_EXTENSIONS.has('.json')).toBe(false)
+  })
+})
+
+describe('hasBinaryExtension', () => {
+  it('should return true for files with binary extensions', () => {
+    expect(hasBinaryExtension('image.png')).toBe(true)
+    expect(hasBinaryExtension('document.pdf')).toBe(true)
+    expect(hasBinaryExtension('archive.zip')).toBe(true)
+    expect(hasBinaryExtension('script.py')).toBe(false)
+  })
+
+  it('should return false for files without extensions', () => {
+    expect(hasBinaryExtension('README')).toBe(false)
+    expect(hasBinaryExtension('Makefile')).toBe(false)
+    expect(hasBinaryExtension('config')).toBe(false)
+  })
+
+  it('should return false for files with text extensions', () => {
+    expect(hasBinaryExtension('readme.txt')).toBe(false)
+    expect(hasBinaryExtension('notes.md')).toBe(false)
+    expect(hasBinaryExtension('data.json')).toBe(false)
+  })
+
+  it('should be case-insensitive for extensions', () => {
+    expect(hasBinaryExtension('image.PNG')).toBe(true)
+    expect(hasBinaryExtension('document.PDF')).toBe(true)
+    expect(hasBinaryExtension('archive.ZIP')).toBe(true)
+  })
+
+  it('should handle edge cases like files ending with a dot', () => {
+    expect(hasBinaryExtension('file.')).toBe(false)
+  })
+
+  it('should handle files with multiple dots', () => {
+    expect(hasBinaryExtension('archive.tar.gz')).toBe(true)
+    expect(hasBinaryExtension('file.tar.gz')).toBe(true)
   })
 })
