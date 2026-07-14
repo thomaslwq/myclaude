@@ -235,7 +235,7 @@ async function callLLM(messages, options = {}) {
  *   - abort()                 — Abort (no fix possible)
  */
 async function runAgentLoop(issueNumber, issueTitle, issueBody) {
-  const MAX_ITERATIONS = 30;
+  const MAX_ITERATIONS = 100;
   const MAX_TOOL_CALLS = 60;
 
   let iteration = 0;
