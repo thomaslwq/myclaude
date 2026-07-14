@@ -135,7 +135,7 @@ const STAGING_OAUTH_CONFIG =
           'https://platform.staging.ant.dev/oauth/code/success?app=claude-code',
         MANUAL_REDIRECT_URL:
           'https://platform.staging.ant.dev/oauth/code/callback',
-        CLIENT_ID: 'local-dev-a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        CLIENT_ID: 'staging-dev-a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         OAUTH_FILE_SUFFIX: '-staging-oauth',
         MCP_PROXY_URL: 'https://mcp-proxy-staging.anthropic.com',
         MCP_PROXY_PATH: '/v1/mcp/{server_id}',
