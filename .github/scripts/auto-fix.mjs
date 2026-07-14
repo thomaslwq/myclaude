@@ -41,7 +41,7 @@ import { resolve } from 'path';
 const ROOT = resolve(import.meta.dirname, '..', '..');
 
 const CONFIG = {
-  llmApiKey:        process.env.LLM_API_KEY || '',
+  llmApiKey:        process.env.LLM_API_KEY || process.env.SENSENOVA_API_KEY || '',
   llmModelName:     process.env.LLM_MODEL_NAME || 'sensenova/deepseek-v4-flash',
   llmApiBase:       process.env.LLM_API_BASE || 'https://open.bigmodel.cn/api/paas/v4/',
   ghToken:          process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',

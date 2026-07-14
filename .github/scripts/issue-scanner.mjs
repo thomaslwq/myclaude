@@ -46,7 +46,7 @@ import { resolve } from 'path';
 const ROOT = resolve(import.meta.dirname, '..', '..');
 
 const CONFIG = {
-  llmApiKey:    process.env.LLM_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || '',
+  llmApiKey:    process.env.LLM_API_KEY || process.env.SENSENOVA_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || '',
   llmModelName: process.env.LLM_MODEL_NAME || 'sensenova/deepseek-v4-flash',
   llmApiBase:   process.env.LLM_API_BASE || '',
   ghToken:      process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
