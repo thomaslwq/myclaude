@@ -78,8 +78,11 @@ export function getAttributionHeader(fingerprint: string): string {
   const version = `${globalThis.MACRO?.VERSION || 'unknown'}.${fingerprint}`
   const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT ?? 'unknown'
 
-  const cch = getFeatureValue_CACHED_MAY_BE_STALE('NATIVE_CLIENT_ATTESTATION', false) ? ' cch=00000;' : ''holder is overwritten by Bun's HTTP stack with attestation token
-  const cch = feature('NATIVE_CLIENT_ATTESTATION') ? ' cch=00000;' : ''
+  // cch attestation: placeholder that Bun's HTTP stack overwrites with attestation token
+  // Only include on Bun to avoid sending invalid placeholder to API on Node.js
+  const cch = typeof process !== 'undefined' && process.isBun
+    ? getFeatureValue_CACHED_MAY_BE_STALE('NATIVE_CLIENT_ATTESTATION', false) ? ' cch=00000;' : ''
+    : ''
   // cc_workload: turn-scoped hint so the API can route e.g. cron-initiated
   // requests to a lower QoS pool. Absent = interactive default. Safe re:
   // fingerprint (computed from msg chars + version only, line 78 above) and
