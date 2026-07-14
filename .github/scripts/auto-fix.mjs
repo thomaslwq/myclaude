@@ -122,7 +122,7 @@ function getDiff() {
  * Supports both streaming and non-streaming.
  */
 async function callLLM(messages, options = {}) {
-  const { maxTokens = 1280000, temperature = 0.3 } = options;
+  const { maxTokens = 128000, temperature = 0.3 } = options;
 
   // Determine the correct API key env var based on model name prefix
   let apiKey = CONFIG.llmApiKey;
@@ -325,7 +325,7 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
     // Get the LLM's next action
     let response;
     try {
-      response = await callLLM(messages, { maxTokens: 1280000, temperature: 0.3 });
+      response = await callLLM(messages, { maxTokens: 128000, temperature: 0.3 });
     } catch (e) {
       log.error(`LLM call failed: ${e.message}`);
       // Try once more with a recovery message
