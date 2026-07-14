@@ -19,8 +19,11 @@
 #   ┌─────────────────────────┬──────────────────────────────────────────────┐
 #   │ Secret                  │ 说明                                         │
 #   ├─────────────────────────┼──────────────────────────────────────────────┤
-#   │ SENSENOVA_API_KEY       │ 商汤 SenseNova API key                       │
-#   │ GH_TOKEN                │ GitHub token（可选，默认用 GITHUB_TOKEN）     │
+#   │ SENSENOVA_API_KEY       │ 商汤 SenseNova API key（主模型）             │
+#   │ LLM_API_KEY             │ 备用模型 API key（降级用）                   │
+#   │ LLM_MODEL_NAME          │ 备用模型名，如 "openai/gpt-4o"              │
+#   │ LLM_API_BASE            │ 备用 API 地址（可选）                       │
+#   │ GH_TOKEN                │ GitHub token（可选，默认用 GITHUB_TOKEN）    │
 #   └─────────────────────────┴──────────────────────────────────────────────┘
 # =============================================================================
 
@@ -88,10 +91,13 @@ jobs:
       - name: Run issue scanner
         id: scan
         env:
-          # LLM configuration
+          # Primary LLM: 商汤日日新 DeepSeek-v4-flash
           SENSENOVA_API_KEY: ${{ secrets.SENSENOVA_API_KEY }}
-          LLM_MODEL_NAME: 'sensenova/deepseek-v4-flash'
-          LLM_API_BASE: 'https://token.sensenova.cn/v1'
+
+          # Fallback LLM configuration
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME || 'openai/gpt-4o' }}
+          LLM_API_BASE: ${{ secrets.LLM_API_BASE || '' }}
 
           # GitHub configuration
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}

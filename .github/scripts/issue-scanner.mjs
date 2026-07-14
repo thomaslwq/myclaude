@@ -46,9 +46,16 @@ import { resolve } from 'path';
 const ROOT = resolve(import.meta.dirname, '..', '..');
 
 const CONFIG = {
-  llmApiKey:    process.env.LLM_API_KEY || process.env.SENSENOVA_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || '',
-  llmModelName: process.env.LLM_MODEL_NAME || 'sensenova/deepseek-v4-flash',
-  llmApiBase:   process.env.LLM_API_BASE || '',
+  llmApiKey:    process.env.LLM_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || '',
+  llmModelName: process.env.LLM_MODEL_NAME || process.env.ANTHROPIC_MODEL || 'openai/gpt-4o',
+  llmApiBase:   process.env.LLM_API_BASE || process.env.ANTHROPIC_BASE_URL || '',
+
+  // SenseTime (商汤日日新) — primary model
+  sensenovaApiKey: process.env.SENSENOVA_API_KEY || '',
+  sensenovaModel:  'deepseek-v4-flash',
+  sensenovaApiBase: 'https://token.sensenova.cn/v1',
+
+  ghToken:      process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
   ghToken:      process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
   repository:   process.env.GITHUB_REPOSITORY || '',
   dryRun:       process.env.DRY_RUN === 'true',
@@ -277,42 +284,69 @@ function getRecentActivity() {
 
 /**
  * Call the LLM with an OpenAI-compatible chat completions API.
+ * Tries SenseTime (商汤日日新) first, falls back to the configured LLM on failure.
  */
 async function callLLM(messages, options = {}) {
   const { maxTokens = 64000, temperature = 0.3 } = options;
 
-  let apiKey = CONFIG.llmApiKey;
-  let apiBase = CONFIG.llmApiBase.trim();
-  let model = CONFIG.llmModelName;
-
-  // Detect provider and set appropriate env vars
-  const modelPrefix = model.split('/')[0];
-  const modelName = model.split('/').pop() || model;
-
-  // Determine API key and base based on model prefix
-  if (modelPrefix === 'sensenova') {
-    apiKey = apiKey || process.env.SENSENOVA_API_KEY || '';
-    apiBase = apiBase || 'https://token.sensenova.cn/v1';
-  } else if (modelPrefix === 'claude' || modelPrefix === 'anthropic') {
-    apiKey = apiKey || process.env.ANTHROPIC_API_KEY || '';
-    apiBase = apiBase || 'https://api.anthropic.com/v1';
-  } else if (modelPrefix === 'gpt' || modelPrefix === 'o1' || modelPrefix === 'o3') {
-    apiKey = apiKey || process.env.OPENAI_API_KEY || '';
-    apiBase = apiBase || process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
-  } else {
-    apiKey = apiKey || process.env.OPENAI_API_KEY || '';
-    // For GLM models, use the z.ai platform
-    if (modelName.startsWith('glm')) {
-      apiBase = 'https://api.z.ai/api/paas/v4';
+  // ── Primary: SenseTime DeepSeek-v4-flash ──
+  if (CONFIG.sensenovaApiKey) {
+    try {
+      return await _callSingleLLM({
+        apiKey: CONFIG.sensenovaApiKey,
+        apiBase: CONFIG.sensenovaApiBase,
+        model: CONFIG.sensenovaModel,
+        messages,
+        maxTokens,
+        temperature,
+        timeout: 120000,
+        label: 'SenseTime DeepSeek-v4-flash',
+      });
+    } catch (err) {
+      log.warn(`SenseTime model failed: ${err.message}`);
+      log.warn('  Falling back to secondary LLM...');
     }
   }
 
-  if (!apiKey) {
-    throw new Error(`No API key found for model "${model}". Set LLM_API_KEY or the provider-specific env var.`);
-  }
+  // ── Fallback: configured LLM ──
+  return await _callSingleLLM({
+    apiKey: CONFIG.llmApiKey,
+    apiBase: CONFIG.llmApiBase,
+    model: CONFIG.llmModelName,
+    messages,
+    maxTokens,
+    temperature,
+    timeout: 120000,
+    label: CONFIG.llmModelName,
+  });
+}
 
-  // Build the endpoint URL
-  const base = apiBase.replace(/\/+$/, '');
+  /**
+
+ * Internal: call a single OpenAI-compatible chat completions API.
+ */
+async function _callSingleLLM({ apiKey, apiBase, model, messages, maxTokens, temperature, timeout, label }) {
+  apiKey = apiKey || '';
+  apiBase = (apiBase || '').trim();
+  model = model || '';
+  if (!apiKey) {
+    throw new Error(`No API key found for "${label}".`);
+  }
+  const modelPrefix = model.split('/')[0];
+  const modelName = model.split('/').pop() || model;
+  let resolvedBase = apiBase;
+  if (!resolvedBase) {
+    if (modelPrefix === 'claude' || modelPrefix === 'anthropic') {
+      resolvedBase = 'https://api.anthropic.com/v1';
+    } else if (modelPrefix === 'gpt' || modelPrefix === 'o1' || modelPrefix === 'o3') {
+      resolvedBase = 'https://api.openai.com/v1';
+    } else if (modelName.startsWith('glm')) {
+      resolvedBase = 'https://api.z.ai/api/paas/v4';
+    } else {
+      resolvedBase = 'https://api.openai.com/v1';
+    }
+  }
+  const base = resolvedBase.replace(/\/+$/, '');
   let endpoint;
   if (base.includes('/chat/completions')) {
     endpoint = base;
@@ -321,50 +355,31 @@ async function callLLM(messages, options = {}) {
   } else {
     endpoint = `${base}/v1/chat/completions`;
   }
-
-  const payload = {
-    model: modelName,
-    messages,
-    max_tokens: maxTokens,
-    temperature,
-  };
-
-  log.info(`Calling LLM: ${model} (${messages.length} messages, ${maxTokens} max tokens)`);
+  const payload = { model: modelName, messages, max_tokens: maxTokens, temperature };
+  log.info(`Calling LLM: ${label} (${messages.length} messages, ${maxTokens} max tokens)`);
   log.info(`  Endpoint: ${endpoint}`);
-
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(120000),
+    signal: AbortSignal.timeout(timeout || 120000),
   });
-
   if (!response.ok) {
     const errText = await response.text().catch(() => 'unknown error');
     throw new Error(`LLM API error (${response.status}): ${errText.slice(0, 500)}`);
   }
-
   const data = await response.json();
   const choice = data?.choices?.[0];
   const message = choice?.message || {};
-  // GLM models sometimes put content in `reasoning_content` instead of `content`
   let content = message.content || message.reasoning_content || '';
-
   if (data?.usage) {
     log.info(`  Tokens: ${data.usage.total_tokens} (prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens})`);
   }
-
   if (!content) {
     log.warn(`  LLM returned empty content. finish_reason: ${choice?.finish_reason}`);
   }
-
   return content;
 }
-
-// ── GitHub API Client ────────────────────────────────────────────────────────
 
 const GH_API_BASE = 'https://api.github.com';
 
