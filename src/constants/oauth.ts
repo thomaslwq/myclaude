@@ -12,6 +12,7 @@ function getOauthConfigType(): OauthConfigType {
       return 'staging'
     }
   }
+  // Only allow staging when USER_TYPE is 'ant', otherwise it falls back to prod
   return 'prod'
 }
 
