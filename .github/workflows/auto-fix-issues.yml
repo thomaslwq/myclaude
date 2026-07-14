@@ -17,9 +17,7 @@
 #   ┌─────────────────────────┬──────────────────────────────────────────────┐
 #   │ Secret                  │ 说明                                         │
 #   ├─────────────────────────┼──────────────────────────────────────────────┤
-#   │ LLM_API_KEY             │ 模型 API key                                 │
-#   │ LLM_MODEL_NAME          │ 模型名，如 "openai/glm-4.5" 或 "gpt-4o"     │
-#   │ LLM_API_BASE            │ API 地址（可选）                             │
+#   │ SENSENOVA_API_KEY       │ 商汤 SenseNova API key                       │
 #   │ NPM_TOKEN               │ npm 发布 token                               │
 #   │ GH_TOKEN                │ GitHub token（可选，默认用 GITHUB_TOKEN）     │
 #   └─────────────────────────┴──────────────────────────────────────────────┘
@@ -94,9 +92,9 @@ jobs:
         id: auto-fix
         env:
           # LLM configuration
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL_NAME: ${{ inputs.model || secrets.LLM_MODEL_NAME || 'openai/glm-4.5' }}
-          LLM_API_BASE: ${{ secrets.LLM_API_BASE || '' }}
+          SENSENOVA_API_KEY: ${{ secrets.SENSENOVA_API_KEY }}
+          LLM_MODEL_NAME: ${{ inputs.model || 'sensenova/deepseek-v4-flash' }}
+          LLM_API_BASE: 'https://token.sensenova.cn/v1'
 
           # GitHub configuration
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}

@@ -42,7 +42,7 @@ const ROOT = resolve(import.meta.dirname, '..', '..');
 
 const CONFIG = {
   llmApiKey:        process.env.LLM_API_KEY || '',
-  llmModelName:     process.env.LLM_MODEL_NAME || 'openai/glm-4.5',
+  llmModelName:     process.env.LLM_MODEL_NAME || 'sensenova/deepseek-v4-flash',
   llmApiBase:       process.env.LLM_API_BASE || 'https://open.bigmodel.cn/api/paas/v4/',
   ghToken:          process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
   repository:       process.env.GITHUB_REPOSITORY || '',
@@ -122,7 +122,7 @@ function getDiff() {
  * Supports both streaming and non-streaming.
  */
 async function callLLM(messages, options = {}) {
-  const { maxTokens = 128000, temperature = 0.3 } = options;
+  const { maxTokens = 64000, temperature = 0.3 } = options;
 
   // Determine the correct API key env var based on model name prefix
   let apiKey = CONFIG.llmApiKey;
@@ -136,6 +136,10 @@ async function callLLM(messages, options = {}) {
   switch (modelPrefix) {
     case 'zai':
       apiKey = apiKey || process.env.ZAI_API_KEY || '';
+      break;
+    case 'sensenova':
+      apiKey = apiKey || process.env.SENSENOVA_API_KEY || '';
+      apiBase = apiBase || 'https://token.sensenova.cn/v1';
       break;
     case 'claude':
     case 'anthropic':
@@ -180,7 +184,7 @@ async function callLLM(messages, options = {}) {
   }
 
   const payload = {
-    model,
+    model: modelName,
     messages,
     max_tokens: maxTokens,
     temperature,
@@ -325,7 +329,7 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
     // Get the LLM's next action
     let response;
     try {
-      response = await callLLM(messages, { maxTokens: 128000, temperature: 0.3 });
+      response = await callLLM(messages, { maxTokens: 64000, temperature: 0.3 });
     } catch (e) {
       log.error(`LLM call failed: ${e.message}`);
       // Try once more with a recovery message

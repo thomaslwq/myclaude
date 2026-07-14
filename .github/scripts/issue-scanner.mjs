@@ -47,8 +47,8 @@ const ROOT = resolve(import.meta.dirname, '..', '..');
 
 const CONFIG = {
   llmApiKey:    process.env.LLM_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || '',
-  llmModelName: process.env.LLM_MODEL_NAME || process.env.ANTHROPIC_MODEL || 'openai/gpt-4o',
-  llmApiBase:   process.env.LLM_API_BASE || process.env.ANTHROPIC_BASE_URL || '',
+  llmModelName: process.env.LLM_MODEL_NAME || 'sensenova/deepseek-v4-flash',
+  llmApiBase:   process.env.LLM_API_BASE || '',
   ghToken:      process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
   repository:   process.env.GITHUB_REPOSITORY || '',
   dryRun:       process.env.DRY_RUN === 'true',
@@ -279,7 +279,7 @@ function getRecentActivity() {
  * Call the LLM with an OpenAI-compatible chat completions API.
  */
 async function callLLM(messages, options = {}) {
-  const { maxTokens = 128000, temperature = 0.3 } = options;
+  const { maxTokens = 64000, temperature = 0.3 } = options;
 
   let apiKey = CONFIG.llmApiKey;
   let apiBase = CONFIG.llmApiBase.trim();
@@ -290,7 +290,10 @@ async function callLLM(messages, options = {}) {
   const modelName = model.split('/').pop() || model;
 
   // Determine API key and base based on model prefix
-  if (modelPrefix === 'claude' || modelPrefix === 'anthropic') {
+  if (modelPrefix === 'sensenova') {
+    apiKey = apiKey || process.env.SENSENOVA_API_KEY || '';
+    apiBase = apiBase || 'https://token.sensenova.cn/v1';
+  } else if (modelPrefix === 'claude' || modelPrefix === 'anthropic') {
     apiKey = apiKey || process.env.ANTHROPIC_API_KEY || '';
     apiBase = apiBase || 'https://api.anthropic.com/v1';
   } else if (modelPrefix === 'gpt' || modelPrefix === 'o1' || modelPrefix === 'o3') {
