@@ -129,6 +129,11 @@ const BINARY_CHECK_SIZE = 8192
  * or a high proportion of non-printable characters.
  */
 export function isBinaryContent(buffer: Buffer): boolean {
+  // If buffer is empty, it's not binary
+  if (buffer.length === 0) {
+    return false
+  }
+
   // Check first BINARY_CHECK_SIZE bytes (or full buffer if smaller)
   const checkSize = Math.min(buffer.length, BINARY_CHECK_SIZE)
 
