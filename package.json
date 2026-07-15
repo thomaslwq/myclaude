@@ -38,7 +38,8 @@
     "README.md",
     "README.zh-CN.md",
     "CHANGELOG.md",
-    "docs/funnycode.png"
+    "docs/funnycode.png",
+    "shims/node-domexception/"
   ],
   "publishConfig": {
     "access": "public"
