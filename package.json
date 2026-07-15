@@ -121,5 +121,8 @@
     "modifiers-napi": "file:./shims/modifiers-napi",
     "node-domexception": "file:./shims/node-domexception",
     "url-handler-napi": "file:./shims/url-handler-napi"
+  },
+  "overrides": {
+    "node-domexception": "file:./shims/node-domexception"
   }
 }
