@@ -297,7 +297,7 @@ async function callLLM(messages, options = {}) {
         apiBase: CONFIG.sensenovaApiBase,
         model: CONFIG.sensenovaModel,
         messages,
-        maxTokens: 1000000,
+        maxTokens: 384000,
         temperature,
         timeout: 120000,
         label: 'SenseTime DeepSeek-v4-flash',
