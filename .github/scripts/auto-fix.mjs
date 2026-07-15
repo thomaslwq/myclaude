@@ -41,9 +41,16 @@ import { resolve } from 'path';
 const ROOT = resolve(import.meta.dirname, '..', '..');
 
 const CONFIG = {
-  llmApiKey:        process.env.LLM_API_KEY || process.env.SENSENOVA_API_KEY || '',
-  llmModelName:     process.env.LLM_MODEL_NAME || 'sensenova/deepseek-v4-flash',
-  llmApiBase:       process.env.LLM_API_BASE || 'https://open.bigmodel.cn/api/paas/v4/',
+  // Fallback / secondary LLM
+  llmApiKey:        process.env.LLM_API_KEY || '',
+  llmModelName:     process.env.LLM_MODEL_NAME || 'openai/gpt-4o',
+  llmApiBase:       process.env.LLM_API_BASE || '',
+
+  // Primary: SenseTime 商汤日日新 DeepSeek-v4-flash (1M context)
+  sensenovaApiKey:  process.env.SENSENOVA_API_KEY || '',
+  sensenovaModel:   'deepseek-v4-flash',
+  sensenovaApiBase: 'https://token.sensenova.cn/v1',
+
   ghToken:          process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
   repository:       process.env.GITHUB_REPOSITORY || '',
   maxIssues:        parseInt(process.env.MAX_ISSUES || '3', 10),
@@ -118,99 +125,57 @@ function getDiff() {
 // ── LLM API Client ──────────────────────────────────────────────────────────
 
 /**
- * Call the LLM with an OpenAI-compatible chat completions API.
- * Supports both streaming and non-streaming.
+ * Call a single LLM via an OpenAI-compatible chat completions endpoint.
+ * Resolves the API base and endpoint based on the model name prefix.
  */
-async function callLLM(messages, options = {}) {
-  const { maxTokens = 64000, temperature = 0.3 } = options;
-
-  // Determine the correct API key env var based on model name prefix
-  let apiKey = CONFIG.llmApiKey;
-  let apiBase = CONFIG.llmApiBase.trim();
-  let model = CONFIG.llmModelName;
-
-  // Detect provider and set appropriate env vars
-  const modelPrefix = model.split('/')[0];
-  const modelName = model.split('/').pop() || model;  // e.g. "glm-4.7-flash"
-
-  switch (modelPrefix) {
-    case 'zai':
-      apiKey = apiKey || process.env.ZAI_API_KEY || '';
-      break;
-    case 'sensenova':
-      apiKey = apiKey || process.env.SENSENOVA_API_KEY || '';
-      apiBase = apiBase || 'https://token.sensenova.cn/v1';
-      break;
-    case 'claude':
-    case 'anthropic':
-      apiKey = apiKey || process.env.ANTHROPIC_API_KEY || '';
-      break;
-    case 'gpt':
-    case 'o1':
-    case 'o3':
-      apiKey = apiKey || process.env.OPENAI_API_KEY || '';
-      apiBase = apiBase || process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
-      break;
-    default:
-      // openai/glm-xxx, glm-xxx, or custom
-      apiKey = apiKey || process.env.OPENAI_API_KEY || '';
-      // GLM / Zhipu models: use the correct Z.AI platform endpoint
-      // (old open.bigmodel.cn was migrated to api.z.ai)
-      if (modelName.startsWith('glm')) {
-        apiBase = 'https://api.z.ai/api/paas/v4';
-      }
-      break;
-  }
-
+async function _callSingleLLM({ apiKey, apiBase, model, messages, maxTokens, temperature, timeout, label }) {
+  apiKey = apiKey || '';
+  apiBase = (apiBase || '').trim();
+  model = model || '';
   if (!apiKey) {
-    throw new Error(`No API key found for model "${model}". Set LLM_API_KEY or the provider-specific env var.`);
+    throw new Error(`No API key found for "${label}".`);
   }
-
-  // Ensure API base has the correct path
-  const base = apiBase.replace(/\/+$/, '');
-
-  // Build the correct endpoint URL:
-  //   - If base already contains /chat/completions → use as-is
-  //   - If base has a version path (/v1, /v2, /v4, etc.) → append /chat/completions
-  //   - Otherwise → append /v1/chat/completions
+  const modelPrefix = model.split('/')[0];
+  const modelName = model.split('/').pop() || model;
+  let resolvedBase = apiBase;
+  if (!resolvedBase) {
+    if (modelPrefix === 'claude' || modelPrefix === 'anthropic') {
+      resolvedBase = 'https://api.anthropic.com/v1';
+    } else if (modelPrefix === 'gpt' || modelPrefix === 'o1' || modelPrefix === 'o3') {
+      resolvedBase = 'https://api.openai.com/v1';
+    } else if (modelName.startsWith('glm')) {
+      resolvedBase = 'https://api.z.ai/api/paas/v4';
+    } else {
+      resolvedBase = 'https://api.openai.com/v1';
+    }
+  }
+  const base = resolvedBase.replace(/\/+$/, '');
   let endpoint;
   if (base.includes('/chat/completions')) {
     endpoint = base;
   } else if (/\/v\d/.test(base)) {
-    // e.g. https://open.bigmodel.cn/api/paas/v4 → /chat/completions
     endpoint = `${base}/chat/completions`;
   } else {
     endpoint = `${base}/v1/chat/completions`;
   }
-
-  const payload = {
-    model: modelName,
-    messages,
-    max_tokens: maxTokens,
-    temperature,
-  };
-
-  log.info(`Calling LLM: ${model} (${messages.length} messages, ${maxTokens} max tokens)`);
+  const payload = { model: modelName, messages, max_tokens: maxTokens, temperature };
+  log.info(`Calling LLM: ${label} (${messages.length} messages, ${maxTokens} max tokens)`);
   log.info(`  Endpoint: ${endpoint}`);
   log.info(`  User message: ${(messages[messages.length - 1]?.content || '').slice(0, 100)}...`);
-
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(timeout || 120000),
   });
-
   if (!response.ok) {
     const errText = await response.text().catch(() => 'unknown error');
     throw new Error(`LLM API error (${response.status}): ${errText.slice(0, 500)}`);
   }
-
   const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content || '';
-
+  const choice = data?.choices?.[0];
+  const message = choice?.message || {};
+  let content = message.content || message.reasoning_content || '';
   if (data?.usage) {
     log.info(`  Tokens: ${data.usage.total_tokens} (prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens})`);
     // Estimate cost (very rough: $3/M input, $15/M output for typical models)
@@ -218,8 +183,51 @@ async function callLLM(messages, options = {}) {
     const outputCost = (data.usage.completion_tokens / 1_000_000) * 15;
     log.info(`  Est. cost: $${(inputCost + outputCost).toFixed(4)}`);
   }
-
+  if (!content) {
+    log.warn(`  LLM returned empty content. finish_reason: ${choice?.finish_reason}`);
+  }
   return content;
+}
+
+/**
+ * Call the LLM with automatic fallback.
+ *
+ * Primary:   SenseTime 商汤日日新 DeepSeek-v4-flash (1M context)
+ * Fallback:  Configured LLM (LLM_API_KEY / LLM_MODEL_NAME / LLM_API_BASE)
+ */
+async function callLLM(messages, options = {}) {
+  const { maxTokens = 64000, temperature = 0.3 } = options;
+
+  // ── Primary: SenseTime DeepSeek-v4-flash (1M context) ──
+  if (CONFIG.sensenovaApiKey) {
+    try {
+      return await _callSingleLLM({
+        apiKey: CONFIG.sensenovaApiKey,
+        apiBase: CONFIG.sensenovaApiBase,
+        model: CONFIG.sensenovaModel,
+        messages,
+        maxTokens: 384000,
+        temperature,
+        timeout: 120000,
+        label: 'SenseTime DeepSeek-v4-flash',
+      });
+    } catch (err) {
+      log.warn(`SenseTime model failed: ${err.message}`);
+      log.warn('  Falling back to secondary LLM...');
+    }
+  }
+
+  // ── Fallback: configured LLM ──
+  return await _callSingleLLM({
+    apiKey: CONFIG.llmApiKey,
+    apiBase: CONFIG.llmApiBase,
+    model: CONFIG.llmModelName,
+    messages,
+    maxTokens,
+    temperature,
+    timeout: 120000,
+    label: CONFIG.llmModelName,
+  });
 }
 
 // ── Agent Loop ───────────────────────────────────────────────────────────────

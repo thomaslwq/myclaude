@@ -41,7 +41,7 @@ on:
         type: boolean
         default: false
       model:
-        description: 'Override LLM model name'
+        description: 'Override fallback LLM model name (unused if SenseTime succeeds)'
         required: false
         default: ''
 
@@ -91,10 +91,13 @@ jobs:
       - name: Run auto-fix agent
         id: auto-fix
         env:
-          # LLM configuration
+          # ── Primary: SenseTime 商汤日日新 DeepSeek-v4-flash (1M context) ──
           SENSENOVA_API_KEY: ${{ secrets.SENSENOVA_API_KEY }}
-          LLM_MODEL_NAME: ${{ inputs.model || 'sensenova/deepseek-v4-flash' }}
-          LLM_API_BASE: 'https://token.sensenova.cn/v1'
+
+          # ── Fallback: degrade to this model if SenseTime fails ──
+          # LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          # LLM_MODEL_NAME: ${{ inputs.model || 'openai/gpt-4o' }}
+          # LLM_API_BASE: ''
 
           # GitHub configuration
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
