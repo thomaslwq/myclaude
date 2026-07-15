@@ -545,16 +545,16 @@ async function main() {
   log.raw(' Auto-Fix Agent — Autonomous Issue Resolution');
   log.raw('==============================================');
   log.raw(`Repository:  ${CONFIG.repository}`);
-  log.raw(`Model:       ${CONFIG.llmModelName}`);
+  log.raw(`Model:       ${CONFIG.sensenovaApiKey ? 'sensenova/deepseek-v4-flash (primary)' : CONFIG.llmModelName + ' (fallback)'}`);
   log.raw(`Max issues:  ${CONFIG.maxIssues}`);
   log.raw(`Cost limit:  $${CONFIG.costLimit}`);
   log.raw(`Dry run:     ${CONFIG.dryRun}`);
   log.raw('==============================================');
   log.raw('');
 
-  // Validate required config
-  if (!CONFIG.llmApiKey) {
-    log.error('LLM_API_KEY is not set. Please configure it in repository secrets.');
+  // Validate required config — at least one LLM provider must be configured
+  if (!CONFIG.sensenovaApiKey && !CONFIG.llmApiKey) {
+    log.error('No LLM API key configured. Set SENSENOVA_API_KEY (primary) or LLM_API_KEY (fallback) in repository secrets.');
     process.exit(1);
   }
   if (!CONFIG.ghToken) {
