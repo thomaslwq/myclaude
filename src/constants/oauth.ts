@@ -4,14 +4,7 @@ import { isEnvTruthy } from 'src/utils/envUtils.js'
 type OauthConfigType = 'prod' | 'staging' | 'local'
 
 function getOauthConfigType(): OauthConfigType {
-  if (process.env.USER_TYPE === 'ant') {
-    if (isEnvTruthy(process.env.USE_LOCAL_OAUTH)) {
-      return 'local'
-    }
-    if (isEnvTruthy(process.env.USE_STAGING_OAUTH)) {
-      return 'staging'
-    }
-  }
+  // Always use production OAuth config - USER_TYPE is user-controllable in open-source fork
   return 'prod'
 }
 
@@ -182,8 +175,20 @@ const ALLOWED_OAUTH_BASE_URLS = [
   'https://claude-staging.fedstart.com',
 ]
 
+// Cache for memoized config (lifetime of process, since env vars don't change at runtime)
+let _cachedOauthConfig: OauthConfig | null = null
+
+/* @internal - for testing only */
+export function _resetOauthConfigCache(): void {
+  _cachedOauthConfig = null
+}
+
 // Default to prod config, override with test/staging if enabled
 export function getOauthConfig(): OauthConfig {
+  if (_cachedOauthConfig !== null) {
+    return _cachedOauthConfig
+  }
+
   let config: OauthConfig = (() => {
     switch (getOauthConfigType()) {
       case 'local':
@@ -245,5 +250,6 @@ export function getOauthConfig(): OauthConfig {
     }
   }
 
+  _cachedOauthConfig = config
   return config
 }
