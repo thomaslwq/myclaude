@@ -229,9 +229,16 @@ export function getOauthConfig(): OauthConfig {
     }
   }
 
-  // Allow CLIENT_ID override via environment variable (e.g., for Xcode integration)
+  // Allow CLIENT_ID override via environment variable (e.g., for Xcode integration).
+  // Must be a valid UUID to prevent OAuth phishing attacks.
   const clientIdOverride = process.env.CLAUDE_CODE_OAUTH_CLIENT_ID
   if (clientIdOverride) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(clientIdOverride)) {
+      throw new Error(
+        `CLAUDE_CODE_OAUTH_CLIENT_ID must be a valid UUID (e.g., "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"). Got: "${clientIdOverride}"`,
+      )
+    }
     config = {
       ...config,
       CLIENT_ID: clientIdOverride,
