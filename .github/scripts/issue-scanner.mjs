@@ -287,9 +287,9 @@ function getRecentActivity() {
  * Tries SenseTime (商汤日日新) first, falls back to the configured LLM on failure.
  */
 async function callLLM(messages, options = {}) {
-  const { maxTokens = 64000, temperature = 0.3 } = options;
+  const { maxTokens = 128000, temperature = 0.3 } = options;
 
-  // ── Primary: SenseTime DeepSeek-v4-flash ──
+  // ── Primary: SenseTime DeepSeek-v4-flash (1M context) ──
   if (CONFIG.sensenovaApiKey) {
     try {
       return await _callSingleLLM({
@@ -297,7 +297,7 @@ async function callLLM(messages, options = {}) {
         apiBase: CONFIG.sensenovaApiBase,
         model: CONFIG.sensenovaModel,
         messages,
-        maxTokens,
+        maxTokens: 1000000,
         temperature,
         timeout: 120000,
         label: 'SenseTime DeepSeek-v4-flash',
