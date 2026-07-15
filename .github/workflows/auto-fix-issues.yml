@@ -17,7 +17,10 @@
 #   ┌─────────────────────────┬──────────────────────────────────────────────┐
 #   │ Secret                  │ 说明                                         │
 #   ├─────────────────────────┼──────────────────────────────────────────────┤
-#   │ SENSENOVA_API_KEY       │ 商汤 SenseNova API key                       │
+#   │ SENSENOVA_API_KEY       │ 商汤 SenseNova API key（主模型）             │
+#   │ LLM_API_KEY             │ 智谱 Zhipu API key（兜底模型，可选）          │
+#   │ LLM_MODEL_NAME          │ 兜底模型名（可选，默认 "openai/glm-4.5"）    │
+#   │ LLM_API_BASE            │ 兜底 API 地址（可选，默认智谱端点）          │
 #   │ NPM_TOKEN               │ npm 发布 token                               │
 #   │ GH_TOKEN                │ GitHub token（可选，默认用 GITHUB_TOKEN）     │
 #   └─────────────────────────┴──────────────────────────────────────────────┘
@@ -41,7 +44,7 @@ on:
         type: boolean
         default: false
       model:
-        description: 'Override fallback LLM model name (unused if SenseTime succeeds)'
+        description: 'Override fallback LLM model name (default: 智谱 GLM-4.5, unused if SenseTime succeeds)'
         required: false
         default: ''
 
@@ -94,9 +97,9 @@ jobs:
           # ── Primary: SenseTime 商汤日日新 DeepSeek-v4-flash (1M context) ──
           SENSENOVA_API_KEY: ${{ secrets.SENSENOVA_API_KEY }}
 
-          # ── Fallback: degrade to this model if SenseTime fails ──
+          # ── Fallback: 智谱 GLM-4.5 (Zhipu, used if SenseTime fails) ──
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL_NAME: ${{ inputs.model || secrets.LLM_MODEL_NAME || 'openai/gpt-4o' }}
+          LLM_MODEL_NAME: ${{ inputs.model || secrets.LLM_MODEL_NAME || 'openai/glm-4.5' }}
           LLM_API_BASE: ${{ secrets.LLM_API_BASE || '' }}
 
           # GitHub configuration

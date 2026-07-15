@@ -41,10 +41,10 @@ import { resolve } from 'path';
 const ROOT = resolve(import.meta.dirname, '..', '..');
 
 const CONFIG = {
-  // Fallback / secondary LLM
+  // Fallback / secondary LLM — 智谱 GLM (Zhipu)
   llmApiKey:        process.env.LLM_API_KEY || '',
-  llmModelName:     process.env.LLM_MODEL_NAME || 'openai/gpt-4o',
-  llmApiBase:       process.env.LLM_API_BASE || '',
+  llmModelName:     process.env.LLM_MODEL_NAME || 'openai/glm-4.5',
+  llmApiBase:       process.env.LLM_API_BASE || 'https://open.bigmodel.cn/api/paas/v4/',
 
   // Primary: SenseTime 商汤日日新 DeepSeek-v4-flash (1M context)
   sensenovaApiKey:  process.env.SENSENOVA_API_KEY || '',
@@ -190,10 +190,100 @@ async function _callSingleLLM({ apiKey, apiBase, model, messages, maxTokens, tem
 }
 
 /**
+ * Call the fallback LLM with the old-style switch-based logic (a3eaee9^ 之前的方式).
+ * Uses the full model name (with prefix) in the API payload, and resolves
+ * the API key/base from the model prefix via a switch statement.
+ */
+async function _callFallbackLLM({ apiKey, apiBase, model, messages, maxTokens, temperature }) {
+  apiKey = apiKey || '';
+  apiBase = (apiBase || '').trim();
+  model = model || '';
+
+  const modelPrefix = model.split('/')[0];
+  const modelName = model.split('/').pop() || model;
+
+  // Resolve API key and base based on model prefix (old switch logic)
+  switch (modelPrefix) {
+    case 'zai':
+      apiKey = apiKey || process.env.ZAI_API_KEY || '';
+      break;
+    case 'claude':
+    case 'anthropic':
+      apiKey = apiKey || process.env.ANTHROPIC_API_KEY || '';
+      break;
+    case 'gpt':
+    case 'o1':
+    case 'o3':
+      apiKey = apiKey || process.env.OPENAI_API_KEY || '';
+      apiBase = apiBase || process.env.OPENAI_API_BASE || 'https://api.openai.com/v1';
+      break;
+    default:
+      // openai/glm-xxx, glm-xxx, or custom
+      apiKey = apiKey || process.env.OPENAI_API_KEY || '';
+      // GLM / Zhipu models: use the Z.AI platform endpoint
+      if (modelName.startsWith('glm')) {
+        apiBase = 'https://api.z.ai/api/paas/v4';
+      }
+      break;
+  }
+
+  if (!apiKey) {
+    throw new Error(`No API key found for model "${model}". Set LLM_API_KEY or the provider-specific env var.`);
+  }
+
+  const base = apiBase.replace(/\/+$/, '');
+  let endpoint;
+  if (base.includes('/chat/completions')) {
+    endpoint = base;
+  } else if (/\/v\d/.test(base)) {
+    endpoint = `${base}/chat/completions`;
+  } else {
+    endpoint = `${base}/v1/chat/completions`;
+  }
+
+  // Use the full model name (with prefix, e.g. "openai/glm-4.5") in the payload
+  const payload = { model, messages, max_tokens: maxTokens, temperature };
+
+  log.info(`Calling LLM: ${model} (${messages.length} messages, ${maxTokens} max tokens)`);
+  log.info(`  Endpoint: ${endpoint}`);
+  log.info(`  User message: ${(messages[messages.length - 1]?.content || '').slice(0, 100)}...`);
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(120000),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'unknown error');
+    throw new Error(`LLM API error (${response.status}): ${errText.slice(0, 500)}`);
+  }
+
+  const data = await response.json();
+  const choice = data?.choices?.[0];
+  const message = choice?.message || {};
+  let content = message.content || message.reasoning_content || '';
+
+  if (data?.usage) {
+    log.info(`  Tokens: ${data.usage.total_tokens} (prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens})`);
+    const inputCost = (data.usage.prompt_tokens / 1_000_000) * 3;
+    const outputCost = (data.usage.completion_tokens / 1_000_000) * 15;
+    log.info(`  Est. cost: $${(inputCost + outputCost).toFixed(4)}`);
+  }
+
+  if (!content) {
+    log.warn(`  LLM returned empty content. finish_reason: ${choice?.finish_reason}`);
+  }
+
+  return content;
+}
+
+/**
  * Call the LLM with automatic fallback.
  *
  * Primary:   SenseTime 商汤日日新 DeepSeek-v4-flash (1M context)
- * Fallback:  Configured LLM (LLM_API_KEY / LLM_MODEL_NAME / LLM_API_BASE)
+ * Fallback:  智谱 GLM-4.5 (Zhipu, a3eaee9^ 之前的 switch-based 方式)
  */
 async function callLLM(messages, options = {}) {
   const { maxTokens = 64000, temperature = 0.3 } = options;
@@ -213,20 +303,18 @@ async function callLLM(messages, options = {}) {
       });
     } catch (err) {
       log.warn(`SenseTime model failed: ${err.message}`);
-      log.warn('  Falling back to secondary LLM...');
+      log.warn('  Falling back to 智谱 GLM-4.5...');
     }
   }
 
-  // ── Fallback: configured LLM ──
-  return await _callSingleLLM({
+  // ── Fallback: 智谱 GLM-4.5 (switch-based, model 全名发送) ──
+  return await _callFallbackLLM({
     apiKey: CONFIG.llmApiKey,
     apiBase: CONFIG.llmApiBase,
     model: CONFIG.llmModelName,
     messages,
     maxTokens,
     temperature,
-    timeout: 120000,
-    label: CONFIG.llmModelName,
   });
 }
 
@@ -545,7 +633,7 @@ async function main() {
   log.raw(' Auto-Fix Agent — Autonomous Issue Resolution');
   log.raw('==============================================');
   log.raw(`Repository:  ${CONFIG.repository}`);
-  log.raw(`Model:       ${CONFIG.sensenovaApiKey ? 'sensenova/deepseek-v4-flash (primary)' : CONFIG.llmModelName + ' (fallback)'}`);
+  log.raw(`Model:       ${CONFIG.sensenovaApiKey ? 'sensenova/deepseek-v4-flash (primary) → 智谱 ' + CONFIG.llmModelName + ' (fallback)' : CONFIG.llmModelName}`);
   log.raw(`Max issues:  ${CONFIG.maxIssues}`);
   log.raw(`Cost limit:  $${CONFIG.costLimit}`);
   log.raw(`Dry run:     ${CONFIG.dryRun}`);
