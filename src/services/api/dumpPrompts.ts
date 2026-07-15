@@ -97,7 +97,8 @@ function dumpRequest(
     const req = jsonParse(body) as Record<string, unknown>
     addApiRequestToCache(req)
 
-    if (process.env.USER_TYPE !== 'ant') return
+    // Require both USER_TYPE=ant and DUMP_PROMPTS=1 to write to disk
+    if (process.env.USER_TYPE !== 'ant' || process.env.DUMP_PROMPTS !== '1') return
     const entries: string[] = []
     const messages = (req.messages ?? []) as Array<{ role?: string }>
 
@@ -170,8 +171,8 @@ export function createDumpPromptsFetch(
     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
     const response = await globalThis.fetch(input, init)
 
-    // Save response async
-    if (timestamp && response.ok && process.env.USER_TYPE === 'ant') {
+    // Save response async — require both USER_TYPE=ant and DUMP_PROMPTS=1
+    if (timestamp && response.ok && process.env.USER_TYPE === 'ant' && process.env.DUMP_PROMPTS === '1') {
       const cloned = response.clone()
       void (async () => {
         try {
