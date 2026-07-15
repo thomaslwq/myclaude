@@ -95,9 +95,9 @@ jobs:
           SENSENOVA_API_KEY: ${{ secrets.SENSENOVA_API_KEY }}
 
           # ── Fallback: degrade to this model if SenseTime fails ──
-          # LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          # LLM_MODEL_NAME: ${{ inputs.model || 'openai/gpt-4o' }}
-          # LLM_API_BASE: ''
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL_NAME: ${{ inputs.model || secrets.LLM_MODEL_NAME || 'openai/gpt-4o' }}
+          LLM_API_BASE: ${{ secrets.LLM_API_BASE || '' }}
 
           # GitHub configuration
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
