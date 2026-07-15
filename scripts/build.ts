@@ -56,6 +56,9 @@ globalThis.MACRO = {
   ISSUES_EXPLAINER: 'file an issue at ' + ${JSON.stringify(process.env.MYCLAUDE_REPOSITORY_URL || pkg.bugs?.url || pkg.repository?.url || '')},
   FEEDBACK_CHANNEL: 'github',
 };
+// Polyfill for bun:bundle feature() — all features default to false
+// when running outside of Bun's compile-time macro system.
+globalThis.feature = globalThis.feature || function feature(name) { return false; };
 `
 
 console.log(`Building myclaude...`)

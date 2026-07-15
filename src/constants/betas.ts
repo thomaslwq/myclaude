@@ -23,7 +23,7 @@ export const TOKEN_EFFICIENT_TOOLS_BETA_HEADER =
 export const SUMMARIZE_CONNECTOR_TEXT_BETA_HEADER = getFeatureValue_CACHED_MAY_BE_STALE('CONNECTOR_TEXT', false)
   ? 'summarize-connector-text-2026-03-13'
   : ''
-export const AFK_MODE_BETA_HEADER = feature('TRANSCRIPT_CLASSIFIER')
+export const AFK_MODE_BETA_HEADER = getFeatureValue_CACHED_MAY_BE_STALE('TRANSCRIPT_CLASSIFIER', false)
   ? 'afk-mode-2026-01-31'
   : ''
 export const CLI_INTERNAL_BETA_HEADER =
