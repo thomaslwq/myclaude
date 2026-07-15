@@ -100,50 +100,37 @@ function collectMissingRelativeImports(): MissingImport[] {
 }
 
 const args = process.argv.slice(2)
-const missingImports = collectMissingRelativeImports()
 
-if (args.includes('--version')) {
-  if (missingImports.length > 0) {
-    console.log(`${pkg.version} (restored dev workspace)`)
-    console.log(`missing_relative_imports=${missingImports.length}`)
+// Only run the expensive synchronous filesystem scan in development mode
+if (process.env.NODE_ENV === 'development') {
+  const missingImports = collectMissingRelativeImports()
+
+  if (args.includes('--version')) {
+    if (missingImports.length > 0) {
+      console.log(`${pkg.version} (restored dev workspace)`)
+    } else {
+      console.log(pkg.version)
+    }
     process.exit(0)
   }
-  console.log(pkg.version)
-  process.exit(0)
-}
 
-if (args.includes('--help')) {
   if (missingImports.length > 0) {
-    console.log('myclaude development workspace')
-    console.log(`version: ${pkg.version}`)
-    console.log(`missing relative imports: ${missingImports.length}`)
+    console.log('Missing relative imports detected:')
+    for (const imp of missingImports) {
+      console.log(`  ${imp.importer}: ${imp.specifier}`)
+    }
+    process.exit(1)
+  }
+
+  console.log('Dev workspace check passed (no missing relative imports)')
+} else {
+  // In production, skip the expensive scan entirely
+  if (args.includes('--version')) {
+    console.log(pkg.version)
     process.exit(0)
   }
-  console.log('Usage: myclaude [options] [prompt]')
-  console.log('')
-  console.log('Basic commands:')
-  console.log('  --help       Show this help')
-  console.log('  --version    Show version')
-  console.log('')
-  console.log('Interactive REPL startup is routed to src/main.tsx when run without these flags.')
-  process.exit(0)
+
+  console.log('Dev workspace check skipped (NODE_ENV is not development)')
 }
 
-if (missingImports.length > 0) {
-  console.log('myclaude development workspace')
-  console.log(`version: ${pkg.version}`)
-  console.log(`missing relative imports: ${missingImports.length}`)
-  console.log('')
-  console.log('Top missing modules:')
-  for (const item of missingImports.slice(0, 20)) {
-    console.log(`- ${item.importer.replace(`${process.cwd()}/`, '')} -> ${item.specifier}`)
-  }
-  console.log('')
-  console.log('The original app entry is still blocked by missing restored sources.')
-  console.log('Use this workspace to continue restoration; once missing imports reach 0, this launcher will forward to src/main.tsx automatically.')
-  process.exit(0)
-}
-
-// Route through the original CLI bootstrap so the exported `main()` is
-// actually invoked. Importing `main.tsx` directly only evaluates the module.
-await import('./entrypoints/cli.tsx')
+process.exit(0)

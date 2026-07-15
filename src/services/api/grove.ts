@@ -272,6 +272,7 @@ export const getGroveNoticeConfig = memoize(
       }
     } catch (err) {
       logForDebugging(`Failed to fetch Grove notice config: ${err}`)
+      getGroveNoticeConfig.cache.clear?.()
       return { success: false }
     }
   },
