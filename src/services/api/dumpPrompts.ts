@@ -5,6 +5,8 @@ import { dirname, join } from 'path'
 import { getSessionId } from 'src/bootstrap/state.js'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
+import { logForDebugging } from '../../utils/debug.js'
+import { logError } from '../../utils/log.js'
 
 function hashString(str: string): string {
   return createHash('sha256').update(str).digest('hex')
@@ -68,7 +70,7 @@ function appendToFile(filePath: string, entries: string[]): void {
   if (entries.length === 0) return
   fs.mkdir(dirname(filePath), { recursive: true })
     .then(() => fs.appendFile(filePath, entries.join('\n') + '\n'))
-    .catch(() => {})
+    .catch((err) => { logForDebugging(`dumpPrompts.appendToFile error: ${err}`, { level: 'error' }) })
 }
 
 function initFingerprint(req: Record<string, unknown>): string {
@@ -139,8 +141,8 @@ function dumpRequest(
     state.messageCountSeen = messages.length
 
     appendToFile(filePath, entries)
-  } catch {
-    // Ignore parsing errors
+  } catch (err) {
+    logForDebugging(`dumpPrompts.dumpRequest error: ${err}`, { level: 'error' })
   }
 }
 
@@ -201,8 +203,8 @@ export function createDumpPromptsFetch(
                 if (line.startsWith('data: ') && line !== 'data: [DONE]') {
                   try {
                     chunks.push(jsonParse(line.slice(6)))
-                  } catch {
-                    // Ignore parse errors
+                  } catch (err) {
+                    logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
                   }
                 }
               }
@@ -216,8 +218,8 @@ export function createDumpPromptsFetch(
             filePath,
             jsonStringify({ type: 'response', timestamp, data }) + '\n',
           )
-        } catch {
-          // Best effort
+        } catch (err) {
+          logForDebugging(`dumpPrompts.response handler error: ${err}`, { level: 'error' })
         }
       })()
     }
