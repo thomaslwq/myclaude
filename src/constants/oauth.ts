@@ -200,6 +200,14 @@ export function getOauthConfig(): OauthConfig {
   const oauthBaseUrl = process.env.CLAUDE_CODE_CUSTOM_OAUTH_URL
   if (oauthBaseUrl) {
     const base = oauthBaseUrl.replace(/\/$/, '')
+    // Validate URL format
+    try {
+      new URL(base)
+    } catch {
+      throw new Error(
+        `CLAUDE_CODE_CUSTOM_OAUTH_URL is not a valid URL: ${base}`,
+      )
+    }
     if (!ALLOWED_OAUTH_BASE_URLS.includes(base)) {
       throw new Error(
         'CLAUDE_CODE_CUSTOM_OAUTH_URL is not an approved endpoint.',
