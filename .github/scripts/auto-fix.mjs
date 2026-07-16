@@ -190,7 +190,7 @@ async function _callSingleLLM({ apiKey, apiBase, model, messages, maxTokens, tem
 }
 
 /**
- * Call the fallback LLM with the old-style switch-based logic (a3eaee9^ 之前的方式).
+ * Call the fallback LLM with the old-style switch-based logic.
  * Uses the full model name (with prefix) in the API payload, and resolves
  * the API key/base from the model prefix via a switch statement.
  */
@@ -283,7 +283,7 @@ async function _callFallbackLLM({ apiKey, apiBase, model, messages, maxTokens, t
  * Call the LLM with automatic fallback.
  *
  * Primary:   SenseTime 商汤日日新 DeepSeek-v4-flash (1M context)
- * Fallback:  智谱 GLM-4.5 (Zhipu, a3eaee9^ 之前的 switch-based 方式)
+ * Fallback:  智谱 GLM-4.5 (Zhipu, old switch-based 方式)
  */
 async function callLLM(messages, options = {}) {
   const { maxTokens = 64000, temperature = 0.3 } = options;

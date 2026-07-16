@@ -24,3 +24,8 @@ coverage/
 
 # npm credentials
 .npmrc
+%USERPROFILE%.npmrc
+
+# Build artifacts
+_final.mjs
+_del_temp.mjs
