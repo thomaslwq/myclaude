@@ -167,12 +167,10 @@ function getLocalOauthConfig(): OauthConfig {
 }
 
 // Allowed base URLs for CLAUDE_CODE_CUSTOM_OAUTH_URL override.
-// Only FedStart/PubSec deployments are permitted to prevent OAuth tokens
+// Only production FedStart deployments are permitted to prevent OAuth tokens
 // from being sent to arbitrary endpoints.
 const ALLOWED_OAUTH_BASE_URLS = [
-  'https://beacon.claude-ai.staging.ant.dev',
   'https://claude.fedstart.com',
-  'https://claude-staging.fedstart.com',
 ]
 
 // Cache for memoized config (lifetime of process, since env vars don't change at runtime)
