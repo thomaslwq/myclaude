@@ -152,32 +152,40 @@ function dumpRequest(
     // Cheap fingerprint first: system+tools don't change between turns,
     // so skip the 300ms stringify when the shape is unchanged.
     const fingerprint = initFingerprint(req)
-    if (!state.initialized || fingerprint !== state.lastInitFingerprint) {
+    let initDataStr: string | undefined
+    let initDataHash: string | undefined
+    const shouldWriteInitData = !state.initialized || fingerprint !== state.lastInitFingerprint
+    if (shouldWriteInitData) {
       const { messages: _, ...initData } = req
-      const initDataStr = jsonStringify(initData)
-      const initDataHash = hashString(initDataStr)
-      state.lastInitFingerprint = fingerprint
-      if (!state.initialized) {
-        state.initialized = true
-        state.lastInitDataHash = initDataHash
-        // Reuse initDataStr rather than re-serializing initData inside a wrapper.
-        // timestamp from toISOString() contains no chars needing JSON escaping.
-        entries.push(
-          `{"type":"init","timestamp":"${ts}","data":${initDataStr}}`,
-        )
-      } else if (initDataHash !== state.lastInitDataHash) {
-        state.lastInitDataHash = initDataHash
-        entries.push(
-          `{"type":"system_update","timestamp":"${ts}","data":${initDataStr}}`,
-        )
-      }
+      initDataStr = jsonStringify(initData)
+      initDataHash = hashString(initDataStr)
     }
 
     // Write only new user messages (assistant messages captured in response)
+    // (computed before state mutation to avoid partial update if jsonStringify throws)
     for (const msg of messages.slice(state.messageCountSeen)) {
       if (msg.role === 'user') {
         entries.push(
           jsonStringify({ type: 'message', timestamp: ts, data: msg }),
+        )
+      }
+    }
+
+    // Mutate state after all fallible computations are complete
+    if (shouldWriteInitData) {
+      state.lastInitFingerprint = fingerprint
+      if (!state.initialized) {
+        state.initialized = true
+        state.lastInitDataHash = initDataHash!
+        // Reuse initDataStr rather than re-serializing initData inside a wrapper.
+        // timestamp from toISOString() contains no chars needing JSON escaping.
+        entries.push(
+          `{"type":"init","timestamp":"${ts}","data":${initDataStr!}}`,
+        )
+      } else if (initDataHash! !== state.lastInitDataHash) {
+        state.lastInitDataHash = initDataHash!
+        entries.push(
+          `{"type":"system_update","timestamp":"${ts}","data":${initDataStr!}}`,
         )
       }
     }
