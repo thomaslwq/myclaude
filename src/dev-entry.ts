@@ -1,7 +1,7 @@
 import pkg from '../package.json'
-import { existsSync, readdirSync } from 'fs'
+import { existsSync } from 'fs'
 import { dirname, extname, join, resolve } from 'path'
-import { readFile } from 'fs/promises'
+import { readFile, readdir } from 'fs/promises'
 
 // Apply MYCLAUDE_* env var aliases before any code reads them
 import { applyEnvAliases } from './utils/envCompat.js'
@@ -38,18 +38,24 @@ type MissingImport = {
   specifier: string
 }
 
-function scanFiles(dir: string, out: string[]): void {
-  if (!existsSync(dir)) return
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+async function scanFiles(dir: string, out: string[]): Promise<void> {
+  let dirHandle
+  try {
+    dirHandle = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  const promises = dirHandle.map(async (entry) => {
     const fullPath = join(dir, entry.name)
     if (entry.isDirectory()) {
-      scanFiles(fullPath, out)
-      continue
+      await scanFiles(fullPath, out)
+      return
     }
     if (['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'].includes(extname(entry.name))) {
       out.push(fullPath)
     }
-  }
+  })
+  await Promise.all(promises)
 }
 
 function hasResolvableTarget(basePath: string): boolean {
@@ -71,7 +77,7 @@ function hasResolvableTarget(basePath: string): boolean {
 
 async function collectMissingRelativeImports(): Promise<MissingImport[]> {
   const files: string[] = []
-  scanFiles(resolve('src'), files)
+  await scanFiles(resolve('src'), files)
   // Skip vendor/ directory which can be large and blocks the event loop with synchronous file reads
   // scanFiles(resolve('vendor'), files)
   const missing: MissingImport[] = []
