@@ -29,7 +29,7 @@ describe('getOauthConfig', () => {
     const mod = await import('../constants/oauth.js')
     mod._resetOauthConfigCache()
     const config = mod.getOauthConfig()
-    expect(config.CLIENT_ID).toBe('9d1c250a-e61b-44d9-88ed-5944d1962f5e')
+    expect(config.CLIENT_ID).toBe('PLACEHOLDER_CLIENT_ID_DO_NOT_USE')
   })
 
   test('accepts valid UUID format for CLAUDE_CODE_OAUTH_CLIENT_ID', async () => {
@@ -53,7 +53,7 @@ describe('getOauthConfig', () => {
     mod._resetOauthConfigCache()
     const config = mod.getOauthConfig()
     // Empty string should be treated as no override, so default prod ID is used
-    expect(config.CLIENT_ID).toBe('9d1c250a-e61b-44d9-88ed-5944d1962f5e')
+    expect(config.CLIENT_ID).toBe('PLACEHOLDER_CLIENT_ID_DO_NOT_USE')
   })
 
   test('rejects invalid CLAUDE_CODE_OAUTH_CLIENT_ID (partial UUID)', async () => {

@@ -89,7 +89,11 @@ const PROD_OAUTH_CONFIG = {
   CLAUDEAI_SUCCESS_URL:
     'https://platform.claude.com/oauth/code/success?app=claude-code',
   MANUAL_REDIRECT_URL: 'https://platform.claude.com/oauth/code/callback',
-  CLIENT_ID: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
+  // NOTE: This is a placeholder CLIENT_ID. In production, you must obtain your own
+  // OAuth credentials from Anthropic's developer portal and set them via the
+  // CLAUDE_CODE_OAUTH_CLIENT_ID environment variable.
+  // Example: export CLAUDE_CODE_OAUTH_CLIENT_ID='your-uuid-here'
+  CLIENT_ID: 'PLACEHOLDER_CLIENT_ID_DO_NOT_USE',
   // No suffix for production config
   OAUTH_FILE_SUFFIX: '',
   MCP_PROXY_URL: 'https://mcp-proxy.anthropic.com',
@@ -128,7 +132,11 @@ const STAGING_OAUTH_CONFIG =
           'https://platform.staging.ant.dev/oauth/code/success?app=claude-code',
         MANUAL_REDIRECT_URL:
           'https://platform.staging.ant.dev/oauth/code/callback',
-        CLIENT_ID: 'local-dev-a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        // NOTE: This is a placeholder CLIENT_ID. In production, you must obtain your own
+        // OAuth credentials from Anthropic's developer portal and set them via the
+        // CLAUDE_CODE_OAUTH_CLIENT_ID environment variable.
+        // Example: export CLAUDE_CODE_OAUTH_CLIENT_ID='your-uuid-here'
+        CLIENT_ID: 'PLACEHOLDER_CLIENT_ID_DO_NOT_USE',
         OAUTH_FILE_SUFFIX: '-staging-oauth',
         MCP_PROXY_URL: 'https://mcp-proxy-staging.anthropic.com',
         MCP_PROXY_PATH: '/v1/mcp/{server_id}',
@@ -159,7 +167,11 @@ function getLocalOauthConfig(): OauthConfig {
     CONSOLE_SUCCESS_URL: `${consoleBase}/buy_credits?returnUrl=/oauth/code/success%3Fapp%3Dclaude-code`,
     CLAUDEAI_SUCCESS_URL: `${consoleBase}/oauth/code/success?app=claude-code`,
     MANUAL_REDIRECT_URL: `${consoleBase}/oauth/code/callback`,
-    CLIENT_ID: 'local-dev-a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    // NOTE: This is a placeholder CLIENT_ID. In production, you must obtain your own
+    // OAuth credentials from Anthropic's developer portal and set them via the
+    // CLAUDE_CODE_OAUTH_CLIENT_ID environment variable.
+    // Example: export CLAUDE_CODE_OAUTH_CLIENT_ID='your-uuid-here'
+    CLIENT_ID: 'PLACEHOLDER_CLIENT_ID_DO_NOT_USE',
     OAUTH_FILE_SUFFIX: '-local-oauth',
     MCP_PROXY_URL: 'http://localhost:8205',
     MCP_PROXY_PATH: '/v1/toolbox/shttp/mcp/{server_id}',
