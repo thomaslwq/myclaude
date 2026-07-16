@@ -1,6 +1,7 @@
 import pkg from '../package.json'
-import { existsSync, readdirSync, readFileSync } from 'fs'
+import { existsSync, readdirSync } from 'fs'
 import { dirname, extname, join, resolve } from 'path'
+import { readFile } from 'fs/promises'
 
 // Apply MYCLAUDE_* env var aliases before any code reads them
 import { applyEnvAliases } from './utils/envCompat.js'
@@ -68,17 +69,18 @@ function hasResolvableTarget(basePath: string): boolean {
   return candidates.some(candidate => existsSync(candidate))
 }
 
-function collectMissingRelativeImports(): MissingImport[] {
+async function collectMissingRelativeImports(): Promise<MissingImport[]> {
   const files: string[] = []
   scanFiles(resolve('src'), files)
-  scanFiles(resolve('vendor'), files)
+  // Skip vendor/ directory which can be large and blocks the event loop with synchronous file reads
+  // scanFiles(resolve('vendor'), files)
   const missing: MissingImport[] = []
   const seen = new Set<string>()
   const pattern =
     /(?:import|export)\s+[\s\S]*?from\s+['"](\.\.?\/[^'"]+)['"]|require\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g
 
   for (const file of files) {
-    const text = readFileSync(file, 'utf8')
+    const text = await readFile(file, 'utf8')
     for (const match of text.matchAll(pattern)) {
       const specifier = match[1] ?? match[2]
       if (!specifier) continue
@@ -101,10 +103,10 @@ function collectMissingRelativeImports(): MissingImport[] {
 
 const args = process.argv.slice(2)
 
-// Only run the expensive synchronous filesystem scan in development mode
+// Only run the filesystem scan in development mode
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'development') {
-    const missingImports = collectMissingRelativeImports()
+    const missingImports = await collectMissingRelativeImports()
 
     if (args.includes('--version')) {
       if (missingImports.length > 0) {
