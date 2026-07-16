@@ -49,10 +49,20 @@ export function clearAllDumpState(): void {
 
 export function addApiRequestToCache(requestData: unknown): void {
   if (process.env.USER_TYPE !== 'ant') return
-  cachedApiRequests.push({
+  
+  // Extract only metadata to prevent sensitive data from being cached in memory
+  // This protects user prompts and system instructions from being accessible
+  // via getLastApiRequests() in case of memory compromise
+  const metadata = {
     timestamp: new Date().toISOString(),
-    request: requestData,
-  })
+    request: {
+      model: (requestData as Record<string, unknown>).model as string,
+      // Store a hash of the request instead of the full data
+      requestHash: hashString(JSON.stringify(requestData)),
+    },
+  }
+  
+  cachedApiRequests.push(metadata)
   if (cachedApiRequests.length > MAX_CACHED_REQUESTS) {
     cachedApiRequests.shift()
   }
