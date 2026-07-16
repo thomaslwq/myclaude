@@ -28,6 +28,39 @@ type DumpState = {
 // Track state per session to avoid duplicating data
 const dumpState = new Map<string, DumpState>()
 
+// Queue to serialize dumpRequest calls per session to prevent race conditions
+const dumpRequestQueue = new Map<string, Array<() => void>>()
+
+function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => void): void {
+  if (!dumpRequestQueue.has(agentIdOrSessionId)) {
+    dumpRequestQueue.set(agentIdOrSessionId, [])
+  }
+  dumpRequestQueue.get(agentIdOrSessionId)!.push(callback)
+  
+  // Process the queue if this is the first item
+  if (dumpRequestQueue.get(agentIdOrSessionId)!.length === 1) {
+    processQueue(agentIdOrSessionId)
+  }
+}
+
+function processQueue(agentIdOrSessionId: string): void {
+  const queue = dumpRequestQueue.get(agentIdOrSessionId)
+  if (!queue || queue.length === 0) {
+    dumpRequestQueue.delete(agentIdOrSessionId)
+    return
+  }
+  
+  const callback = queue.shift()!
+  callback()
+  
+  // Process the next item in the queue if there are more
+  if (queue.length > 0) {
+    setImmediate(() => processQueue(agentIdOrSessionId))
+  } else {
+    dumpRequestQueue.delete(agentIdOrSessionId)
+  }
+}
+
 export function getLastApiRequests(): Array<{
   timestamp: string
   request: unknown
@@ -177,7 +210,10 @@ export function createDumpPromptsFetch(
       // Parsing + stringifying the request (system prompt + tool schemas = MBs)
       // takes hundreds of ms. Defer so it doesn't block the actual API call —
       // this is debug tooling for /issue, not on the critical path.
-      setImmediate(dumpRequest, init.body as string, timestamp, state, filePath)
+      // Use a per-session queue to avoid race conditions on state.
+      enqueueDumpRequest(agentIdOrSessionId, () => {
+        dumpRequest(init.body as string, timestamp!, state, filePath)
+      })
     }
 
     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
