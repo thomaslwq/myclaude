@@ -19,6 +19,9 @@ import {
 import { logError } from '../../utils/log.js'
 import { getClaudeCodeUserAgent } from '../../utils/userAgent.js'
 
+// Per-account mutex to prevent concurrent config writes in fetchAndStoreGroveConfig
+const groveConfigLocks = new Map<string, Promise<void>>()
+
 // Cache expiration: 24 hours
 const GROVE_CACHE_EXPIRATION_MS = 24 * 60 * 60 * 1000
 
@@ -196,32 +199,45 @@ export async function isQualifiedForGrove(): Promise<boolean> {
  * Fetch Grove config from API and store in cache
  */
 async function fetchAndStoreGroveConfig(accountId: string): Promise<void> {
-  try {
-    const result = await getGroveNoticeConfig()
-    if (!result.success) {
-      return
-    }
-    const groveEnabled = result.data.grove_enabled
-    const cachedEntry = getGlobalConfig().groveConfigCache?.[accountId]
-    if (
-      cachedEntry?.grove_enabled === groveEnabled &&
-      Date.now() - cachedEntry.timestamp <= GROVE_CACHE_EXPIRATION_MS
-    ) {
-      return
-    }
-    saveGlobalConfig(current => ({
-      ...current,
-      groveConfigCache: {
-        ...current.groveConfigCache,
-        [accountId]: {
-          grove_enabled: groveEnabled,
-          timestamp: Date.now(),
+  // Serialize per-account fetch-and-store operations to avoid lost updates
+  const existing = groveConfigLocks.get(accountId) ?? Promise.resolve()
+  const next = existing.then(async () => {
+    try {
+      const result = await getGroveNoticeConfig()
+      if (!result.success) {
+        return
+      }
+      const groveEnabled = result.data.grove_enabled
+      const cachedEntry = getGlobalConfig().groveConfigCache?.[accountId]
+      if (
+        cachedEntry?.grove_enabled === groveEnabled &&
+        Date.now() - cachedEntry.timestamp <= GROVE_CACHE_EXPIRATION_MS
+      ) {
+        return
+      }
+      saveGlobalConfig(current => ({
+        ...current,
+        groveConfigCache: {
+          ...current.groveConfigCache,
+          [accountId]: {
+            grove_enabled: groveEnabled,
+            timestamp: Date.now(),
+          },
         },
-      },
-    }))
-  } catch (err) {
-    logForDebugging(`Grove: Failed to fetch and store config: ${err}`)
-  }
+      }))
+    } catch (err) {
+      logForDebugging(`Grove: Failed to fetch and store config: ${err}`)
+    }
+  })
+  groveConfigLocks.set(accountId, next)
+  // Clean up the lock entry when done to prevent memory leak
+  void next.then(() => {
+    // Only remove if we're still the current lock for this account
+    if (groveConfigLocks.get(accountId) === next) {
+      groveConfigLocks.delete(accountId)
+    }
+  })
+  await next
 }
 
 /**
