@@ -239,7 +239,7 @@ export function createDumpPromptsFetch(
     // Save response async — require both USER_TYPE=ant and DUMP_PROMPTS=1
     if (timestamp && response.ok && process.env.USER_TYPE === 'ant' && process.env.DUMP_PROMPTS === '1') {
       const cloned = response.clone()
-      void (async () => {
+      ;(async () => {
         try {
           const isStreaming = cloned.headers
             .get('content-type')
@@ -282,9 +282,15 @@ export function createDumpPromptsFetch(
             jsonStringify({ type: 'response', timestamp, data }) + '\n',
           )
         } catch (err) {
-          logForDebugging(`dumpPrompts.response handler error: ${err}`, { level: 'error' })
+          try {
+            logForDebugging(`dumpPrompts.response handler error: ${err}`, { level: 'error' })
+          } catch {
+            // Silently ignore if logForDebugging itself throws
+          }
         }
-      })()
+      })().catch((err: unknown) => {
+        logForDebugging(`dumpPrompts.response handler unhandled rejection: ${err}`, { level: 'error' })
+      })
     }
 
     return response
