@@ -79,16 +79,11 @@ export function getAttributionHeader(fingerprint: string): string {
   const version = `${baseVersion}.${fingerprint}`
   const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT ?? 'unknown'
 
-  const cch = getFeatureValue_CACHED_MAY_BE_STALE('NATIVE_CLIENT_ATTESTATION', false) ? ' cch=00000;' : '' // holder is overwritten by Bun's HTTP stack with attestation token
   // cc_workload: turn-scoped hint so the API can route e.g. cron-initiated
-  // requests to a lower QoS pool. Absent = interactive default. Safe re:
-  // fingerprint (computed from msg chars + version only, line 78 above) and
-  // cch attestation (placeholder overwritten in serialized body bytes after
-  // this string is built). Server _parse_cc_header tolerates unknown extra
-  // fields so old API deploys silently ignore this.
+  // requests to a lower QoS pool. Absent = interactive default.
   const workload = getWorkload()
   const workloadPair = workload ? ` cc_workload=${workload};` : ''
-  const header = `x-anthropic-billing-header: cc_version=${version}; cc_entrypoint=${entrypoint};${cch}${workloadPair}`
+  const header = `x-anthropic-billing-header: cc_version=${version}; cc_entrypoint=${entrypoint};${workloadPair}`
 
   logForDebugging(`attribution header ${header}`)
   return header

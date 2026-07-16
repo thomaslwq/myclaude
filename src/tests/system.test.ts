@@ -55,4 +55,10 @@ describe('getAttributionHeader', () => {
     const result = getAttributionHeader('fp')
     expect(result).toBe('')
   })
+
+  it('should not include cch placeholder (no custom Bun stack)', async () => {
+    const { getAttributionHeader } = await import('../constants/system.js')
+    const result = getAttributionHeader('test-fp')
+    expect(result).not.toContain('cch=')
+  })
 })
