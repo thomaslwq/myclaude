@@ -30,6 +30,8 @@ const dumpState = new Map<string, DumpState>()
 
 // Queue to serialize dumpRequest calls per session to prevent race conditions
 const dumpRequestQueue = new Map<string, Array<() => void>>()
+// Track which sessions are currently being processed to avoid concurrent processing
+const processingQueues = new Set<string>()
 
 function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => void): void {
   if (!dumpRequestQueue.has(agentIdOrSessionId)) {
@@ -37,16 +39,21 @@ function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => void): v
   }
   dumpRequestQueue.get(agentIdOrSessionId)!.push(callback)
   
-  // Process the queue if this is the first item
-  if (dumpRequestQueue.get(agentIdOrSessionId)!.length === 1) {
+  // Start processing the queue only if it's not already being processed
+  // This prevents race conditions where concurrent enqueue calls
+  // would trigger multiple processQueue invocations for the same session
+  if (!processingQueues.has(agentIdOrSessionId)) {
     processQueue(agentIdOrSessionId)
   }
 }
 
 function processQueue(agentIdOrSessionId: string): void {
+  processingQueues.add(agentIdOrSessionId)
+  
   const queue = dumpRequestQueue.get(agentIdOrSessionId)
   if (!queue || queue.length === 0) {
     dumpRequestQueue.delete(agentIdOrSessionId)
+    processingQueues.delete(agentIdOrSessionId)
     return
   }
   
@@ -54,10 +61,12 @@ function processQueue(agentIdOrSessionId: string): void {
   callback()
   
   // Process the next item in the queue if there are more
+  // Using setImmediate to avoid stack overflow with rapid enqueues
   if (queue.length > 0) {
     setImmediate(() => processQueue(agentIdOrSessionId))
   } else {
     dumpRequestQueue.delete(agentIdOrSessionId)
+    processingQueues.delete(agentIdOrSessionId)
   }
 }
 
