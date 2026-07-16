@@ -102,35 +102,40 @@ function collectMissingRelativeImports(): MissingImport[] {
 const args = process.argv.slice(2)
 
 // Only run the expensive synchronous filesystem scan in development mode
-if (process.env.NODE_ENV === 'development') {
-  const missingImports = collectMissingRelativeImports()
+async function main(): Promise<void> {
+  if (process.env.NODE_ENV === 'development') {
+    const missingImports = collectMissingRelativeImports()
 
-  if (args.includes('--version')) {
+    if (args.includes('--version')) {
+      if (missingImports.length > 0) {
+        console.log(`${pkg.version} (restored dev workspace)`)
+      } else {
+        console.log(pkg.version)
+      }
+      process.exit(0)
+    }
+
     if (missingImports.length > 0) {
-      console.log(`${pkg.version} (restored dev workspace)`)
-    } else {
+      console.log('Missing relative imports detected:')
+      for (const imp of missingImports) {
+        console.log(`  ${imp.importer}: ${imp.specifier}`)
+      }
+      process.exit(1)
+    }
+
+    console.log('Dev workspace check passed (no missing relative imports)')
+  } else {
+    // In production, skip the expensive scan entirely
+    if (args.includes('--version')) {
       console.log(pkg.version)
+      process.exit(0)
     }
-    process.exit(0)
+
+    console.log('Dev workspace check skipped (NODE_ENV is not development)')
   }
 
-  if (missingImports.length > 0) {
-    console.log('Missing relative imports detected:')
-    for (const imp of missingImports) {
-      console.log(`  ${imp.importer}: ${imp.specifier}`)
-    }
-    process.exit(1)
-  }
-
-  console.log('Dev workspace check passed (no missing relative imports)')
-} else {
-  // In production, skip the expensive scan entirely
-  if (args.includes('--version')) {
-    console.log(pkg.version)
-    process.exit(0)
-  }
-
-  console.log('Dev workspace check skipped (NODE_ENV is not development)')
+  // Launch the actual CLI application
+  await import('./entrypoints/cli.js')
 }
 
-process.exit(0)
+void main()
