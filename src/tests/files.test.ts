@@ -56,6 +56,34 @@ describe('isBinaryContent', () => {
     }
     expect(isBinaryContent(buffer)).toBe(true)
   })
+
+  it('should detect binary content after text header (issue #102)', () => {
+    // Create a buffer with 10000 bytes of text followed by binary content
+    const buffer = Buffer.alloc(15000)
+    // Fill first 10000 bytes with printable text
+    for (let i = 0; i < 10000; i++) {
+      buffer[i] = 0x41 // 'A'
+    }
+    // Add binary content (null byte) after the text header
+    buffer[10000] = 0x00
+    
+    // This should detect the binary content even though it's after the first 8192 bytes
+    expect(isBinaryContent(buffer)).toBe(true)
+  })
+
+  it('should detect binary content after long text header (issue #102)', () => {
+    // Create a buffer with 20000 bytes of text followed by binary content
+    const buffer = Buffer.alloc(25000)
+    // Fill first 20000 bytes with printable text
+    for (let i = 0; i < 20000; i++) {
+      buffer[i] = 0x41 // 'A'
+    }
+    // Add binary content (null byte) after the text header
+    buffer[20000] = 0x00
+    
+    // This should detect the binary content even though it's after the first 8192 bytes
+    expect(isBinaryContent(buffer)).toBe(true)
+  })
 })
 
 describe('BINARY_EXTENSIONS', () => {
