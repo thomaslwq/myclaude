@@ -25,6 +25,13 @@ const groveConfigLocks = new Map<string, Promise<void>>()
 // Cache expiration: 24 hours
 const GROVE_CACHE_EXPIRATION_MS = 24 * 60 * 60 * 1000
 
+// Configurable timeout for Grove API requests (default: 3 seconds)
+// Can be overridden via GROVE_API_TIMEOUT_MS environment variable
+const GROVE_API_TIMEOUT_MS = parseInt(
+  process.env.GROVE_API_TIMEOUT_MS ?? '3000',
+  10,
+)
+
 /**
  * Creates a memoized async function with TTL (time-to-live) cache expiration.
  * If the cache is expired, the function re-executes and updates the cache.
@@ -324,7 +331,7 @@ export const getGroveNoticeConfig = memoizeWithTTL(
               ...authHeaders.headers,
               'User-Agent': getUserAgent(),
             },
-            timeout: 3000, // Short timeout - if slow, skip Grove dialog
+            timeout: GROVE_API_TIMEOUT_MS, // Short timeout - if slow, skip Grove dialog
           },
         )
       })
@@ -348,6 +355,12 @@ export const getGroveNoticeConfig = memoizeWithTTL(
       }
     } catch (err) {
       logError(err)
+      // Log timeout specifically for better debugging
+      if (axios.isAxiosError(err) && err.code === 'ECONNABORTED') {
+        logForDebugging(
+          `Grove: API request timed out after ${GROVE_API_TIMEOUT_MS}ms. This may cause the Grove dialog to be suppressed for users with slow connections.`,
+        )
+      }
       // Don't cache failures
       getGroveNoticeConfig.cache.clear?.()
       return { success: false }
