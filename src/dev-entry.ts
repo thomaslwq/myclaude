@@ -1,5 +1,5 @@
 import pkg from '../package.json'
-import { existsSync } from 'fs'
+import { access } from 'fs/promises'
 import { dirname, extname, join, resolve } from 'path'
 import { readFile, readdir } from 'fs/promises'
 
@@ -58,7 +58,7 @@ async function scanFiles(dir: string, out: string[]): Promise<void> {
   await Promise.all(promises)
 }
 
-function hasResolvableTarget(basePath: string): boolean {
+async function hasResolvableTarget(basePath: string): Promise<boolean> {
   const withoutJs = basePath.replace(/\.js$/u, '')
   const candidates = [
     withoutJs,
@@ -72,7 +72,17 @@ function hasResolvableTarget(basePath: string): boolean {
     join(withoutJs, 'index.tsx'),
     join(withoutJs, 'index.js'),
   ]
-  return candidates.some(candidate => existsSync(candidate))
+  const results = await Promise.all(
+    candidates.map(async (candidate) => {
+      try {
+        await access(candidate)
+        return true
+      } catch {
+        return false
+      }
+    })
+  )
+  return results.some(exists => exists)
 }
 
 async function collectMissingRelativeImports(): Promise<MissingImport[]> {
@@ -91,7 +101,7 @@ async function collectMissingRelativeImports(): Promise<MissingImport[]> {
       const specifier = match[1] ?? match[2]
       if (!specifier) continue
       const target = resolve(dirname(file), specifier)
-      if (hasResolvableTarget(target)) continue
+      if (await hasResolvableTarget(target)) continue
       const key = `${file} -> ${specifier}`
       if (seen.has(key)) continue
       seen.add(key)

@@ -174,9 +174,13 @@ function dumpRequest(
     // (computed before state mutation to avoid partial update if jsonStringify throws)
     for (const msg of messages.slice(state.messageCountSeen)) {
       if (msg.role === 'user') {
-        entries.push(
-          jsonStringify({ type: 'message', timestamp: ts, data: msg }),
-        )
+        try {
+          entries.push(
+            jsonStringify({ type: 'message', timestamp: ts, data: msg }),
+          )
+        } catch (err) {
+          logError(`dumpPrompts.dumpRequest: failed to stringify message: ${err}`)
+        }
       }
     }
 
