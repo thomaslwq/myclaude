@@ -52,9 +52,9 @@ describe('dumpPrompts cache security', () => {
     expect(cachedRequest.system).toBeUndefined()
     expect(cachedRequest.content).toBeUndefined()
     
-    // Verify that only metadata is stored (model name, hash)
+    // Verify that only metadata is stored (model name)
     expect(cachedRequest.model).toBe('claude-3-5-sonnet-20241022')
-    expect(cachedRequest.requestHash).toBeDefined()
+    expect(cachedRequest.requestHash).toBeUndefined()
     expect(cached[0].timestamp).toBeDefined()
   })
   

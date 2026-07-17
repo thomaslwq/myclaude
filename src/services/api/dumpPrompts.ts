@@ -99,8 +99,6 @@ export function addApiRequestToCache(requestData: unknown): void {
     timestamp: new Date().toISOString(),
     request: {
       model: (requestData as Record<string, unknown>).model as string,
-      // Store a hash of the request instead of the full data
-      requestHash: hashString(JSON.stringify(requestData)),
     },
   }
   

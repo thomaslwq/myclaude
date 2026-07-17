@@ -9,7 +9,7 @@ describe('getGroveNoticeConfig cache invalidation', () => {
     
     // Check that getGroveNoticeConfig has cache.clear in its catch block
     // by looking for the pattern in the function
-    const noticeConfigStart = source.indexOf('export const getGroveNoticeConfig = memoize(')
+    const noticeConfigStart = source.indexOf('export const getGroveNoticeConfig = memoizeWithTTL(')
     const noticeConfigEnd = source.indexOf('),\n\n/**', noticeConfigStart)
     
     // If we can't find the end, just check if cache.clear exists anywhere in the file

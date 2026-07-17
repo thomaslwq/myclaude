@@ -1,5 +1,5 @@
 import axios from 'axios'
-import memoize from 'lodash-es/memoize.js'
+import lodashMemoize from 'lodash-es/memoize.js'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
@@ -24,6 +24,53 @@ const groveConfigLocks = new Map<string, Promise<void>>()
 
 // Cache expiration: 24 hours
 const GROVE_CACHE_EXPIRATION_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Creates a memoized async function with TTL (time-to-live) cache expiration.
+ * If the cache is expired, the function re-executes and updates the cache.
+ * When the cache is cleared manually (via updateGroveSettings or markGroveNoticeViewed),
+ * the underlying lodash memoize cache is cleared as well.
+ */
+function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
+  fn: T,
+  ttlMs: number,
+): T & { cache: { clear: () => void } } {
+  // Track the timestamp of the last successful cache write
+  let lastCachedAt = 0
+  const memoized = lodashMemoize(fn) as T & { cache: { clear: () => void } }
+
+  const originalClear = memoized.cache.clear.bind(memoized.cache)
+
+  // Override the original function to check TTL
+  const wrapped = (async (...args: any[]) => {
+    const now = Date.now()
+    if (lastCachedAt !== 0 && now - lastCachedAt >= ttlMs) {
+      // Cache expired, clear it before calling
+      originalClear()
+      lastCachedAt = 0
+    }
+    const result = await memoized(...args)
+    // Only update timestamp on success (not ApiResult failure)
+    if (
+      result &&
+      typeof result === 'object' &&
+      'success' in result &&
+      result.success === true
+    ) {
+      lastCachedAt = Date.now()
+    }
+    return result
+  }) as T
+
+  wrapped.cache = {
+    clear: () => {
+      originalClear()
+      lastCachedAt = 0
+    },
+  }
+
+  return wrapped as T & { cache: { clear: () => void } }
+}
 
 export type AccountSettings = {
   grove_enabled: boolean | null
@@ -52,7 +99,7 @@ export type ApiResult<T> = { success: true; data: T } | { success: false }
  * Memoized for the session to avoid redundant per-render requests.
  * Cache is invalidated in updateGroveSettings() so post-toggle reads are fresh.
  */
-export const getGroveSettings = memoize(
+export const getGroveSettings = memoizeWithTTL(
   async (): Promise<ApiResult<AccountSettings>> => {
     // Grove is a notification feature; during an outage, skipping it is correct.
     if (isEssentialTrafficOnly()) {
@@ -85,6 +132,7 @@ export const getGroveSettings = memoize(
       return { success: false }
     }
   },
+  GROVE_CACHE_EXPIRATION_MS,
 )
 
 /**
@@ -196,7 +244,7 @@ export async function isQualifiedForGrove(): Promise<boolean> {
 }
 
 /**
- * Fetch Grove config from API and store in cache
+ * Fetch Grove config from API and store in cach
  */
 async function fetchAndStoreGroveConfig(accountId: string): Promise<void> {
   // Serialize per-account fetch-and-store operations to avoid lost updates
@@ -250,7 +298,7 @@ async function fetchAndStoreGroveConfig(accountId: string): Promise<void> {
  * Returns ApiResult to distinguish between API failure and success.
  * Uses existing OAuth 401 retry, then returns failure if that doesn't help.
  */
-export const getGroveNoticeConfig = memoize(
+export const getGroveNoticeConfig = memoizeWithTTL(
   async (): Promise<ApiResult<GroveConfig>> => {
     // Grove is a notification feature; during an outage, skipping it is correct.
     if (isEssentialTrafficOnly()) {
@@ -292,11 +340,13 @@ export const getGroveNoticeConfig = memoize(
         },
       }
     } catch (err) {
-      logForDebugging(`Failed to fetch Grove notice config: ${err}`)
+      logError(err)
+      // Don't cache failures
       getGroveNoticeConfig.cache.clear?.()
       return { success: false }
     }
   },
+  GROVE_CACHE_EXPIRATION_MS,
 )
 
 /**
