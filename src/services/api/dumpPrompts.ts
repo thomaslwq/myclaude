@@ -43,6 +43,7 @@ function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => void): v
   // This prevents race conditions where concurrent enqueue calls
   // would trigger multiple processQueue invocations for the same session
   if (!processingQueues.has(agentIdOrSessionId)) {
+    processingQueues.add(agentIdOrSessionId)
     processQueue(agentIdOrSessionId)
   }
 }
