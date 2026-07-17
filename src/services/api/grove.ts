@@ -81,8 +81,8 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
     } catch (error) {
       // Clear cache on error to prevent caching rejected promises
       originalClear()
-      lastCachedAt = 0
-      throw error
+      lastCachedAt = -1
+      return { success: false } as any
     }
   }) as T
 

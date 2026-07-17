@@ -29,11 +29,11 @@ type DumpState = {
 const dumpState = new Map<string, DumpState>()
 
 // Queue to serialize dumpRequest calls per session to prevent race conditions
-const dumpRequestQueue = new Map<string, Array<() => void>>()
+const dumpRequestQueue = new Map<string, Array<() => Promise<void>>>()
 // Track which sessions are currently being processed to avoid concurrent processing
 const processingQueues = new Set<string>()
 
-function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => void): void {
+function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => Promise<void>): void {
   if (!dumpRequestQueue.has(agentIdOrSessionId)) {
     dumpRequestQueue.set(agentIdOrSessionId, [])
   }
@@ -48,7 +48,7 @@ function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => void): v
   }
 }
 
-function processQueue(agentIdOrSessionId: string): void {
+async function processQueue(agentIdOrSessionId: string): Promise<void> {
   processingQueues.add(agentIdOrSessionId)
   
   const queue = dumpRequestQueue.get(agentIdOrSessionId)
@@ -59,7 +59,7 @@ function processQueue(agentIdOrSessionId: string): void {
   }
   
   const callback = queue.shift()!
-  callback()
+  await callback()
   
   // Process the next item in the queue if there are more
   // Using setImmediate to avoid stack overflow with rapid enqueues
@@ -117,11 +117,14 @@ export function getDumpPromptsPath(agentIdOrSessionId?: string): string {
   )
 }
 
-function appendToFile(filePath: string, entries: string[]): void {
+async function appendToFile(filePath: string, entries: string[]): Promise<void> {
   if (entries.length === 0) return
-  fs.mkdir(dirname(filePath), { recursive: true })
-    .then(() => fs.appendFile(filePath, entries.join('\n') + '\n'))
-    .catch((err) => { logForDebugging(`dumpPrompts.appendToFile error: ${err}`, { level: 'error' }) })
+  try {
+    await fs.mkdir(dirname(filePath), { recursive: true })
+    await fs.appendFile(filePath, entries.join('\n') + '\n')
+  } catch (err) {
+    logForDebugging(`dumpPrompts.appendToFile error: ${err}`, { level: 'error' })
+  }
 }
 
 function initFingerprint(req: Record<string, unknown>): string {
@@ -140,12 +143,12 @@ function initFingerprint(req: Record<string, unknown>): string {
   return `${req.model}|${toolNames}|${sysLen}`
 }
 
-function dumpRequest(
+async function dumpRequest(
   body: string,
   ts: string,
   state: DumpState,
   filePath: string,
-): void {
+): Promise<void> {
   try {
     const req = jsonParse(body) as Record<string, unknown>
     addApiRequestToCache(req)
@@ -203,7 +206,7 @@ function dumpRequest(
     }
     state.messageCountSeen = messages.length
 
-    appendToFile(filePath, entries)
+    await appendToFile(filePath, entries)
   } catch (err) {
     logForDebugging(`dumpPrompts.dumpRequest error: ${err}`, { level: 'error' })
   }
@@ -231,8 +234,8 @@ export function createDumpPromptsFetch(
       // takes hundreds of ms. Defer so it doesn't block the actual API call —
       // this is debug tooling for /issue, not on the critical path.
       // Use a per-session queue to avoid race conditions on state.
-      enqueueDumpRequest(agentIdOrSessionId, () => {
-        dumpRequest(init.body as string, timestamp!, state, filePath)
+      enqueueDumpRequest(agentIdOrSessionId, async () => {
+        await dumpRequest(init.body as string, timestamp!, state, filePath)
       })
     }
 
