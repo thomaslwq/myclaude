@@ -184,8 +184,14 @@ export async function fetchAndStorePassesEligibility(): Promise<ReferralEligibil
     return fetchInProgress
   }
 
-  // Store the promise to share with concurrent calls
-  fetchInProgress = (async () => {
+  // Set the promise immediately to prevent concurrent fetches (atomic assignment)
+  let resolvePromise: (value: ReferralEligibilityResponse | null) => void
+  fetchInProgress = new Promise<ReferralEligibilityResponse | null>((resolve) => {
+    resolvePromise = resolve
+  })
+
+  // Start the fetch in the background
+  ;(async () => {
     try {
       const response = await fetchReferralEligibility()
 
@@ -206,11 +212,11 @@ export async function fetchAndStorePassesEligibility(): Promise<ReferralEligibil
         `Passes eligibility cached for org ${orgId}: ${response.eligible}`,
       )
 
-      return response
+      resolvePromise(response)
     } catch (error) {
       logForDebugging('Failed to fetch and cache passes eligibility')
       logError(error as Error)
-      return null
+      resolvePromise(null)
     } finally {
       // Clear the promise when done
       fetchInProgress = null
