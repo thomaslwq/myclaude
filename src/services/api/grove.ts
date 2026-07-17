@@ -59,14 +59,23 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
     }
     try {
       const result = await memoized(...args)
-      // Only update timestamp on success (not ApiResult failure)
       if (
         result &&
         typeof result === 'object' &&
         'success' in result &&
         result.success === true
       ) {
+        // Only update timestamp on success
         lastCachedAt = Date.now()
+      } else if (
+        result &&
+        typeof result === 'object' &&
+        'success' in result &&
+        result.success === false
+      ) {
+        // Clear cache on failure so the next call will re-execute
+        originalClear()
+        lastCachedAt = 0
       }
       return result
     } catch (error) {

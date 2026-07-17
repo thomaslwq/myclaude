@@ -147,7 +147,23 @@ async function appendSessionLogImpl(
           // Use the per-session sequential fetch wrapper to prevent race conditions
           // with other concurrent writes.
           const sequentialFetch = getOrCreateSequentialFetch(sessionId)
-          const logs = await sequentialFetch(sessionId, url, headers)
+          let logs: Entry[] | null = null
+          try {
+            logs = await sequentialFetch(sessionId, url, headers)
+          } catch (fetchError) {
+            // fetchSessionLogsFromUrl catches its own errors and returns null,
+            // but the sequential wrapper or other unexpected errors could throw.
+            // Log and continue to retry rather than crashing.
+            logError(
+              new Error(
+                `Session 409: fetch failed for session ${sessionId}, entry ${entry.uuid}: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`,
+              ),
+            )
+            logForDiagnosticsNoPII(
+              'error',
+              'session_persist_409_fetch_fail',
+            )
+          }
           const adoptedUuid = findLastUuid(logs)
           if (adoptedUuid) {
             lastUuidMap.set(sessionId, adoptedUuid)
@@ -155,20 +171,15 @@ async function appendSessionLogImpl(
               `Session 409: re-fetched ${logs!.length} entries, adopting lastUuid=${adoptedUuid}, retrying entry ${entry.uuid}`,
             )
           } else {
-            // Can't determine server state — give up
-            const errorData = response.data as SessionIngressError
-            const errorMessage =
-              errorData.error?.message || 'Concurrent modification detected'
-            logError(
-              new Error(
-                `Session persistence conflict: UUID mismatch for session ${sessionId}, entry ${entry.uuid}. ${errorMessage}`,
-              ),
+            // Couldn't determine server state — log and retry (don't give up
+            // immediately; transient fetch failures should be retried).
+            logForDebugging(
+              `Session 409: could not determine server state for session ${sessionId}, entry ${entry.uuid}`,
             )
             logForDiagnosticsNoPII(
-              'error',
-              'session_persist_fail_concurrent_modification',
+              'warn',
+              'session_persist_409_no_adopted_uuid',
             )
-            return false
           }
         }
         logForDiagnosticsNoPII('info', 'session_persist_409_adopt_server_uuid')
@@ -191,10 +202,15 @@ async function appendSessionLogImpl(
       })
     } catch (error) {
       // Network errors, 5xx - retryable
-      const axiosError = error as AxiosError<SessionIngressError>
-      logError(new Error(`Error persisting session log: ${axiosError.message}`))
+      const errorMessage =
+        error instanceof Error ? error.message : String(error)
+      const axiosStatus =
+        error && typeof error === 'object' && 'status' in error
+          ? (error as { status?: number }).status
+          : undefined
+      logError(new Error(`Error persisting session log: ${errorMessage}`))
       logForDiagnosticsNoPII('error', 'session_persist_fail_status', {
-        status: axiosError.status,
+        status: axiosStatus,
         attempt,
       })
     }
