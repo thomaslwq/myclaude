@@ -172,16 +172,16 @@ export function getCachedRemainingPasses(): number | null {
  * Returns the fetched response or null on error
  */
 export async function fetchAndStorePassesEligibility(): Promise<ReferralEligibilityResponse | null> {
-  // Return existing promise if fetch is already in progress
-  if (fetchInProgress) {
-    logForDebugging('Passes: Reusing in-flight eligibility fetch')
-    return fetchInProgress
-  }
-
   const orgId = getOauthAccountInfo()?.organizationUuid
 
   if (!orgId) {
     return null
+  }
+
+  // Return existing promise if fetch is already in progress
+  if (fetchInProgress) {
+    logForDebugging('Passes: Reusing in-flight eligibility fetch')
+    return fetchInProgress
   }
 
   // Store the promise to share with concurrent calls
