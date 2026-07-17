@@ -250,27 +250,53 @@ export function createDumpPromptsFetch(
 
           let data: unknown
           if (isStreaming && cloned.body) {
-            // Parse SSE stream into chunks
+            // Parse SSE stream into chunks incrementally to avoid memory exhaustion.
+            // Instead of accumulating the entire response body, we keep only a small
+            // trailing fragment for incomplete events and process complete events as
+            // they arrive.
             const reader = cloned.body.getReader()
             const decoder = new TextDecoder()
             let buffer = ''
+            const chunks: unknown[] = []
             try {
               while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
+                // Only keep the incomplete trailing part, not the entire accumulated buffer
                 buffer += decoder.decode(value, { stream: true })
+                
+                // Process complete SSE events from the buffer
+                const lastDoubleNewline = buffer.lastIndexOf('\n\n')
+                if (lastDoubleNewline !== -1) {
+                  const completeEvents = buffer.slice(0, lastDoubleNewline)
+                  buffer = buffer.slice(lastDoubleNewline + 2) // Keep incomplete part
+                  
+                  for (const event of completeEvents.split('\n\n')) {
+                    for (const line of event.split('\n')) {
+                      if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                        try {
+                          chunks.push(jsonParse(line.slice(6)))
+                        } catch (err) {
+                          logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
+                        }
+                      }
+                    }
+                  }
+                }
               }
             } finally {
               reader.releaseLock()
             }
-            const chunks: unknown[] = []
-            for (const event of buffer.split('\n\n')) {
-              for (const line of event.split('\n')) {
-                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                  try {
-                    chunks.push(jsonParse(line.slice(6)))
-                  } catch (err) {
-                    logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
+            // Process any remaining data in the buffer
+            if (buffer.trim()) {
+              for (const event of buffer.split('\n\n')) {
+                for (const line of event.split('\n')) {
+                  if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    try {
+                      chunks.push(jsonParse(line.slice(6)))
+                    } catch (err) {
+                      logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
+                    }
                   }
                 }
               }
