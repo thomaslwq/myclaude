@@ -85,13 +85,13 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 10, curre
 
 async function getChangedFilesSinceLastCommit(): Promise<string[]> {
   try {
-    const { execSync } = await import('child_process')
+    const { exec } = await import('child_process/promises')
     // Get files changed in the working tree (unstaged + staged)
-    const result = execSync('git diff --name-only HEAD --diff-filter=ACMR', {
+    const { stdout } = await exec('git diff --name-only HEAD --diff-filter=ACMR', {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'ignore'],
     })
-    const files = result.trim().split('\n').filter(Boolean)
+    const files = stdout.trim().split('\n').filter(Boolean)
     // Filter to only source files we care about
     return files
       .filter(f => SUPPORTED_EXTENSIONS.has(extname(f)) && f.startsWith('src/'))
