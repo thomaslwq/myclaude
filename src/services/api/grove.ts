@@ -49,17 +49,24 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
       originalClear()
       lastCachedAt = 0
     }
-    const result = await memoized(...args)
-    // Only update timestamp on success (not ApiResult failure)
-    if (
-      result &&
-      typeof result === 'object' &&
-      'success' in result &&
-      result.success === true
-    ) {
-      lastCachedAt = Date.now()
+    try {
+      const result = await memoized(...args)
+      // Only update timestamp on success (not ApiResult failure)
+      if (
+        result &&
+        typeof result === 'object' &&
+        'success' in result &&
+        result.success === true
+      ) {
+        lastCachedAt = Date.now()
+      }
+      return result
+    } catch (error) {
+      // Clear cache on error to prevent caching rejected promises
+      originalClear()
+      lastCachedAt = 0
+      throw error
     }
-    return result
   }) as T
 
   wrapped.cache = {
