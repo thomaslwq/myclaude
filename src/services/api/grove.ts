@@ -18,9 +18,10 @@ import {
 } from '../../utils/http.js'
 import { logError } from '../../utils/log.js'
 import { getClaudeCodeUserAgent } from '../../utils/userAgent.js'
+import { Mutex } from 'async-mutex'
 
 // Per-account mutex to prevent concurrent config writes in fetchAndStoreGroveConfig
-const groveConfigLocks = new Map<string, Promise<void>>()
+const groveConfigMutexes = new Map<string, Mutex>()
 
 // Cache expiration: 24 hours
 const GROVE_CACHE_EXPIRATION_MS = 24 * 60 * 60 * 1000
@@ -262,17 +263,14 @@ export async function isQualifiedForGrove(): Promise<boolean> {
  */
 async function fetchAndStoreGroveConfig(accountId: string): Promise<void> {
   // Serialize per-account fetch-and-store operations to avoid lost updates
-  // Use a proper mutex pattern: create the promise first, set it atomically,
-  // then wait for the previous operation and execute.
-  let releaseLock: () => void
-  const lockPromise = new Promise<void>(resolve => {
-    releaseLock = resolve
-  })
+  // Use async-mutex for correctness and clarity
+  let mutex = groveConfigMutexes.get(accountId)
+  if (!mutex) {
+    mutex = new Mutex()
+    groveConfigMutexes.set(accountId, mutex)
+  }
 
-  const previous = groveConfigLocks.get(accountId) ?? Promise.resolve()
-  groveConfigLocks.set(accountId, lockPromise)
-
-  await previous
+  const release = await mutex.acquire()
   try {
     const result = await getGroveNoticeConfig()
     if (!result.success) {
@@ -299,11 +297,7 @@ async function fetchAndStoreGroveConfig(accountId: string): Promise<void> {
   } catch (err) {
     logForDebugging(`Grove: Failed to fetch and store config: ${err}`)
   } finally {
-    releaseLock()
-    // Only remove if we're still the current lock for this account
-    if (groveConfigLocks.get(accountId) === lockPromise) {
-      groveConfigLocks.delete(accountId)
-    }
+    release()
   }
 }
 
