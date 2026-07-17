@@ -303,6 +303,7 @@ export async function getTeleportEvents(
 
   const all: Entry[] = []
   let cursor: string | undefined
+  let previousCursor: string | undefined
   let pages = 0
 
   // Infinite-loop guard: 1000/page × 100 pages = 100k events. Larger than
@@ -311,6 +312,15 @@ export async function getTeleportEvents(
   const maxPages = 100
 
   while (pages < maxPages) {
+    // If the cursor hasn't changed since the previous page, the server is
+    // not making progress — treat it as end-of-stream to avoid an infinite
+    // loop with a non-null, non-advancing cursor.
+    if (pages > 0 && cursor === previousCursor) {
+      logForDebugging(
+        `[teleport] Cursor stalled (unchanged from page ${pages}); treating as end-of-stream`,
+      )
+      break
+    }
     const params: Record<string, string | number> = { limit: 1000 }
     if (cursor !== undefined) {
       params.cursor = cursor
@@ -396,6 +406,7 @@ export async function getTeleportEvents(
     if (next_cursor == null) {
       break
     }
+    previousCursor = cursor
     cursor = next_cursor
   }
 
