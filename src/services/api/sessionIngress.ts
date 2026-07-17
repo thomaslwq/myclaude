@@ -492,7 +492,14 @@ function findLastUuid(logs: Entry[] | null): UUID | undefined {
   if (!logs) {
     return undefined
   }
-  const entry = logs.findLast(e => 'uuid' in e && e.uuid)
+  // Use a manual backward loop instead of findLast for Node 18 compatibility
+  let entry: Entry | undefined
+  for (let i = logs.length - 1; i >= 0; i--) {
+    if ('uuid' in logs[i] && logs[i].uuid) {
+      entry = logs[i]
+      break
+    }
+  }
   return entry && 'uuid' in entry ? (entry.uuid as UUID) : undefined
 }
 
