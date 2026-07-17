@@ -35,6 +35,17 @@ const sequentialAppendBySession: Map<
   ) => Promise<boolean>
 > = new Map()
 
+// Per-session sequential wrappers for fetchSessionLogsFromUrl during 409 recovery
+// to ensure re-fetches are atomic with respect to other concurrent writes.
+const sequentialFetchBySession: Map<
+  string,
+  (
+    sessionId: string,
+    url: string,
+    headers: Record<string, string>,
+  ) => Promise<Entry[] | null>
+> = new Map()
+
 /**
  * Gets or creates a sequential wrapper for a session
  * This ensures that log appends for a session are processed one at a time
@@ -52,6 +63,26 @@ function getOrCreateSequentialAppend(sessionId: string) {
     sequentialAppendBySession.set(sessionId, sequentialAppend)
   }
   return sequentialAppend
+}
+
+/**
+ * Gets or creates a sequential wrapper for fetchSessionLogsFromUrl for a session.
+ * This ensures that re-fetches during 409 recovery are serialized with respect to
+ * other concurrent writes for the same session.
+ */
+function getOrCreateSequentialFetch(sessionId: string) {
+  let sequentialFetch = sequentialFetchBySession.get(sessionId)
+  if (!sequentialFetch) {
+    sequentialFetch = sequential(
+      async (
+        sid: string,
+        url: string,
+        headers: Record<string, string>,
+      ) => await fetchSessionLogsFromUrl(sid, url, headers),
+    )
+    sequentialFetchBySession.set(sessionId, sequentialFetch)
+  }
+  return sequentialFetch
 }
 
 /**
@@ -113,7 +144,10 @@ async function appendSessionLogImpl(
         } else {
           // Server didn't return x-last-uuid (e.g. v1 endpoint). Re-fetch
           // the session to discover the current head of the append chain.
-          const logs = await fetchSessionLogsFromUrl(sessionId, url, headers)
+          // Use the per-session sequential fetch wrapper to prevent race conditions
+          // with other concurrent writes.
+          const sequentialFetch = getOrCreateSequentialFetch(sessionId)
+          const logs = await sequentialFetch(sessionId, url, headers)
           const adoptedUuid = findLastUuid(logs)
           if (adoptedUuid) {
             lastUuidMap.set(sessionId, adoptedUuid)
@@ -520,6 +554,7 @@ function findLastUuid(logs: Entry[] | null): UUID | undefined {
 export function clearSession(sessionId: string): void {
   lastUuidMap.delete(sessionId)
   sequentialAppendBySession.delete(sessionId)
+  sequentialFetchBySession.delete(sessionId)
 }
 
 /**
@@ -529,4 +564,5 @@ export function clearSession(sessionId: string): void {
 export function clearAllSessions(): void {
   lastUuidMap.clear()
   sequentialAppendBySession.clear()
+  sequentialFetchBySession.clear()
 }
