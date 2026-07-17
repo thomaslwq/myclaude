@@ -20,8 +20,8 @@ import type {
 // Cache expiration time: 24 hours (eligibility changes only on subscription/experiment changes)
 const CACHE_EXPIRATION_MS = 24 * 60 * 60 * 1000
 
-// Track in-flight fetch to prevent duplicate API calls
-let fetchInProgress: Promise<ReferralEligibilityResponse | null> | null = null
+// Track in-flight fetches per org to prevent duplicate API calls
+const fetchInProgressMap = new Map<string, Promise<ReferralEligibilityResponse | null>>()
 
 export async function fetchReferralEligibility(
   campaign: ReferralCampaign = 'claude_code_guest_pass',
@@ -178,17 +178,19 @@ export async function fetchAndStorePassesEligibility(): Promise<ReferralEligibil
     return null
   }
 
-  // Return existing promise if fetch is already in progress
-  if (fetchInProgress) {
-    logForDebugging('Passes: Reusing in-flight eligibility fetch')
-    return fetchInProgress
+  // Return existing promise if fetch is already in progress for this org
+  const existingPromise = fetchInProgressMap.get(orgId)
+  if (existingPromise) {
+    logForDebugging(`Passes: Reusing in-flight eligibility fetch for org ${orgId}`)
+    return existingPromise
   }
 
   // Set the promise immediately to prevent concurrent fetches (atomic assignment)
   let resolvePromise: (value: ReferralEligibilityResponse | null) => void
-  fetchInProgress = new Promise<ReferralEligibilityResponse | null>((resolve) => {
+  const promise = new Promise<ReferralEligibilityResponse | null>((resolve) => {
     resolvePromise = resolve
   })
+  fetchInProgressMap.set(orgId, promise)
 
   // Start the fetch in the background
   ;(async () => {
@@ -219,11 +221,11 @@ export async function fetchAndStorePassesEligibility(): Promise<ReferralEligibil
       resolvePromise(null)
     } finally {
       // Clear the promise when done
-      fetchInProgress = null
+      fetchInProgressMap.delete(orgId)
     }
   })()
 
-  return fetchInProgress
+  return promise
 }
 
 /**

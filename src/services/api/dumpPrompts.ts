@@ -309,10 +309,9 @@ export function createDumpPromptsFetch(
             data = await cloned.json()
           }
 
-          await fs.appendFile(
-            filePath,
-            jsonStringify({ type: 'response', timestamp, data }) + '\n',
-          )
+          await appendToFile(filePath, [
+            jsonStringify({ type: 'response', timestamp, data }),
+          ])
         } catch (err) {
           try {
             logForDebugging(`dumpPrompts.response handler error: ${err}`, { level: 'error' })
