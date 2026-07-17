@@ -277,5 +277,7 @@ export async function prefetchPassesEligibility(): Promise<void> {
     return
   }
 
-  void getCachedOrFetchPassesEligibility()
+  void getCachedOrFetchPassesEligibility().catch(() => {
+    // Ignore errors - this is a background prefetch
+  })
 }

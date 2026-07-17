@@ -119,19 +119,19 @@ async function collectMissingRelativeImports(): Promise<MissingImport[]> {
 
 const args = process.argv.slice(2)
 
-// Only run the filesystem scan in development mode
-async function main(): Promise<void> {
-  if (process.env.NODE_ENV === 'development') {
-    const missingImports = await collectMissingRelativeImports()
+// Handle --version immediately without any filesystem scan
+if (args.includes('--version')) {
+  console.log(pkg.version)
+  process.exit(0)
+}
 
-    if (args.includes('--version')) {
-      if (missingImports.length > 0) {
-        console.log(`${pkg.version} (restored dev workspace)`)
-      } else {
-        console.log(pkg.version)
-      }
-      process.exit(0)
-    }
+// Only run the filesystem scan in development mode when explicitly enabled
+async function main(): Promise<void> {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.MYCLAUDE_CHECK_MISSING_IMPORTS === 'true'
+  ) {
+    const missingImports = await collectMissingRelativeImports()
 
     if (missingImports.length > 0) {
       console.log('Missing relative imports detected:')
@@ -142,13 +142,8 @@ async function main(): Promise<void> {
     }
 
     console.log('Dev workspace check passed (no missing relative imports)')
-  } else {
+  } else if (process.env.NODE_ENV !== 'development') {
     // In production, skip the expensive scan entirely
-    if (args.includes('--version')) {
-      console.log(pkg.version)
-      process.exit(0)
-    }
-
     console.log('Dev workspace check skipped (NODE_ENV is not development)')
   }
 
