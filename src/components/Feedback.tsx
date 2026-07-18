@@ -1,8 +1,8 @@
 import { readFile, stat } from 'fs/promises';
 import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { getLastAPIRequest } from 'src/bootstrap/state.js';
-import { getLastAssistantMessage, normalizeMessagesForAPI } from 'src/utils/messages.js';
+import { getLastAPIRequest } from '../bootstrap/state.js';
+import { getLastAssistantMessage, normalizeMessagesForAPI } from '../utils/messages.js';
 import type { CommandResultDisplay } from '../commands.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { Box, Text, useInput } from '../ink.js';
