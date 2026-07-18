@@ -294,8 +294,22 @@ export async function getSessionLogsViaOAuth(
     ...getOAuthHeaders(accessToken),
     'x-organization-uuid': orgUUID,
   }
-  const result = await fetchSessionLogsFromUrl(sessionId, url, headers)
-  return result
+
+  // Use the per-session sequential wrapper to serialize fetch operations
+  // with append operations for the same session, preventing race conditions
+  const sequential = getOrCreateSequential(sessionId)
+  const result = await sequential(sessionId, url, headers, true)
+  const logs = result as Entry[] | null
+
+  // Update the last UUID to the last entry's UUID to maintain consistency
+  if (logs && logs.length > 0) {
+    const lastEntry = logs.at(-1)
+    if (lastEntry && 'uuid' in lastEntry && lastEntry.uuid) {
+      lastUuidMap.set(sessionId, lastEntry.uuid)
+    }
+  }
+
+  return logs
 }
 
 /**
