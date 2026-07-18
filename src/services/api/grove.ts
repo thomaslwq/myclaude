@@ -50,6 +50,8 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
   const memoized = lodashMemoize(fn) as T & { cache: { clear: () => void } }
 
   const originalClear = memoized.cache.clear.bind(memoized.cache)
+  // Per-argument mutex to prevent concurrent cache rebuilds
+  const refreshMutexes = new Map<string, Mutex>()
 
   // Override the original function to check TTL
   const wrapped = (async (...args: any[]) => {
@@ -57,28 +59,50 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
     const cacheExpired = lastCachedAt !== 0 && now - lastCachedAt >= ttlMs
 
     if (cacheExpired) {
-      // Cache expired — try to refresh by calling the original function directly.
-      // Do NOT clear the underlying lodash cache beforehand, so that if the
-      // refresh fails (transient error) the old cached value is preserved.
+      // Ensure only one caller refreshes the cache at a time.
+      // Use a mutex keyed by the first argument to serialize concurrent rebuilds.
+      const key = String(args[0] ?? '_default')
+      let mutex = refreshMutexes.get(key)
+      if (!mutex) {
+        mutex = new Mutex()
+        refreshMutexes.set(key, mutex)
+      }
+
+      const release = await mutex.acquire()
       try {
-        const freshResult = await fn(...args)
-        if (
-          freshResult &&
-          typeof freshResult === 'object' &&
-          'success' in freshResult &&
-          freshResult.success === true
-        ) {
-          // Success — update the lodash cache with the fresh result
-          originalClear()
-          memoized.cache.set(args[0], freshResult)
-          lastCachedAt = Date.now()
-          return freshResult
+        // Double-check: another call may have already refreshed the cache
+        // while we were waiting for the mutex.
+        const now2 = Date.now()
+        if (lastCachedAt !== 0 && now2 - lastCachedAt < ttlMs) {
+          // Cache was refreshed by another call — use the cached value.
+          return memoized(...args)
         }
-        // Transient failure — return the cached value (lodash still has it)
-        return memoized(...args)
-      } catch (error) {
-        // Transient error — return the cached value (lodash still has it)
-        return memoized(...args)
+
+        // Cache expired — try to refresh by calling the original function directly.
+        // Do NOT clear the underlying lodash cache beforehand, so that if the
+        // refresh fails (transient error) the old cached value is preserved.
+        try {
+          const freshResult = await fn(...args)
+          if (
+            freshResult &&
+            typeof freshResult === 'object' &&
+            'success' in freshResult &&
+            freshResult.success === true
+          ) {
+            // Success — update the lodash cache with the fresh result
+            originalClear()
+            memoized.cache.set(args[0], freshResult)
+            lastCachedAt = Date.now()
+            return freshResult
+          }
+          // Transient failure — return the cached value (lodash still has it)
+          return memoized(...args)
+        } catch (error) {
+          // Transient error — return the cached value (lodash still has it)
+          return memoized(...args)
+        }
+      } finally {
+        release()
       }
     }
 
