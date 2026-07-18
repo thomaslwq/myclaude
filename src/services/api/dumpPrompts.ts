@@ -343,18 +343,10 @@ export function createDumpPromptsFetch(
             jsonStringify({ type: 'response', timestamp, data }),
           ])
         } catch (err) {
-          try {
-            logForDebugging(`dumpPrompts.response handler error: ${err}`, { level: 'error' })
-          } catch {
-            // Silently ignore if logForDebugging itself throws
-          }
+          logError(`dumpPrompts.response handler error: ${err}`)
         }
       })().catch((err: unknown) => {
-        try {
-          logForDebugging(`dumpPrompts.response handler unhandled rejection: ${err}`, { level: 'error' })
-        } catch {
-          // Silently ignore if logForDebugging itself throws
-        }
+        logError(`dumpPrompts.response handler unhandled rejection: ${err}`)
       })
     }
 
