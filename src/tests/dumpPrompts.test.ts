@@ -127,4 +127,35 @@ describe('dumpPrompts security', () => {
       expect(e.code).toBe('ENOENT')
     }
   })
+
+  test('should NOT write to disk when NODE_ENV=production even if env vars are set', async () => {
+    // Set NODE_ENV to production
+    process.env.NODE_ENV = 'production'
+    process.env.USER_TYPE = 'ant'
+    process.env.DUMP_PROMPTS = '1'
+    
+    const fetch = createDumpPromptsFetch('test-session')
+    const mockResponse = new Response(JSON.stringify({ id: 'msg_123', role: 'assistant', content: [] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    })
+    
+    const mockFetch = async () => mockResponse
+    await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'claude-3-5-sonnet-20241022', messages: [] })
+    })
+    
+    // Verify no file was created
+    const filePath = getDumpPromptsPath('test-session')
+    try {
+      await fs.access(filePath)
+      expect.fail('File should not exist when NODE_ENV=production')
+    } catch (e) {
+      expect(e.code).toBe('ENOENT')
+    }
+    
+    // Clean up
+    delete process.env.NODE_ENV
+  })
 })

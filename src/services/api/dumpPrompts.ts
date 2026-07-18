@@ -168,6 +168,9 @@ async function dumpRequest(
   state: DumpState,
   filePath: string,
 ): Promise<void> {
+  // Disable in production to prevent accidental data leakage
+  if (process.env.NODE_ENV === 'production') return
+
   try {
     const req = jsonParse(body) as Record<string, unknown>
     addApiRequestToCache(req)
@@ -268,7 +271,8 @@ export function createDumpPromptsFetch(
     const response = await globalThis.fetch(input, init)
 
     // Save response async — require both USER_TYPE=ant and DUMP_PROMPTS=1
-    if (timestamp && response.ok && process.env.USER_TYPE === 'ant' && process.env.DUMP_PROMPTS === '1') {
+    // Also disable in production to prevent accidental data leakage
+    if (timestamp && response.ok && process.env.NODE_ENV !== 'production' && process.env.USER_TYPE === 'ant' && process.env.DUMP_PROMPTS === '1') {
       const cloned = response.clone()
       ;(async () => {
         try {
