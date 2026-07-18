@@ -146,14 +146,27 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
   
   const missing: MissingImport[] = []
   const seen = new Set<string>()
-  const pattern =
-    /(?:import|export)\s+[\s\S]*?from\s+['"](\..?\/[^'"]+)['"]|require\(\s*['"](\..?\/[^'"]+)['"]\s*\)/g
+  const importPattern = /(?:import|export)\s+[^'"]*?from\s+['"](\..?\/[^'"]+)['"]/g
+  const requirePattern = /require\(\s*['"](\..?\/[^'"]+)['"]\s*\)/g
 
   for (const file of files) {
     const text = await getFileContent(file)
     if (!text) continue
-    for (const match of text.matchAll(pattern)) {
-      const specifier = match[1] ?? match[2]
+    for (const match of text.matchAll(importPattern)) {
+      const specifier = match[1]
+      if (!specifier) continue
+      const target = resolve(dirname(file), specifier)
+      if (await hasResolvableTarget(target)) continue
+      const key = `${file} -> ${specifier}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      missing.push({
+        importer: file,
+        specifier,
+      })
+    }
+    for (const match of text.matchAll(requirePattern)) {
+      const specifier = match[1]
       if (!specifier) continue
       const target = resolve(dirname(file), specifier)
       if (await hasResolvableTarget(target)) continue
