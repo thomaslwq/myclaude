@@ -86,7 +86,7 @@ export function clearSessionCaches(
   // Clear stored image paths cache
   clearStoredImagePaths()
 
-  // Clear all session ingress caches (lastUuidMap, sequentialAppendBySession)
+  // Clear all session ingress caches (lastUuidMap, sequentialBySession)
   clearAllSessions()
   // Clear swarm permission pending callbacks
   if (!hasPreserved) clearAllPendingCallbacks()

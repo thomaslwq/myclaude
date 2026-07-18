@@ -25,64 +25,49 @@ const lastUuidMap: Map<string, UUID> = new Map()
 const MAX_RETRIES = 10
 const BASE_DELAY_MS = 500
 
-// Per-session sequential wrappers to prevent concurrent log writes
-const sequentialAppendBySession: Map<
+// Per-session sequential wrapper to serialize both append and fetch operations
+// This ensures atomicity between concurrent appends and re-fetches during 409 recovery.
+const sequentialBySession: Map<
   string,
   (
-    entry: TranscriptMessage,
+    entryOrSid: TranscriptMessage | string,
     url: string,
     headers: Record<string, string>,
-  ) => Promise<boolean>
-> = new Map()
-
-// Per-session sequential wrappers for fetchSessionLogsFromUrl during 409 recovery
-// to ensure re-fetches are atomic with respect to other concurrent writes.
-const sequentialFetchBySession: Map<
-  string,
-  (
-    sessionId: string,
-    url: string,
-    headers: Record<string, string>,
-  ) => Promise<Entry[] | null>
+    isFetch?: boolean,
+  ) => Promise<boolean | Entry[] | null>
 > = new Map()
 
 /**
  * Gets or creates a sequential wrapper for a session
  * This ensures that log appends for a session are processed one at a time
  */
-function getOrCreateSequentialAppend(sessionId: string) {
-  let sequentialAppend = sequentialAppendBySession.get(sessionId)
-  if (!sequentialAppend) {
-    sequentialAppend = sequential(
-      async (
-        entry: TranscriptMessage,
-        url: string,
-        headers: Record<string, string>,
-      ) => await appendSessionLogImpl(sessionId, entry, url, headers),
-    )
-    sequentialAppendBySession.set(sessionId, sequentialAppend)
-  }
-  return sequentialAppend
-}
-
 /**
- * Gets or creates a sequential wrapper for fetchSessionLogsFromUrl for a session.
- * This ensures that re-fetches during 409 recovery are serialized with respect to
- * other concurrent writes for the same session.
+ * Gets or creates a sequential wrapper for a session that serializes both
+ * append and fetch operations. This ensures atomicity between concurrent
+ * appends and re-fetches during 409 recovery.
  */
-function getOrCreateSequentialFetch(sessionId: string) {
-  let sequentialFetch = sequentialFetchBySession.get(sessionId)
-  if (!sequentialFetch) {
-    sequentialFetch = sequential(
+function getOrCreateSequential(sessionId: string) {
+  let wrapper = sequentialBySession.get(sessionId)
+  if (!wrapper) {
+    wrapper = sequential(
       async (
-        sid: string,
+        entryOrSid: TranscriptMessage | string,
         url: string,
         headers: Record<string, string>,
-      ) => await fetchSessionLogsFromUrl(sid, url, headers),
+        isFetch = false,
+      ) => {
+        if (isFetch) {
+          const sid = entryOrSid as string
+          return await fetchSessionLogsFromUrl(sid, url, headers)
+        } else {
+          const entry = entryOrSid as TranscriptMessage
+          return await appendSessionLogImpl(sessionId, entry, url, headers)
+        }
+      },
     )
-    sequentialFetchBySession.set(sessionId, sequentialFetch)
+    sequentialBySession.set(sessionId, wrapper)
   }
-  return sequentialFetch
+  return wrapper
 }
 
 /**
@@ -144,12 +129,12 @@ async function appendSessionLogImpl(
         } else {
           // Server didn't return x-last-uuid (e.g. v1 endpoint). Re-fetch
           // the session to discover the current head of the append chain.
-          // Use the per-session sequential fetch wrapper to prevent race conditions
-          // with other concurrent writes.
-          const sequentialFetch = getOrCreateSequentialFetch(sessionId)
+          // Use the per-session sequential wrapper to serialize with other
+          // concurrent operations for this session.
+          const sequential = getOrCreateSequential(sessionId)
           let logs: Entry[] | null = null
           try {
-            logs = await sequentialFetch(sessionId, url, headers)
+            logs = await sequential(sessionId, url, headers, true)
           } catch (fetchError) {
             // fetchSessionLogsFromUrl catches its own errors and returns null,
             // but the sequential wrapper or other unexpected errors could throw.
@@ -257,8 +242,8 @@ export async function appendSessionLog(
     'Content-Type': 'application/json',
   }
 
-  const sequentialAppend = getOrCreateSequentialAppend(sessionId)
-  return sequentialAppend(entry, url, headers)
+  const sequential = getOrCreateSequential(sessionId)
+  return sequential(entry, url, headers, false)
 }
 
 /**
@@ -569,8 +554,7 @@ function findLastUuid(logs: Entry[] | null): UUID | undefined {
  */
 export function clearSession(sessionId: string): void {
   lastUuidMap.delete(sessionId)
-  sequentialAppendBySession.delete(sessionId)
-  sequentialFetchBySession.delete(sessionId)
+  sequentialBySession.delete(sessionId)
 }
 
 /**
@@ -579,6 +563,5 @@ export function clearSession(sessionId: string): void {
  */
 export function clearAllSessions(): void {
   lastUuidMap.clear()
-  sequentialAppendBySession.clear()
-  sequentialFetchBySession.clear()
+  sequentialBySession.clear()
 }
