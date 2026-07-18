@@ -7,6 +7,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { logError } from '../../utils/log.js'
+import { Mutex } from 'async-mutex'
 
 function hashString(str: string): string {
   return createHash('sha256').update(str).digest('hex')
@@ -30,8 +31,10 @@ const dumpState = new Map<string, DumpState>()
 
 // Queue to serialize dumpRequest calls per session to prevent race conditions
 const dumpRequestQueue = new Map<string, Array<() => Promise<void>>>()
-// Track which sessions are currently being processed to avoid concurrent processing
-const processingQueues = new Set<string>()
+// Per-session mutex to prevent concurrent queue processing
+const dumpRequestMutexes = new Map<string, Mutex>()
+// Mutex to protect the creation of per-session mutexes (atomic check-and-set)
+const dumpRequestMapMutex = new Mutex()
 
 function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => Promise<void>): void {
   if (!dumpRequestQueue.has(agentIdOrSessionId)) {
@@ -39,35 +42,43 @@ function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => Promise<
   }
   dumpRequestQueue.get(agentIdOrSessionId)!.push(callback)
   
-  // Start processing the queue only if it's not already being processed
-  // This prevents race conditions where concurrent enqueue calls
-  // would trigger multiple processQueue invocations for the same session
-  if (!processingQueues.has(agentIdOrSessionId)) {
-    processingQueues.add(agentIdOrSessionId)
-    processQueue(agentIdOrSessionId)
-  }
+  // Start processing the queue asynchronously; the mutex ensures only one
+  // processQueue runs per session at a time, preventing race conditions.
+  processQueue(agentIdOrSessionId)
 }
 
 async function processQueue(agentIdOrSessionId: string): Promise<void> {
-  processingQueues.add(agentIdOrSessionId)
-  
-  const queue = dumpRequestQueue.get(agentIdOrSessionId)
-  if (!queue || queue.length === 0) {
-    dumpRequestQueue.delete(agentIdOrSessionId)
-    processingQueues.delete(agentIdOrSessionId)
-    return
+  // Acquire the per-session mutex to serialize processing
+  const mapRelease = await dumpRequestMapMutex.acquire()
+  let mutex = dumpRequestMutexes.get(agentIdOrSessionId)
+  if (!mutex) {
+    mutex = new Mutex()
+    dumpRequestMutexes.set(agentIdOrSessionId, mutex)
   }
-  
-  const callback = queue.shift()!
-  await callback()
-  
-  // Process the next item in the queue if there are more
-  // Using setImmediate to avoid stack overflow with rapid enqueues
-  if (queue.length > 0) {
-    setImmediate(() => processQueue(agentIdOrSessionId))
-  } else {
-    dumpRequestQueue.delete(agentIdOrSessionId)
-    processingQueues.delete(agentIdOrSessionId)
+  mapRelease()
+
+  const release = await mutex.acquire()
+  try {
+    const queue = dumpRequestQueue.get(agentIdOrSessionId)
+    if (!queue || queue.length === 0) {
+      dumpRequestQueue.delete(agentIdOrSessionId)
+      dumpRequestMutexes.delete(agentIdOrSessionId)
+      return
+    }
+    
+    const callback = queue.shift()!
+    await callback()
+    
+    // Process the next item in the queue if there are more
+    // Using setImmediate to avoid stack overflow with rapid enqueues
+    if (queue.length > 0) {
+      setImmediate(() => processQueue(agentIdOrSessionId))
+    } else {
+      dumpRequestQueue.delete(agentIdOrSessionId)
+      dumpRequestMutexes.delete(agentIdOrSessionId)
+    }
+  } finally {
+    release()
   }
 }
 
