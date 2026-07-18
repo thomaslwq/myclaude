@@ -9,6 +9,14 @@ import { logForDebugging } from '../../utils/debug.js'
 import { logError } from '../../utils/log.js'
 import { Mutex } from 'async-mutex'
 
+// Warn at module load if sensitive env vars are set
+if (process.env.USER_TYPE === 'ant' && process.env.DUMP_PROMPTS === '1') {
+  logForDebugging(
+    'DUMP_PROMPTS is enabled. This will write full API payloads (including system prompts, user messages, and tool definitions) to the filesystem. This is intended for debugging only and should NOT be used in production.',
+    { level: 'warn' },
+  )
+}
+
 function hashString(str: string): string {
   return createHash('sha256').update(str).digest('hex')
 }
@@ -166,6 +174,12 @@ async function dumpRequest(
 
     // Require both USER_TYPE=ant and DUMP_PROMPTS=1 to write to disk
     if (process.env.USER_TYPE !== 'ant' || process.env.DUMP_PROMPTS !== '1') return
+
+    // Warn about potential sensitive data exposure
+    logForDebugging(
+      'DUMP_PROMPTS is enabled. This will write full API payloads (including system prompts, user messages, and tool definitions) to the filesystem. This is intended for debugging only and should NOT be used in production.',
+      { level: 'warn' },
+    )
     const entries: string[] = []
     const messages = (req.messages ?? []) as Array<{ role?: string }>
 
