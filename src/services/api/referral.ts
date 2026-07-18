@@ -44,8 +44,10 @@ export async function fetchReferralEligibility(
 
   // Set the promise immediately to prevent concurrent fetches (atomic assignment)
   let resolvePromise: (value: ReferralEligibilityResponse) => void
-  const promise = new Promise<ReferralEligibilityResponse>((resolve) => {
+  let rejectPromise: (reason: unknown) => void
+  const promise = new Promise<ReferralEligibilityResponse>((resolve, reject) => {
     resolvePromise = resolve
+    rejectPromise = reject
   })
   fetchInProgressMap.set(orgUUID, promise)
 
@@ -63,7 +65,7 @@ export async function fetchReferralEligibility(
       logError(error as Error)
       // Remove the promise so subsequent calls can retry
       fetchInProgressMap.delete(orgUUID)
-      throw error
+      rejectPromise(error)
     }
   })()
 
