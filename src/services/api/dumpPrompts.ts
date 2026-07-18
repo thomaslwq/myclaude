@@ -279,13 +279,12 @@ export function createDumpPromptsFetch(
           let data: unknown
           if (isStreaming && cloned.body) {
             // Parse SSE stream into chunks incrementally to avoid memory exhaustion.
-            // Instead of accumulating the entire response body, we keep only a small
-            // trailing fragment for incomplete events and process complete events as
-            // they arrive.
+            // Instead of accumulating the entire response body, we write chunks
+            // directly to the file as they arrive.
             const reader = cloned.body.getReader()
             const decoder = new TextDecoder()
             let buffer = ''
-            const chunks: unknown[] = []
+            const chunkEntries: string[] = []
             try {
               while (true) {
                 const { done, value } = await reader.read()
@@ -303,7 +302,14 @@ export function createDumpPromptsFetch(
                     for (const line of event.split('\n')) {
                       if (line.startsWith('data: ') && line !== 'data: [DONE]') {
                         try {
-                          chunks.push(jsonParse(line.slice(6)))
+                          const chunk = jsonParse(line.slice(6))
+                          // Write chunk directly to file to avoid memory accumulation
+                          chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
+                          // Flush to disk periodically to avoid unbounded memory growth
+                          if (chunkEntries.length >= 50) {
+                            await appendToFile(filePath, chunkEntries)
+                            chunkEntries.length = 0
+                          }
                         } catch (err) {
                           logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
                         }
@@ -321,7 +327,9 @@ export function createDumpPromptsFetch(
                 for (const line of event.split('\n')) {
                   if (line.startsWith('data: ') && line !== 'data: [DONE]') {
                     try {
-                      chunks.push(jsonParse(line.slice(6)))
+                      const chunk = jsonParse(line.slice(6))
+                      // Write chunk directly to file to avoid memory accumulation
+                      chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
                     } catch (err) {
                       logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
                     }
@@ -329,7 +337,11 @@ export function createDumpPromptsFetch(
                 }
               }
             }
-            data = { stream: true, chunks }
+            // Flush any remaining chunks
+            if (chunkEntries.length > 0) {
+              await appendToFile(filePath, chunkEntries)
+            }
+            data = { stream: true, chunks: [] }
           } else {
             data = await cloned.json()
           }
