@@ -245,22 +245,32 @@ export async function isQualifiedForGrove(): Promise<boolean> {
   const cachedEntry = globalConfig.groveConfigCache?.[accountId]
   const now = Date.now()
 
-  // No cache - trigger background fetch and return false (non-blocking)
-  // The Grove dialog won't show this session, but will next time if eligible
+  // No cache - fetch synchronously (with existing timeout) to get the config
+  // This ensures the Grove dialog can show in the current session if eligible
   if (!cachedEntry) {
     logForDebugging(
-      'Grove: No cache, fetching config in background (dialog skipped this session)',
+      'Grove: No cache, fetching config synchronously',
     )
-    void fetchAndStoreGroveConfig(accountId)
+    await fetchAndStoreGroveConfig(accountId)
+    // Re-read cache after fetch
+    const updatedConfig = getGlobalConfig().groveConfigCache?.[accountId]
+    if (updatedConfig) {
+      return updatedConfig.grove_enabled
+    }
     return false
   }
 
-  // Cache exists but is stale - return cached value and refresh in background
+  // Cache exists but is stale - refresh synchronously and return updated value
   if (now - cachedEntry.timestamp > GROVE_CACHE_EXPIRATION_MS) {
     logForDebugging(
-      'Grove: Cache stale, returning cached data and refreshing in background',
+      'Grove: Cache stale, refreshing config',
     )
-    void fetchAndStoreGroveConfig(accountId)
+    await fetchAndStoreGroveConfig(accountId)
+    // Re-read cache after fetch
+    const updatedConfig = getGlobalConfig().groveConfigCache?.[accountId]
+    if (updatedConfig) {
+      return updatedConfig.grove_enabled
+    }
     return cachedEntry.grove_enabled
   }
 
@@ -286,30 +296,46 @@ async function fetchAndStoreGroveConfig(accountId: string): Promise<void> {
 
   const release = await mutex.acquire()
   try {
-    const result = await getGroveNoticeConfig()
-    if (!result.success) {
-      return
+    // Retry up to 2 times with a short delay for transient failures
+    let lastError: Error | undefined
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const result = await getGroveNoticeConfig()
+        if (!result.success) {
+          // On failure, wait briefly and retry
+          if (attempt < 2) {
+            await new Promise(resolve => setTimeout(resolve, 500))
+            continue
+          }
+          return
+        }
+        const groveEnabled = result.data.grove_enabled
+        const cachedEntry = getGlobalConfig().groveConfigCache?.[accountId]
+        if (
+          cachedEntry?.grove_enabled === groveEnabled &&
+          Date.now() - cachedEntry.timestamp <= GROVE_CACHE_EXPIRATION_MS
+        ) {
+          return
+        }
+        saveGlobalConfig(current => ({
+          ...current,
+          groveConfigCache: {
+            ...current.groveConfigCache,
+            [accountId]: {
+              grove_enabled: groveEnabled,
+              timestamp: Date.now(),
+            },
+          },
+        }))
+        return
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err))
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      }
     }
-    const groveEnabled = result.data.grove_enabled
-    const cachedEntry = getGlobalConfig().groveConfigCache?.[accountId]
-    if (
-      cachedEntry?.grove_enabled === groveEnabled &&
-      Date.now() - cachedEntry.timestamp <= GROVE_CACHE_EXPIRATION_MS
-    ) {
-      return
-    }
-    saveGlobalConfig(current => ({
-      ...current,
-      groveConfigCache: {
-        ...current.groveConfigCache,
-        [accountId]: {
-          grove_enabled: groveEnabled,
-          timestamp: Date.now(),
-        },
-      },
-    }))
-  } catch (err) {
-    logForDebugging(`Grove: Failed to fetch and store config: ${err}`)
+    logForDebugging(`Grove: Failed to fetch and store config after 3 attempts: ${lastError}`)
   } finally {
     release()
   }
