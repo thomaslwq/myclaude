@@ -83,7 +83,16 @@ async function processQueue(agentIdOrSessionId: string): Promise<void> {
     if (queue && queue.length > 0) {
       // More items were added — keep the flag set and start a new processing loop
       // (flag stays set, so enqueueDumpRequest won't start a duplicate)
-      processQueue(agentIdOrSessionId)
+      // Await the recursive call to avoid unhandled promise rejections.
+      // If the recursive call throws, we still need to clean up the flag.
+      try {
+        await processQueue(agentIdOrSessionId)
+      } catch (err) {
+        logError(`processQueue: recursive call failed for ${agentIdOrSessionId}`, err)
+        // Clean up the flag so the queue is not permanently blocked
+        dumpRequestQueue.delete(agentIdOrSessionId)
+        processingFlags.delete(agentIdOrSessionId)
+      }
     } else {
       // No items — clean up the queue and clear the flag
       dumpRequestQueue.delete(agentIdOrSessionId)
