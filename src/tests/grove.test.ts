@@ -2,16 +2,26 @@ import { describe, test, expect } from 'bun:test'
 import { readFileSync } from 'fs'
 
 describe('getGroveNoticeConfig cache invalidation', () => {
-  test('should clear memoized cache on API failure', () => {
+  test('should NOT clear memoized cache on transient API failure (to avoid unnecessary API calls)', () => {
     const source = readFileSync('./src/services/api/grove.ts', 'utf-8')
     const noticeConfigStart = source.indexOf('export const getGroveNoticeConfig = memoizeWithTTL(')
     const functionBody = source.substring(noticeConfigStart, noticeConfigStart + 3000)
-    expect(functionBody).toContain('getGroveNoticeConfig.cache.clear')
+    // On transient failure, we should NOT clear the cache — keep the last successful result
+    expect(functionBody).not.toContain('getGroveNoticeConfig.cache.clear')
   })
 
-  test('getGroveSettings already clears cache on failure (reference)', () => {
+  test('getGroveSettings.cache.clear is still called from updateGroveSettings and markGroveNoticeViewed', () => {
     const source = readFileSync('./src/services/api/grove.ts', 'utf-8')
+    // The cache.clear method should still exist and be callable manually
     expect(source).toContain('getGroveSettings.cache.clear')
+  })
+
+  test('getGroveSettings should NOT clear cache on API failure', () => {
+    const source = readFileSync('./src/services/api/grove.ts', 'utf-8')
+    const settingsStart = source.indexOf('export const getGroveSettings = memoizeWithTTL(')
+    const functionBody = source.substring(settingsStart, settingsStart + 1500)
+    // The catch block should NOT call cache.clear()
+    expect(functionBody).not.toContain('getGroveSettings.cache.clear')
   })
 })
 

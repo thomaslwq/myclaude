@@ -160,12 +160,15 @@ async function dumpRequest(
   // Disable in production to prevent accidental data leakage
   if (process.env.NODE_ENV === 'production') return
 
+  // Only parse and cache if USER_TYPE is ant (needed for caching or writing to disk)
+  if (process.env.USER_TYPE !== 'ant') return
+
   try {
     const req = jsonParse(body) as Record<string, unknown>
     addApiRequestToCache(req)
 
-    // Require both USER_TYPE=ant and DUMP_PROMPTS=1 to write to disk
-    if (process.env.USER_TYPE !== 'ant' || process.env.DUMP_PROMPTS !== '1') return
+    // Require DUMP_PROMPTS=1 to write to disk
+    if (process.env.DUMP_PROMPTS !== '1') return
 
     // Warn about potential sensitive data exposure
     logForDebugging(

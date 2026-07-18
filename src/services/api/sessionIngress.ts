@@ -38,10 +38,6 @@ const sequentialBySession: Map<
 > = new Map()
 
 /**
- * Gets or creates a sequential wrapper for a session
- * This ensures that log appends for a session are processed one at a time
- */
-/**
  * Gets or creates a sequential wrapper for a session that serializes both
  * append and fetch operations. This ensures atomicity between concurrent
  * appends and re-fetches during 409 recovery.
@@ -262,7 +258,15 @@ export async function getSessionLogs(
   }
 
   const headers = { Authorization: `Bearer ${sessionToken}` }
-  const logs = await fetchSessionLogsFromUrl(sessionId, url, headers)
+
+  // Go through the per-session sequential wrapper so that the fetch is
+  // serialized with any concurrent append operations for the same session.
+  // This avoids the race condition where a direct call to
+  // fetchSessionLogsFromUrl could observe stale state or interleave with
+  // a 409 re-fetch inside appendSessionLogImpl.
+  const sequential = getOrCreateSequential(sessionId)
+  const result = await sequential(sessionId, url, headers, true)
+  const logs = result as Entry[] | null
 
   if (logs && logs.length > 0) {
     // Update our lastUuid to the last entry's UUID

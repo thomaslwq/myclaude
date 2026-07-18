@@ -75,15 +75,18 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
         'success' in result &&
         result.success === false
       ) {
-        // Clear cache on failure so the next call will re-execute
-        originalClear()
-        lastCachedAt = 0
+        // Don't clear cache on transient failures — keep the last successful
+        // result to avoid unnecessary API calls on intermittent network issues.
+        // The cache will naturally expire after TTL (24h), allowing a retry then.
+        // This prevents a cascade of requests on transient errors.
+        // Do not update lastCachedAt so the cache stays valid.
       }
       return result
     } catch (error) {
-      // Clear cache on error to prevent caching rejected promises
-      originalClear()
-      lastCachedAt = -1
+      // Don't clear cache on transient errors — keep the last successful
+      // result to avoid unnecessary API calls on intermittent network issues.
+      // The cache will naturally expire after TTL (24h), allowing a retry then.
+      // This prevents a cascade of requests on transient errors.
       return { success: false } as any
     }
   }) as T
@@ -150,11 +153,9 @@ export const getGroveSettings = memoizeWithTTL(
       return { success: true, data: response.data }
     } catch (err) {
       logError(err)
-      // Don't cache failures — transient network issues would lock the user
-      // out of privacy settings for the entire session (deadlock: dialog needs
-      // success to render the toggle, toggle calls updateGroveSettings which
-      // is the only other place the cache is cleared).
-      getGroveSettings.cache.clear?.()
+      // Don't clear cache on transient failures — keep the last successful
+      // result to avoid unnecessary API calls on intermittent network issues.
+      // The cache will naturally expire after TTL (24h), allowing a retry then.
       return { success: false }
     }
   },
@@ -395,8 +396,9 @@ export const getGroveNoticeConfig = memoizeWithTTL(
           `Grove: API request timed out after ${GROVE_API_TIMEOUT_MS}ms. This may cause the Grove dialog to be suppressed for users with slow connections.`,
         )
       }
-      // Don't cache failures
-      getGroveNoticeConfig.cache.clear?.()
+      // Don't clear cache on transient failures — keep the last successful
+      // result to avoid unnecessary API calls on intermittent network issues.
+      // The cache will naturally expire after TTL (24h), allowing a retry then.
       return { success: false }
     }
   },
