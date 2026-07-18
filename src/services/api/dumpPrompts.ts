@@ -73,9 +73,23 @@ async function processQueue(agentIdOrSessionId: string): Promise<void> {
       await callback()
     }
   } finally {
-    // Clean up after processing is complete
-    dumpRequestQueue.delete(agentIdOrSessionId)
+    // Clear the flag first so any new enqueues can start a new processQueue
+    // if items are added while we're cleaning up.
     processingFlags.delete(agentIdOrSessionId)
+
+    // Re-check if new items were added while we were processing/exiting.
+    // Without this check, a callback enqueued between the loop exiting and
+    // the finally block running would see the flag still set, not start a
+    // new processQueue, and then be deleted below — losing the callback.
+    const queue = dumpRequestQueue.get(agentIdOrSessionId)
+    if (queue && queue.length > 0) {
+      // More items were added — start a new processing loop
+      processingFlags.add(agentIdOrSessionId)
+      processQueue(agentIdOrSessionId)
+    } else {
+      // No items — clean up the queue
+      dumpRequestQueue.delete(agentIdOrSessionId)
+    }
   }
 }
 
