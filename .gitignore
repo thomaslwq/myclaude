@@ -13,6 +13,7 @@ coverage/
 *.swp
 *.swo
 
+.test-tmp/
 .claude/
 .atomcode/
 .atomcode.md
