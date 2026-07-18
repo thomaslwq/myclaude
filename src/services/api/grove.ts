@@ -340,9 +340,10 @@ async function fetchAndStoreGroveConfig(accountId: string): Promise<void> {
     mutex = new Mutex()
     groveConfigMutexes.set(accountId, mutex)
   }
-  mapRelease()
-
+  // Keep the map mutex held until after the per-account mutex is acquired
+  // to ensure atomic check-and-set of the mutex instance
   const release = await mutex.acquire()
+  mapRelease()
   try {
     // Retry up to 2 times with a short delay for transient failures
     let lastError: Error | undefined
