@@ -174,6 +174,18 @@ async function appendSessionLogImpl(
         return false // Non-retryable
       }
 
+      if (response.status === 403) {
+        logForDebugging('Forbidden - session token lacks permission')
+        logForDiagnosticsNoPII('error', 'session_persist_fail_forbidden')
+        return false // Non-retryable
+      }
+
+      if (response.status === 404) {
+        logForDebugging('Session not found')
+        logForDiagnosticsNoPII('error', 'session_persist_fail_not_found')
+        return false // Non-retryable
+      }
+
       // Other 4xx (429, etc.) - retryable
       logForDebugging(
         `Failed to persist session log: ${response.status} ${response.statusText}`,

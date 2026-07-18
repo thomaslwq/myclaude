@@ -1,7 +1,9 @@
 import pkg from '../package.json'
 import { access } from 'fs/promises'
-import { dirname, extname, join, resolve } from 'path'
+import { realpathSync } from 'fs'
 import { readFile, readdir } from 'fs/promises'
+import { dirname, extname, join, resolve } from 'path'
+import { fileURLToPath } from 'url'
 
 // Apply MYCLAUDE_* env var aliases before any code reads them
 import { applyEnvAliases } from './utils/envCompat.js'
@@ -201,12 +203,14 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
 
 // Only run the main entry point logic when this file is executed directly
 // (not when imported as a module for testing)
-const isMainModule = process.argv[1] && (
-  process.argv[1].endsWith('/dev-entry.ts') ||
-  process.argv[1].endsWith('/dev-entry.js') ||
-  process.argv[1].endsWith('\\dev-entry.ts') ||
-  process.argv[1].endsWith('\\dev-entry.js')
-)
+// Uses realpath + fileURLToPath to handle symlinks, relative paths, and different path separators
+const isMainModule = process.argv[1] && (() => {
+  try {
+    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+  } catch {
+    return false
+  }
+})()
 
 if (isMainModule) {
   const args = process.argv.slice(2)
