@@ -98,6 +98,7 @@ async function getChangedFilesSinceLastCommit(): Promise<string[]> {
       .map(f => resolve(f))
   } catch {
     // If git is not available or not a git repo, return empty to fall back to full scan
+    console.debug('getChangedFilesSinceLastCommit: Git command failed (no commits or not a git repo), falling back to full directory scan')
     return []
   }
 }
