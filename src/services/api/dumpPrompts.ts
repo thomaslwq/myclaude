@@ -361,7 +361,11 @@ export function createDumpPromptsFetch(
           }
         }
       })().catch((err: unknown) => {
-        logForDebugging(`dumpPrompts.response handler unhandled rejection: ${err}`, { level: 'error' })
+        try {
+          logForDebugging(`dumpPrompts.response handler unhandled rejection: ${err}`, { level: 'error' })
+        } catch {
+          // Silently ignore if logForDebugging itself throws
+        }
       })
     }
 
