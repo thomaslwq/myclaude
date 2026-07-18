@@ -28,6 +28,13 @@ export async function fetchReferralEligibility(
 ): Promise<ReferralEligibilityResponse> {
   const { accessToken, orgUUID } = await prepareApiRequest()
 
+  // Return existing promise if fetch is already in progress for this org
+  const existingPromise = fetchInProgressMap.get(orgUUID)
+  if (existingPromise) {
+    logForDebugging(`Passes: Reusing in-flight eligibility fetch for org ${orgUUID}`)
+    return existingPromise as Promise<ReferralEligibilityResponse>
+  }
+
   const headers = {
     ...getOAuthHeaders(accessToken),
     'x-organization-uuid': orgUUID,
@@ -35,13 +42,32 @@ export async function fetchReferralEligibility(
 
   const url = `${getOauthConfig().BASE_API_URL}/api/oauth/organizations/${orgUUID}/referral/eligibility`
 
-  const response = await axios.get(url, {
-    headers,
-    params: { campaign },
-    timeout: 5000, // 5 second timeout for background fetch
+  // Set the promise immediately to prevent concurrent fetches (atomic assignment)
+  let resolvePromise: (value: ReferralEligibilityResponse) => void
+  const promise = new Promise<ReferralEligibilityResponse>((resolve) => {
+    resolvePromise = resolve
   })
+  fetchInProgressMap.set(orgUUID, promise)
 
-  return response.data
+  // Start the fetch
+  ;(async () => {
+    try {
+      const response = await axios.get(url, {
+        headers,
+        params: { campaign },
+        timeout: 5000, // 5 second timeout for background fetch
+      })
+
+      resolvePromise(response.data)
+    } catch (error) {
+      logError(error as Error)
+      // Remove the promise so subsequent calls can retry
+      fetchInProgressMap.delete(orgUUID)
+      throw error
+    }
+  })()
+
+  return promise
 }
 
 export async function fetchReferralRedemptions(
@@ -178,54 +204,33 @@ export async function fetchAndStorePassesEligibility(): Promise<ReferralEligibil
     return null
   }
 
-  // Return existing promise if fetch is already in progress for this org
-  const existingPromise = fetchInProgressMap.get(orgId)
-  if (existingPromise) {
-    logForDebugging(`Passes: Reusing in-flight eligibility fetch for org ${orgId}`)
-    return existingPromise
-  }
-
-  // Set the promise immediately to prevent concurrent fetches (atomic assignment)
-  let resolvePromise: (value: ReferralEligibilityResponse | null) => void
-  const promise = new Promise<ReferralEligibilityResponse | null>((resolve) => {
-    resolvePromise = resolve
-  })
-  fetchInProgressMap.set(orgId, promise)
-
   // Start the fetch in the background
-  ;(async () => {
-    try {
-      const response = await fetchReferralEligibility()
+  try {
+    const response = await fetchReferralEligibility()
 
-      const cacheEntry = {
-        ...response,
-        timestamp: Date.now(),
-      }
-
-      saveGlobalConfig(current => ({
-        ...current,
-        passesEligibilityCache: {
-          ...current.passesEligibilityCache,
-          [orgId]: cacheEntry,
-        },
-      }))
-
-      logForDebugging(
-        `Passes eligibility cached for org ${orgId}: ${response.eligible}`,
-      )
-
-      resolvePromise(response)
-    } catch (error) {
-      logForDebugging('Failed to fetch and cache passes eligibility')
-      logError(error as Error)
-      resolvePromise(null)
-    } finally {
-      // Clear the promise when done
-      fetchInProgressMap.delete(orgId)
+    const cacheEntry = {
+      ...response,
+      timestamp: Date.now(),
     }
-  })()
 
-  return promise
+    saveGlobalConfig(current => ({
+      ...current,
+      passesEligibilityCache: {
+        ...current.passesEligibilityCache,
+        [orgId]: cacheEntry,
+      },
+    }))
+
+    logForDebugging(
+      `Passes eligibility cached for org ${orgId}: ${response.eligible}`,
+    )
+
+    return response
+  } catch (error) {
+    logForDebugging('Failed to fetch and cache passes eligibility')
+    logError(error as Error)
+    return null
+  }
 }
 
 /**
