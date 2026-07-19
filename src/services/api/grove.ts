@@ -127,18 +127,17 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
         'success' in result &&
         result.success === false
       ) {
-        // Don't clear cache on transient failures — keep the last successful
-        // result to avoid unnecessary API calls on intermittent network issues.
+        // Update timestamp on transient failure to prevent immediate retries.
         // The cache will naturally expire after TTL (24h), allowing a retry then.
         // This prevents a cascade of requests on transient errors.
-        // Do not update lastCachedAt so the cache stays valid.
+        lastCachedAt = Date.now()
       }
       return result
     } catch (error) {
-      // Don't clear cache on transient errors — keep the last successful
-      // result to avoid unnecessary API calls on intermittent network issues.
+      // Update timestamp on transient errors to prevent immediate retries.
       // The cache will naturally expire after TTL (24h), allowing a retry then.
       // This prevents a cascade of requests on transient errors.
+      lastCachedAt = Date.now()
       return { success: false } as any
     }
   }) as T
