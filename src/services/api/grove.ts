@@ -52,6 +52,8 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
   const originalClear = memoized.cache.clear.bind(memoized.cache)
   // Per-argument mutex to prevent concurrent cache rebuilds
   const refreshMutexes = new Map<string, Mutex>()
+  // Mutex to protect the creation of per-key mutexes (atomic check-and-set)
+  const refreshMapMutex = new Mutex()
 
   // Override the original function to check TTL
   const wrapped = (async (...args: any[]) => {
@@ -62,11 +64,14 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
       // Ensure only one caller refreshes the cache at a time.
       // Use a mutex keyed by the first argument to serialize concurrent rebuilds.
       const key = String(args[0] ?? '_default')
+      // Acquire the map mutex to atomically check-and-set the per-key mutex
+      const mapRelease = await refreshMapMutex.acquire()
       let mutex = refreshMutexes.get(key)
       if (!mutex) {
         mutex = new Mutex()
         refreshMutexes.set(key, mutex)
       }
+      mapRelease()
 
       const release = await mutex.acquire()
       try {
