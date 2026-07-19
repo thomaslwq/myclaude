@@ -454,14 +454,13 @@ export function createDumpPromptsFetch(
             if (chunkEntries.length > 0) {
               await appendToFile(filePath, chunkEntries)
             }
-            data = { stream: true, chunks: [] }
           } else {
             data = await cloned.json()
-          }
 
-          await appendToFile(filePath, [
-            jsonStringify({ type: 'response', timestamp, data }),
-          ])
+            await appendToFile(filePath, [
+              jsonStringify({ type: 'response', timestamp, data }),
+            ])
+          }
         } catch (err) {
           logError(`dumpPrompts.response handler error: ${err}`)
         }

@@ -125,14 +125,14 @@ async function appendSessionLogImpl(
         } else {
           // Server didn't return x-last-uuid (e.g. v1 endpoint). Re-fetch
           // the session to discover the current head of the append chain.
-          // Use the per-session sequential wrapper to ensure atomicity with
-          // concurrent appends/fetches. The sequential wrapper is now reentrant:
-          // it detects reentrant calls and executes them immediately instead of
-          // queuing, avoiding a deadlock while preserving serialization.
+          // We are already inside the per-session sequential wrapper (called
+          // from appendSessionLog via getOrCreateSequential), so no other
+          // append or fetch for this session can run concurrently. Calling
+          // fetchSessionLogsFromUrl directly is safe and avoids depending on
+          // the reentrancy behavior of the sequential wrapper.
           let logs: Entry[] | null = null
           try {
-            const sequentialWrapper = getOrCreateSequential(sessionId)
-            logs = (await sequentialWrapper(sessionId, url, headers, true)) as Entry[] | null
+            logs = await fetchSessionLogsFromUrl(sessionId, url, headers)
           } catch (fetchError) {
             // fetchSessionLogsFromUrl catches its own errors and returns null,
             // but other unexpected errors could throw.
