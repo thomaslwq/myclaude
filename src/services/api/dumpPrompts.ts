@@ -61,47 +61,45 @@ function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => Promise<
 
 async function processQueue(agentIdOrSessionId: string): Promise<void> {
   try {
-    // Process all items in the queue. New items added while processing will
-    // be picked up in subsequent iterations of the loop.
+    // Keep processing until the queue is empty. New items added while processing
+    // will be picked up in subsequent iterations of the outer loop.
+    // This iterative approach avoids stack growth from recursion.
     while (true) {
+      // Inner loop: process all currently queued items
+      while (true) {
+        const queue = dumpRequestQueue.get(agentIdOrSessionId)
+        if (!queue || queue.length === 0) {
+          break
+        }
+
+        const callback = queue.shift()!
+        try {
+          await callback()
+        } catch (err) {
+          logForDebugging(`dumpPrompts.processQueue: callback threw: ${err}`, { level: 'error' })
+        }
+      }
+
+      // Re-check if new items were added while we were processing.
+      // NOTE: We check the queue BEFORE clearing the flag to avoid a race condition.
+      // If we cleared the flag first, a new callback enqueued between the flag
+      // deletion and the re-check would see the flag as not set, start a new
+      // processQueue in enqueueDumpRequest, and then this re-check would also
+      // start another processQueue — causing concurrent processing loops.
       const queue = dumpRequestQueue.get(agentIdOrSessionId)
       if (!queue || queue.length === 0) {
-        break
-      }
-      
-      const callback = queue.shift()!
-      try {
-        await callback()
-      } catch (err) {
-        logForDebugging(`dumpPrompts.processQueue: callback threw: ${err}`, { level: 'error' })
-      }
-    }
-  } finally {
-    // Re-check if new items were added while we were processing/exiting.
-    // NOTE: We check the queue BEFORE clearing the flag to avoid a race condition.
-    // If we cleared the flag first, a new callback enqueued between the flag
-    // deletion and the re-check would see the flag as not set, start a new
-    // processQueue in enqueueDumpRequest, and then this re-check would also
-    // start another processQueue — causing concurrent processing loops.
-    const queue = dumpRequestQueue.get(agentIdOrSessionId)
-    if (queue && queue.length > 0) {
-      // More items were added — keep the flag set and start a new processing loop
-      // (flag stays set, so enqueueDumpRequest won't start a duplicate)
-      // Await the recursive call to avoid unhandled promise rejections.
-      // If the recursive call throws, we still need to clean up the flag.
-      try {
-        await processQueue(agentIdOrSessionId)
-      } catch (err) {
-        logError(`processQueue: recursive call failed for ${agentIdOrSessionId}`, err)
-        // Clean up the flag so the queue is not permanently blocked
+        // No items — clean up the queue and clear the flag, then exit
         dumpRequestQueue.delete(agentIdOrSessionId)
         processingFlags.delete(agentIdOrSessionId)
+        return
       }
-    } else {
-      // No items — clean up the queue and clear the flag
-      dumpRequestQueue.delete(agentIdOrSessionId)
-      processingFlags.delete(agentIdOrSessionId)
+      // If items were added, continue the outer loop (no recursion needed)
     }
+  } catch (err) {
+    // If an unexpected error occurs, clean up so the queue is not permanently blocked
+    logError(`processQueue: failed for ${agentIdOrSessionId}`, err)
+    dumpRequestQueue.delete(agentIdOrSessionId)
+    processingFlags.delete(agentIdOrSessionId)
   }
 }
 
