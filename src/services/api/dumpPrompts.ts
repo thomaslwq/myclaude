@@ -337,18 +337,25 @@ export function createDumpPromptsFetch(
                     
                     // Process the complete events
                     for (const event of completeEvents.split('\n\n')) {
+                      // Accumulate all data lines within a single event before parsing
+                      // (SSE spec allows multiple data lines per event, which should be concatenated)
+                      let dataLines: string[] = []
                       for (const line of event.split('\n')) {
                         if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                          try {
-                            const chunk = jsonParse(line.slice(6))
-                            chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
-                            if (chunkEntries.length >= 50) {
-                              await appendToFile(filePath, chunkEntries)
-                              chunkEntries.length = 0
-                            }
-                          } catch (err) {
-                            logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
+                          dataLines.push(line.slice(6))
+                        }
+                      }
+                      // If we have accumulated data lines, join them and parse as a single JSON
+                      if (dataLines.length > 0) {
+                        try {
+                          const chunk = jsonParse(dataLines.join('\n'))
+                          chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
+                          if (chunkEntries.length >= 50) {
+                            await appendToFile(filePath, chunkEntries)
+                            chunkEntries.length = 0
                           }
+                        } catch (err) {
+                          logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
                         }
                       }
                     }
@@ -390,20 +397,27 @@ export function createDumpPromptsFetch(
                   bufferLength = incomplete.length
                   
                   for (const event of completeEvents.split('\n\n')) {
+                    // Accumulate all data lines within a single event before parsing
+                    // (SSE spec allows multiple data lines per event, which should be concatenated)
+                    let dataLines: string[] = []
                     for (const line of event.split('\n')) {
                       if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                        try {
-                          const chunk = jsonParse(line.slice(6))
-                          // Write chunk directly to file to avoid memory accumulation
-                          chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
-                          // Flush to disk periodically to avoid unbounded memory growth
-                          if (chunkEntries.length >= 50) {
-                            await appendToFile(filePath, chunkEntries)
-                            chunkEntries.length = 0
-                          }
-                        } catch (err) {
-                          logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
+                        dataLines.push(line.slice(6))
+                      }
+                    }
+                    // If we have accumulated data lines, join them and parse as a single JSON
+                    if (dataLines.length > 0) {
+                      try {
+                        const chunk = jsonParse(dataLines.join('\n'))
+                        // Write chunk directly to file to avoid memory accumulation
+                        chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
+                        // Flush to disk periodically to avoid unbounded memory growth
+                        if (chunkEntries.length >= 50) {
+                          await appendToFile(filePath, chunkEntries)
+                          chunkEntries.length = 0
                         }
+                      } catch (err) {
+                        logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
                       }
                     }
                   }
@@ -416,15 +430,22 @@ export function createDumpPromptsFetch(
             const buffer = bufferChunks.join('')
             if (buffer.trim()) {
               for (const event of buffer.split('\n\n')) {
+                // Accumulate all data lines within a single event before parsing
+                // (SSE spec allows multiple data lines per event, which should be concatenated)
+                let dataLines: string[] = []
                 for (const line of event.split('\n')) {
                   if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                    try {
-                      const chunk = jsonParse(line.slice(6))
-                      // Write chunk directly to file to avoid memory accumulation
-                      chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
-                    } catch (err) {
-                      logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
-                    }
+                    dataLines.push(line.slice(6))
+                  }
+                }
+                // If we have accumulated data lines, join them and parse as a single JSON
+                if (dataLines.length > 0) {
+                  try {
+                    const chunk = jsonParse(dataLines.join('\n'))
+                    // Write chunk directly to file to avoid memory accumulation
+                    chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
+                  } catch (err) {
+                    logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
                   }
                 }
               }
