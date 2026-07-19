@@ -103,11 +103,19 @@ export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
     }
 
     // Get files changed in the working tree (unstaged + staged)
-    const { stdout } = await exec('git diff --name-only HEAD --diff-filter=ACMR', {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore'],
-    })
-    const files = stdout.trim().split('\n').filter(Boolean)
+    const [diffResult, untrackedResult] = await Promise.all([
+      exec('git diff --name-only HEAD --diff-filter=ACMR', {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore'],
+      }),
+      exec('git ls-files --others --exclude-standard', {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore'],
+      }),
+    ])
+    const changed = diffResult.stdout.trim().split('\n').filter(Boolean)
+    const untracked = untrackedResult.stdout.trim().split('\n').filter(Boolean)
+    const files = [...changed, ...untracked]
     // Filter to only source files we care about
     return files
       .filter(f => SUPPORTED_EXTENSIONS.has(extname(f)) && f.startsWith('src/'))
