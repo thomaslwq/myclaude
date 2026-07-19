@@ -70,7 +70,11 @@ async function processQueue(agentIdOrSessionId: string): Promise<void> {
       }
       
       const callback = queue.shift()!
-      await callback()
+      try {
+        await callback()
+      } catch (err) {
+        logForDebugging(`dumpPrompts.processQueue: callback threw: ${err}`, { level: 'error' })
+      }
     }
   } finally {
     // Re-check if new items were added while we were processing/exiting.
