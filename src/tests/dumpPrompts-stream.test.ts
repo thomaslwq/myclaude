@@ -82,8 +82,16 @@ describe('dumpPrompts streaming memory', () => {
     const parsed = JSON.parse(responseLine!)
     expect(parsed.type).toBe('response')
     expect(parsed.data.stream).toBe(true)
-    expect(parsed.data.chunks).toBeInstanceOf(Array)
-    expect(parsed.data.chunks.length).toBeGreaterThanOrEqual(eventCount)
+    // Chunks are written directly to the file, not stored in memory
+    // Verify that the file contains chunk entries
+    const content = await fs.readFile(filePath, 'utf-8')
+    const chunkLines = content.split('\n').filter(line => {
+      try {
+        const obj = JSON.parse(line)
+        return obj.type === 'chunk'
+      } catch { return false }
+    })
+    expect(chunkLines.length).toBeGreaterThanOrEqual(eventCount)
   })
 
   test('should process streaming events incrementally without accumulating entire body', async () => {
@@ -130,8 +138,15 @@ describe('dumpPrompts streaming memory', () => {
     const parsed = JSON.parse(responseLine!)
     expect(parsed.type).toBe('response')
     expect(parsed.data.stream).toBe(true)
-    expect(parsed.data.chunks).toBeInstanceOf(Array)
-    expect(parsed.data.chunks.length).toBe(3)
+    // Verify that the file contains chunk entries (3 events = 3 chunks)
+    const content = await fs.readFile(filePath, 'utf-8')
+    const chunkLines = content.split('\n').filter(line => {
+      try {
+        const obj = JSON.parse(line)
+        return obj.type === 'chunk'
+      } catch { return false }
+    })
+    expect(chunkLines.length).toBe(3)
   })
 
   test('should handle partial events across chunk boundaries', async () => {
@@ -180,7 +195,14 @@ describe('dumpPrompts streaming memory', () => {
     const parsed = JSON.parse(responseLine!)
     expect(parsed.type).toBe('response')
     expect(parsed.data.stream).toBe(true)
-    expect(parsed.data.chunks).toBeInstanceOf(Array)
-    expect(parsed.data.chunks.length).toBe(1)
+    // Verify that the file contains chunk entries (1 complete event despite split chunks)
+    const content = await fs.readFile(filePath, 'utf-8')
+    const chunkLines = content.split('\n').filter(line => {
+      try {
+        const obj = JSON.parse(line)
+        return obj.type === 'chunk'
+      } catch { return false }
+    })
+    expect(chunkLines.length).toBe(1)
   })
 })
