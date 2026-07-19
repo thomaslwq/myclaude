@@ -323,11 +323,58 @@ export function createDumpPromptsFetch(
                 bufferChunks.push(decoded)
                 bufferLength += decoded.length
                 
-                // Prevent unbounded buffer growth — if a single event exceeds the limit, skip it
+                // Prevent unbounded buffer growth — if the buffer exceeds the limit,
+                // first try to extract and process any complete events before discarding
                 if (bufferLength > MAX_BUFFER_SIZE) {
-                  logForDebugging('dumpPrompts: buffer exceeded max size, skipping event', { level: 'warn' })
-                  bufferChunks.length = 0
-                  bufferLength = 0
+                  logForDebugging('dumpPrompts: buffer exceeded max size, extracting complete events', { level: 'warn' })
+                  // Join the buffer to search for complete events
+                  const fullBuffer = bufferChunks.join('')
+                  const lastDoubleNewline = fullBuffer.lastIndexOf('\n\n')
+                  if (lastDoubleNewline !== -1) {
+                    // There are complete events we can still process
+                    const completeEvents = fullBuffer.slice(0, lastDoubleNewline)
+                    const incomplete = fullBuffer.slice(lastDoubleNewline + 2)
+                    
+                    // Process the complete events
+                    for (const event of completeEvents.split('\n\n')) {
+                      for (const line of event.split('\n')) {
+                        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                          try {
+                            const chunk = jsonParse(line.slice(6))
+                            chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
+                            if (chunkEntries.length >= 50) {
+                              await appendToFile(filePath, chunkEntries)
+                              chunkEntries.length = 0
+                            }
+                          } catch (err) {
+                            logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
+                          }
+                        }
+                      }
+                    }
+                    
+                    // Keep only the incomplete trailing part
+                    bufferChunks.length = 0
+                    bufferChunks.push(incomplete)
+                    bufferLength = incomplete.length
+                    
+                    // If the incomplete part is still too large, truncate it
+                    if (bufferLength > MAX_BUFFER_SIZE) {
+                      logForDebugging('dumpPrompts: incomplete buffer still exceeds max size, truncating', { level: 'warn' })
+                      const truncated = incomplete.slice(-MAX_BUFFER_SIZE)
+                      bufferChunks.length = 0
+                      bufferChunks.push(truncated)
+                      bufferLength = truncated.length
+                    }
+                  } else {
+                    // No complete events found — keep only the last MAX_BUFFER_SIZE bytes
+                    logForDebugging('dumpPrompts: no complete events, truncating buffer', { level: 'warn' })
+                    const fullBuffer = bufferChunks.join('')
+                    const truncated = fullBuffer.slice(-MAX_BUFFER_SIZE)
+                    bufferChunks.length = 0
+                    bufferChunks.push(truncated)
+                    bufferLength = truncated.length
+                  }
                   continue
                 }
                 
