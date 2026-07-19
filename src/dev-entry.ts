@@ -85,9 +85,23 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 10, curre
   await Promise.all(promises)
 }
 
-async function getChangedFilesSinceLastCommit(): Promise<string[]> {
+export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
   try {
     const { exec } = await import('child_process/promises')
+
+    // Check if the repository has a HEAD reference (i.e., at least one commit)
+    // This handles empty repos and shallow clones gracefully
+    try {
+      await exec('git rev-parse --verify HEAD', {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore'],
+      })
+    } catch {
+      // No HEAD reference - this is a fresh repo or shallow clone
+      console.debug('getChangedFilesSinceLastCommit: No HEAD reference (empty repo or shallow clone), falling back to full directory scan')
+      return []
+    }
+
     // Get files changed in the working tree (unstaged + staged)
     const { stdout } = await exec('git diff --name-only HEAD --diff-filter=ACMR', {
       encoding: 'utf8',

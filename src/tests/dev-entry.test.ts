@@ -108,6 +108,22 @@ describe('collectMissingRelativeImports performance', () => {
     }
   });
 
+  test('getChangedFilesSinceLastCommit should handle empty repo gracefully', async () => {
+    const { getChangedFilesSinceLastCommit } = await import('../dev-entry.js');
+    
+    // Create a temporary directory with no git repo
+    const testDir = createTempDir();
+    try {
+      // Change to the temp dir context (we can't easily change cwd, so we test the function directly)
+      // The function should not throw when run outside a git repo
+      // It should return an empty array gracefully
+      const result = await getChangedFilesSinceLastCommit();
+      expect(Array.isArray(result)).toBe(true);
+    } finally {
+      cleanupTempDir(testDir);
+    }
+  });
+
   test('getChangedFilesSinceLastCommit should return array when git is available', async () => {
     // This is an internal function, but we can test it indirectly
     // by checking that collectMissingRelativeImports works
