@@ -271,14 +271,19 @@ export function createDumpPromptsFetch(
     let timestamp: string | undefined
 
     if (init?.method === 'POST' && init.body) {
-      timestamp = new Date().toISOString()
-      // Parsing + stringifying the request (system prompt + tool schemas = MBs)
-      // takes hundreds of ms. Defer so it doesn't block the actual API call —
-      // this is debug tooling for /issue, not on the critical path.
-      // Use a per-session queue to avoid race conditions on state.
-      enqueueDumpRequest(agentIdOrSessionId, async () => {
-        await dumpRequest(init.body as string, timestamp!, state, filePath)
-      })
+      // Skip enqueue entirely in production or for non-ant users —
+      // the dumpRequest function immediately returns in those cases,
+      // so the enqueue would just create unnecessary overhead.
+      if (process.env.NODE_ENV !== 'production' && process.env.USER_TYPE === 'ant') {
+        timestamp = new Date().toISOString()
+        // Parsing + stringifying the request (system prompt + tool schemas = MBs)
+        // takes hundreds of ms. Defer so it doesn't block the actual API call —
+        // this is debug tooling for /issue, not on the critical path.
+        // Use a per-session queue to avoid race conditions on state.
+        enqueueDumpRequest(agentIdOrSessionId, async () => {
+          await dumpRequest(init.body as string, timestamp!, state, filePath)
+        })
+      }
     }
 
     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
