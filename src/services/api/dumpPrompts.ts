@@ -8,6 +8,27 @@ import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { logError } from '../../utils/log.js'
 
+/**
+ * Parse SSE event data lines into a JSON object.
+ * Extracts all `data: ` lines from an event (excluding `data: [DONE]`),
+ * joins them with newlines, and parses the result as JSON.
+ * Returns null if no data lines are found or if parsing fails.
+ */
+function parseEventData(event: string): unknown | null {
+  const dataLines: string[] = []
+  for (const line of event.split('\n')) {
+    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+      dataLines.push(line.slice(6))
+    }
+  }
+  if (dataLines.length === 0) return null
+  try {
+    return jsonParse(dataLines.join('\n'))
+  } catch {
+    return null
+  }
+}
+
 // Warn at module load if sensitive env vars are set
 if (process.env.USER_TYPE === 'ant' && process.env.DUMP_PROMPTS === '1') {
   logForDebugging(
@@ -337,25 +358,12 @@ export function createDumpPromptsFetch(
                     
                     // Process the complete events
                     for (const event of completeEvents.split('\n\n')) {
-                      // Accumulate all data lines within a single event before parsing
-                      // (SSE spec allows multiple data lines per event, which should be concatenated)
-                      let dataLines: string[] = []
-                      for (const line of event.split('\n')) {
-                        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                          dataLines.push(line.slice(6))
-                        }
-                      }
-                      // If we have accumulated data lines, join them and parse as a single JSON
-                      if (dataLines.length > 0) {
-                        try {
-                          const chunk = jsonParse(dataLines.join('\n'))
-                          chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
-                          if (chunkEntries.length >= 50) {
-                            await appendToFile(filePath, chunkEntries)
-                            chunkEntries.length = 0
-                          }
-                        } catch (err) {
-                          logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
+                      const chunk = parseEventData(event)
+                      if (chunk !== null) {
+                        chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
+                        if (chunkEntries.length >= 50) {
+                          await appendToFile(filePath, chunkEntries)
+                          chunkEntries.length = 0
                         }
                       }
                     }
@@ -397,27 +405,14 @@ export function createDumpPromptsFetch(
                   bufferLength = incomplete.length
                   
                   for (const event of completeEvents.split('\n\n')) {
-                    // Accumulate all data lines within a single event before parsing
-                    // (SSE spec allows multiple data lines per event, which should be concatenated)
-                    let dataLines: string[] = []
-                    for (const line of event.split('\n')) {
-                      if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                        dataLines.push(line.slice(6))
-                      }
-                    }
-                    // If we have accumulated data lines, join them and parse as a single JSON
-                    if (dataLines.length > 0) {
-                      try {
-                        const chunk = jsonParse(dataLines.join('\n'))
-                        // Write chunk directly to file to avoid memory accumulation
-                        chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
-                        // Flush to disk periodically to avoid unbounded memory growth
-                        if (chunkEntries.length >= 50) {
-                          await appendToFile(filePath, chunkEntries)
-                          chunkEntries.length = 0
-                        }
-                      } catch (err) {
-                        logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
+                    const chunk = parseEventData(event)
+                    if (chunk !== null) {
+                      // Write chunk directly to file to avoid memory accumulation
+                      chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
+                      // Flush to disk periodically to avoid unbounded memory growth
+                      if (chunkEntries.length >= 50) {
+                        await appendToFile(filePath, chunkEntries)
+                        chunkEntries.length = 0
                       }
                     }
                   }
@@ -430,23 +425,10 @@ export function createDumpPromptsFetch(
             const buffer = bufferChunks.join('')
             if (buffer.trim()) {
               for (const event of buffer.split('\n\n')) {
-                // Accumulate all data lines within a single event before parsing
-                // (SSE spec allows multiple data lines per event, which should be concatenated)
-                let dataLines: string[] = []
-                for (const line of event.split('\n')) {
-                  if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                    dataLines.push(line.slice(6))
-                  }
-                }
-                // If we have accumulated data lines, join them and parse as a single JSON
-                if (dataLines.length > 0) {
-                  try {
-                    const chunk = jsonParse(dataLines.join('\n'))
-                    // Write chunk directly to file to avoid memory accumulation
-                    chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
-                  } catch (err) {
-                    logForDebugging(`dumpPrompts.SSE parse error: ${err}`, { level: 'error' })
-                  }
+                const chunk = parseEventData(event)
+                if (chunk !== null) {
+                  // Write chunk directly to file to avoid memory accumulation
+                  chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
                 }
               }
             }
