@@ -64,7 +64,7 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
   // Override the original function to check TTL
   const wrapped = (async (...args: any[]) => {
     const now = Date.now()
-    const cacheExpired = lastCachedAt !== 0 && now - lastCachedAt >= ttlMs
+    const cacheExpired = lastCachedAt === 0 || now - lastCachedAt >= ttlMs
 
     if (cacheExpired) {
       const key = String(args[0] ?? '_default')
