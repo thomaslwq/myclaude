@@ -1,6 +1,5 @@
 import pkg from '../package.json'
 import { access } from 'fs/promises'
-import { realpathSync } from 'fs'
 import { readFile, readdir } from 'fs/promises'
 import { dirname, extname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
@@ -225,14 +224,10 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
 
 // Only run the main entry point logic when this file is executed directly
 // (not when imported as a module for testing)
-// Uses realpath + fileURLToPath to handle symlinks, relative paths, and different path separators
-const isMainModule = process.argv[1] && (() => {
-  try {
-    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
-  } catch {
-    return false
-  }
-})()
+// Uses resolve + fileURLToPath to handle relative paths and different path separators
+// Avoids synchronous I/O by using path.resolve instead of fs.realpathSync
+const isMainModule = process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 
 if (isMainModule) {
   const args = process.argv.slice(2)
