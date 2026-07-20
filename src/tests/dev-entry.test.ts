@@ -45,6 +45,26 @@ describe('collectMissingRelativeImports performance', () => {
     }
   });
 
+  test('scanFiles should include .github directory', async () => {
+    const { scanFiles } = await import('../dev-entry.js');
+    
+    const files: string[] = [];
+    // Scan from root with depth 2 to include .github
+    await scanFiles(resolve('.'), files, 2);
+    
+    // Should include .github directory files (scripts)
+    const githubFiles = files.filter(f => f.includes(join('.github', 'scripts')));
+    expect(githubFiles.length).toBeGreaterThan(0);
+    
+    // Should not include files from the .git directory (only .git/config and .git/HEAD should be excluded)
+    const gitDirFiles = files.filter(f => f.includes(join('.git', 'config')) || f.includes(join('.git', 'HEAD')));
+    expect(gitDirFiles.length).toBe(0);
+    
+    // Should not include node_modules files
+    const nodeModulesFiles = files.filter(f => f.includes('node_modules'));
+    expect(nodeModulesFiles.length).toBe(0);
+  });
+
   test('collectMissingRelativeImports should be exported', async () => {
     const { collectMissingRelativeImports } = await import('../dev-entry.js');
     expect(typeof collectMissingRelativeImports).toBe('function');

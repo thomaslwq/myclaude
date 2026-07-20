@@ -72,8 +72,8 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 10, curre
   const promises = dirHandle.map(async (entry) => {
     const fullPath = join(dir, entry.name)
     if (entry.isDirectory()) {
-      // Skip node_modules, .git, and other common large directories
-      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name.startsWith('.')) return
+      // Skip node_modules, .git, and other common large directories (but allow .github)
+      if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
       await scanFiles(fullPath, out, maxDepth, currentDepth + 1)
       return
     }
