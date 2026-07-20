@@ -58,8 +58,8 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
    */
   const pendingRefreshes = new Map<string, Promise<any>>()
 
-  // Mutex to make the cache-expired check-and-set atomic (prevents race conditions)
-  const refreshMutex = new Mutex()
+  // Per-key mutexes to prevent unnecessary blocking when different keys are used
+  const keyMutexes = new Map<string, Mutex>()
 
   // Override the original function to check TTL
   const wrapped = (async (...args: any[]) => {
@@ -69,11 +69,17 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
     if (cacheExpired) {
       const key = String(args[0] ?? '_default')
 
-      // Use a mutex to atomically check if a refresh is already in progress and
-      // start a new one if not. This prevents duplicate API calls when two
-      // concurrent calls both pass the cacheExpired check before either sets
-      // the pending promise.
-      const release = await refreshMutex.acquire()
+      // Get or create a per-key mutex to atomically check if a refresh is
+      // already in progress and start a new one if not. This prevents duplicate
+      // API calls when two concurrent calls both pass the cacheExpired check
+      // before either sets the pending promise, while avoiding unnecessary
+      // blocking between different keys.
+      let keyMutex = keyMutexes.get(key)
+      if (!keyMutex) {
+        keyMutex = new Mutex()
+        keyMutexes.set(key, keyMutex)
+      }
+      const release = await keyMutex.acquire()
       try {
         // Double-check inside the mutex: another call may have already started a refresh
         const existing = pendingRefreshes.get(key)
