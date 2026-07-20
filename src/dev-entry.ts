@@ -49,7 +49,7 @@ async function getFileContent(filePath: string): Promise<string | null> {
     const stats = await stat(filePath).catch(() => null)
     if (!stats) return null
     const cached = fileContentCache.get(filePath)
-    if (cached && cached.mtime > stats.mtimeMs) {
+    if (cached && cached.mtime >= stats.mtimeMs) {
       return cached.content
     }
     const content = await readFile(filePath, 'utf8')
