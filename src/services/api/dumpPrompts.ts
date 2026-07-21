@@ -335,9 +335,8 @@ export function createDumpPromptsFetch(
             // directly to the file as they arrive.
             const reader = cloned.body.getReader()
             const decoder = new TextDecoder()
-            // Use array of chunks to avoid O(n²) string concatenation
-            const bufferChunks: string[] = []
-            let bufferLength = 0
+            // Use a single string buffer to avoid O(n²) join() calls on every iteration
+            let buffer = ''
             const MAX_BUFFER_SIZE = 10 * 1024 * 1024 // 10MB limit to prevent memory exhaustion
             const chunkEntries: string[] = []
             try {
@@ -345,22 +344,19 @@ export function createDumpPromptsFetch(
                 const { done, value } = await reader.read()
                 if (done) break
                 
-                // Push decoded chunk to array — O(1) amortized, avoids O(n²) string concatenation
+                // Append decoded chunk to string — avoids O(n) join() on every iteration
                 const decoded = decoder.decode(value, { stream: true })
-                bufferChunks.push(decoded)
-                bufferLength += decoded.length
+                buffer += decoded
                 
                 // Prevent unbounded buffer growth — if the buffer exceeds the limit,
                 // first try to extract and process any complete events before discarding
-                if (bufferLength > MAX_BUFFER_SIZE) {
+                if (buffer.length > MAX_BUFFER_SIZE) {
                   logForDebugging('dumpPrompts: buffer exceeded max size, extracting complete events', { level: 'warn' })
-                  // Join the buffer to search for complete events
-                  const fullBuffer = bufferChunks.join('')
-                  const lastDoubleNewline = fullBuffer.lastIndexOf('\n\n')
+                  const lastDoubleNewline = buffer.lastIndexOf('\n\n')
                   if (lastDoubleNewline !== -1) {
                     // There are complete events we can still process
-                    const completeEvents = fullBuffer.slice(0, lastDoubleNewline)
-                    const incomplete = fullBuffer.slice(lastDoubleNewline + 2)
+                    const completeEvents = buffer.slice(0, lastDoubleNewline)
+                    const incomplete = buffer.slice(lastDoubleNewline + 2)
                     
                     // Process the complete events
                     for (const event of completeEvents.split('\n\n')) {
@@ -375,40 +371,28 @@ export function createDumpPromptsFetch(
                     }
                     
                     // Keep only the incomplete trailing part
-                    bufferChunks.length = 0
-                    bufferChunks.push(incomplete)
-                    bufferLength = incomplete.length
+                    buffer = incomplete
                     
                     // If the incomplete part is still too large, truncate it
-                    if (bufferLength > MAX_BUFFER_SIZE) {
+                    if (buffer.length > MAX_BUFFER_SIZE) {
                       logForDebugging('dumpPrompts: incomplete buffer still exceeds max size, truncating', { level: 'warn' })
-                      const truncated = incomplete.slice(-MAX_BUFFER_SIZE)
-                      bufferChunks.length = 0
-                      bufferChunks.push(truncated)
-                      bufferLength = truncated.length
+                      buffer = incomplete.slice(-MAX_BUFFER_SIZE)
                     }
                   } else {
                     // No complete events found — keep only the last MAX_BUFFER_SIZE bytes
                     logForDebugging('dumpPrompts: no complete events, truncating buffer', { level: 'warn' })
-                    const fullBuffer = bufferChunks.join('')
-                    const truncated = fullBuffer.slice(-MAX_BUFFER_SIZE)
-                    bufferChunks.length = 0
-                    bufferChunks.push(truncated)
-                    bufferLength = truncated.length
+                    buffer = buffer.slice(-MAX_BUFFER_SIZE)
                   }
                   continue
                 }
                 
-                // Only join the buffer when we need to search for complete events
-                // The buffer is kept small (just the trailing incomplete part), so this is efficient
-                const buffer = bufferChunks.join('')
+                // Buffer is a single string, so we can search for events directly
+                // without joining an array. This is O(1) per character with lastIndexOf.
                 const lastDoubleNewline = buffer.lastIndexOf('\n\n')
                 if (lastDoubleNewline !== -1) {
                   const completeEvents = buffer.slice(0, lastDoubleNewline)
                   const incomplete = buffer.slice(lastDoubleNewline + 2) // Keep incomplete part
-                  bufferChunks.length = 0
-                  bufferChunks.push(incomplete)
-                  bufferLength = incomplete.length
+                  buffer = incomplete
                   
                   for (const event of completeEvents.split('\n\n')) {
                     const chunk = parseEventData(event)
@@ -428,7 +412,6 @@ export function createDumpPromptsFetch(
               reader.releaseLock()
             }
             // Process any remaining data in the buffer
-            const buffer = bufferChunks.join('')
             if (buffer.trim()) {
               for (const event of buffer.split('\n\n')) {
                 const chunk = parseEventData(event)
