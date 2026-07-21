@@ -25,6 +25,15 @@ import { getSettingsFilePathForSource } from './settings.js'
 import { resetSettingsCache } from './settingsCache.js'
 
 /**
+ * When true, use stat() polling instead of native fs.watch events.
+ * Chokidar 5.0.0 changed the default event system to use native fs.watch
+ * with recursive:true on Windows. This can cause issues with certain
+ * file systems (network drives, WSL filesystems), so we use polling
+ * on Windows to maintain backward compatibility with the previous behavior.
+ */
+const USE_POLLING = typeof Bun !== 'undefined' || process.platform === 'win32'
+
+/**
  * Time in milliseconds to wait for file writes to stabilize before processing.
  * This helps avoid processing partial writes or rapid successive changes.
  */
@@ -136,7 +145,7 @@ export async function initialize(): Promise<void> {
     },
     // Additional options for stability
     ignorePermissionErrors: true,
-    usePolling: false, // Use native file system events
+    usePolling: USE_POLLING, // Use native file system events, poll on Windows/Bun for stability
     atomic: true, // Handle atomic writes better
   })
 

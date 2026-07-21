@@ -59,7 +59,7 @@ const POLLING_INTERVAL_MS = 2000
  * Workaround: use stat() polling under Bun. No FSWatcher = no deadlock.
  * The fix is pending upstream; remove this once the Bun PR lands.
  */
-const USE_POLLING = typeof Bun !== 'undefined'
+const USE_POLLING = typeof Bun !== 'undefined' || process.platform === 'win32'
 
 let watcher: FSWatcher | null = null
 let reloadTimer: ReturnType<typeof setTimeout> | null = null

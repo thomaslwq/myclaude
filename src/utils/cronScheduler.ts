@@ -443,6 +443,7 @@ export function createCronScheduler(
       ignoreInitial: true,
       awaitWriteFinish: { stabilityThreshold: FILE_STABILITY_MS },
       ignorePermissionErrors: true,
+      usePolling: typeof Bun !== 'undefined' || process.platform === 'win32',
     })
     watcher.on('add', () => void load(false))
     watcher.on('change', () => void load(false))
