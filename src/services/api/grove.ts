@@ -22,8 +22,6 @@ import { Mutex } from 'async-mutex'
 
 // Per-account mutex to prevent concurrent config writes in fetchAndStoreGroveConfig
 const groveConfigMutexes = new Map<string, Mutex>()
-// Mutex to protect the creation of per-account mutexes (atomic check-and-set)
-const groveConfigMapMutex = new Mutex()
 
 // Cache expiration: 24 hours
 const GROVE_CACHE_EXPIRATION_MS = 24 * 60 * 60 * 1000
@@ -365,17 +363,12 @@ export async function isQualifiedForGrove(): Promise<boolean> {
 async function fetchAndStoreGroveConfig(accountId: string): Promise<void> {
   // Serialize per-account fetch-and-store operations to avoid lost updates
   // Use async-mutex for correctness and clarity
-  // Use a separate mutex to protect the map check-and-set atomically
-  const mapRelease = await groveConfigMapMutex.acquire()
   let mutex = groveConfigMutexes.get(accountId)
   if (!mutex) {
     mutex = new Mutex()
     groveConfigMutexes.set(accountId, mutex)
   }
-  // Keep the map mutex held until after the per-account mutex is acquired
-  // to ensure atomic check-and-set of the mutex instance
   const release = await mutex.acquire()
-  mapRelease()
   try {
     // Retry up to 2 times with a short delay for transient failures
     let lastError: Error | undefined

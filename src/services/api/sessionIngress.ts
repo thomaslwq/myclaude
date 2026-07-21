@@ -125,19 +125,17 @@ async function appendSessionLogImpl(
         } else {
           // Server didn't return x-last-uuid (e.g. v1 endpoint). Re-fetch
           // the session to discover the current head of the append chain.
-          // Route through the per-session sequential wrapper to maintain
-          // consistency — even though the sequential utility is reentrant
-          // (the inner call executes immediately), this avoids depending on
-          // the wrapper's reentrancy behavior and prevents potential issues
-          // if the implementation ever changes.
+          // Call fetchSessionLogsFromUrl directly instead of going through
+          // the sequential wrapper, because we are already executing inside
+          // the sequential wrapper's context. Routing through the wrapper
+          // again would create a reentrant call that depends on the
+          // sequential utility's reentrancy support — a fragile
+          // implementation detail that could cause a deadlock if the
+          // utility ever changes to use a standard lock.
           let logs: Entry[] | null = null
           try {
-            const seq = getOrCreateSequential(sessionId)
-            logs = (await seq(sessionId, url, headers, true)) as Entry[] | null
+            logs = await fetchSessionLogsFromUrl(sessionId, url, headers)
           } catch (fetchError) {
-            // The sequential wrapper catches its own errors and returns null,
-            // but other unexpected errors could throw.
-            // Log and continue to retry rather than crashing.
             logError(
               new Error(
                 `Session 409: fetch failed for session ${sessionId}, entry ${entry.uuid}: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`,
