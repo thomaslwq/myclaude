@@ -69,23 +69,28 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 10, curre
   } catch {
     return
   }
-  const promises = dirHandle.map(async (entry) => {
-    try {
-      const fullPath = join(dir, entry.name)
-      if (entry.isDirectory()) {
-        // Skip node_modules, .git, and other common large directories (but allow .github)
-        if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
-        await scanFiles(fullPath, out, maxDepth, currentDepth + 1)
-        return
+  // Process entries in batches to avoid unbounded concurrency
+  const BATCH_SIZE = 50
+  for (let i = 0; i < dirHandle.length; i += BATCH_SIZE) {
+    const batch = dirHandle.slice(i, i + BATCH_SIZE)
+    const promises = batch.map(async (entry) => {
+      try {
+        const fullPath = join(dir, entry.name)
+        if (entry.isDirectory()) {
+          // Skip node_modules, .git, and other common large directories (but allow .github)
+          if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
+          await scanFiles(fullPath, out, maxDepth, currentDepth + 1)
+          return
+        }
+        if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
+          out.push(fullPath)
+        }
+      } catch {
+        // Gracefully skip this entry (e.g., permission error, I/O failure)
       }
-      if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
-        out.push(fullPath)
-      }
-    } catch {
-      // Gracefully skip this entry (e.g., permission error, I/O failure)
-    }
-  })
-  await Promise.all(promises)
+    })
+    await Promise.all(promises)
+  }
 }
 
 export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
