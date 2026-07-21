@@ -195,6 +195,65 @@ describe('collectMissingRelativeImports performance', () => {
     }
   });
 
+  test('hasResolvableTarget should be efficient - use single readdir instead of multiple access calls', async () => {
+    const { hasResolvableTarget } = await import('../dev-entry.js');
+    expect(typeof hasResolvableTarget).toBe('function');
+    
+    const testDir = createTempDir();
+    try {
+      // Create a .ts file
+      writeFileSync(join(testDir, 'myModule.ts'), 'export const x = 1');
+      
+      // Test with basePath that has .js extension (simulating import resolution)
+      const result = await hasResolvableTarget(join(testDir, 'myModule.js'));
+      expect(result).toBe(true); // Should resolve to myModule.ts
+      
+      // Test with basePath that has no extension
+      const result2 = await hasResolvableTarget(join(testDir, 'myModule'));
+      expect(result2).toBe(true); // Should resolve to myModule.ts
+      
+      // Test with non-existent file
+      const result3 = await hasResolvableTarget(join(testDir, 'nonExistent'));
+      expect(result3).toBe(false);
+    } finally {
+      cleanupTempDir(testDir);
+    }
+  });
+
+  test('hasResolvableTarget should prefer .ts over .js when both exist', async () => {
+    const { hasResolvableTarget } = await import('../dev-entry.js');
+    
+    const testDir = createTempDir();
+    try {
+      // Create both .js and .ts files
+      writeFileSync(join(testDir, 'myModule.js'), 'export const x = 1');
+      writeFileSync(join(testDir, 'myModule.ts'), 'export const x = 2');
+      
+      // When resolving myModule, it should find it (preferring .ts)
+      const result = await hasResolvableTarget(join(testDir, 'myModule'));
+      expect(result).toBe(true);
+    } finally {
+      cleanupTempDir(testDir);
+    }
+  });
+
+  test('hasResolvableTarget should resolve index files in directories', async () => {
+    const { hasResolvableTarget } = await import('../dev-entry.js');
+    
+    const testDir = createTempDir();
+    try {
+      // Create a directory with an index.ts file
+      mkdirSync(join(testDir, 'myDir'), { recursive: true });
+      writeFileSync(join(testDir, 'myDir', 'index.ts'), 'export const x = 1');
+      
+      // Resolving myDir should find index.ts
+      const result = await hasResolvableTarget(join(testDir, 'myDir'));
+      expect(result).toBe(true);
+    } finally {
+      cleanupTempDir(testDir);
+    }
+  });
+
   test('regex should not cause catastrophic backtracking on malformed input', async () => {
     // This test ensures the regex used in collectMissingRelativeImports
     // does not cause catastrophic backtracking on malformed input

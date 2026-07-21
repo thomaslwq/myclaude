@@ -1,7 +1,6 @@
 import pkg from '../package.json'
-import { access } from 'fs/promises'
 import { readFile, readdir } from 'fs/promises'
-import { dirname, extname, join, resolve } from 'path'
+import { basename, dirname, extname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 
 // Apply MYCLAUDE_* env var aliases before any code reads them
@@ -135,31 +134,43 @@ export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
   }
 }
 
-async function hasResolvableTarget(basePath: string): Promise<boolean> {
+export async function hasResolvableTarget(basePath: string): Promise<boolean> {
   const withoutJs = basePath.replace(/\.js$/u, '')
-  const candidates = [
-    withoutJs,
-    `${withoutJs}.ts`,
-    `${withoutJs}.tsx`,
-    `${withoutJs}.js`,
-    `${withoutJs}.jsx`,
-    `${withoutJs}.mjs`,
-    `${withoutJs}.cjs`,
-    join(withoutJs, 'index.ts'),
-    join(withoutJs, 'index.tsx'),
-    join(withoutJs, 'index.js'),
-  ]
-  const results = await Promise.all(
-    candidates.map(async (candidate) => {
+  const parentDir = dirname(withoutJs)
+  const baseName = basename(withoutJs)
+
+  try {
+    const entries = await readdir(parentDir, { withFileTypes: true })
+    const files = new Set(entries.filter(e => e.isFile()).map(e => e.name))
+    const dirs = new Set(entries.filter(e => e.isDirectory()).map(e => e.name))
+
+    // Check direct file candidates in preference order (.ts before .js to avoid build artifacts)
+    if (files.has(baseName)) return true
+    if (files.has(`${baseName}.ts`)) return true
+    if (files.has(`${baseName}.tsx`)) return true
+    if (files.has(`${baseName}.js`)) return true
+    if (files.has(`${baseName}.jsx`)) return true
+    if (files.has(`${baseName}.mjs`)) return true
+    if (files.has(`${baseName}.cjs`)) return true
+
+    // Check if baseName is a directory with index files
+    if (dirs.has(baseName)) {
       try {
-        await access(candidate)
-        return true
+        const subDir = join(parentDir, baseName)
+        const subEntries = await readdir(subDir, { withFileTypes: true })
+        const subFiles = new Set(subEntries.filter(e => e.isFile()).map(e => e.name))
+        if (subFiles.has('index.ts')) return true
+        if (subFiles.has('index.tsx')) return true
+        if (subFiles.has('index.js')) return true
       } catch {
-        return false
+        // Directory not readable
       }
-    })
-  )
-  return results.some(exists => exists)
+    }
+
+    return false
+  } catch {
+    return false
+  }
 }
 
 export async function collectMissingRelativeImports(): Promise<MissingImport[]> {

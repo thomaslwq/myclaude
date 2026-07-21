@@ -27,6 +27,9 @@ coverage/
 .npmrc
 %USERPROFILE%.npmrc
 
+# package manager lock files (only bun.lock should be used)
+package-lock.json
+
 # Build artifacts
 _final.mjs
 _del_temp.mjs
