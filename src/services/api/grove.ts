@@ -131,6 +131,10 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
         return refreshPromise
       } finally {
         release()
+        // Clean up the per-key mutex to prevent memory leaks from unbounded
+        // key accumulation. The mutex is no longer needed after the refresh
+        // completes, and a new one will be created if needed for future refreshes.
+        keyMutexes.delete(key)
       }
     }
 
@@ -168,6 +172,8 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
     clear: () => {
       originalClear()
       lastCachedAt = 0
+      // Clear all per-key mutexes to prevent memory leaks
+      keyMutexes.clear()
     },
   }
 
