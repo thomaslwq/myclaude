@@ -22,7 +22,7 @@ interface SessionIngressError {
 // Module-level state
 const lastUuidMap: Map<string, UUID> = new Map()
 
-const MAX_RETRIES = 10
+const MAX_RETRIES = 5
 const BASE_DELAY_MS = 500
 
 // Per-session sequential wrapper to serialize both append and fetch operations
@@ -221,10 +221,12 @@ async function appendSessionLogImpl(
     }
 
     const delayMs = Math.min(BASE_DELAY_MS * Math.pow(2, attempt - 1), 8000)
+    // Add jitter (±25%) to avoid thundering herd when multiple clients retry simultaneously
+    const jitteredDelay = delayMs * (0.75 + Math.random() * 0.5)
     logForDebugging(
-      `Remote persistence attempt ${attempt}/${MAX_RETRIES} failed, retrying in ${delayMs}ms…`,
+      `Remote persistence attempt ${attempt}/${MAX_RETRIES} failed, retrying in ${jitteredDelay}ms…`,
     )
-    await sleep(delayMs)
+    await sleep(jitteredDelay)
   }
 
   return false
