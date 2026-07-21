@@ -70,6 +70,44 @@ describe('collectMissingRelativeImports performance', () => {
     expect(typeof collectMissingRelativeImports).toBe('function');
   });
 
+  test('scanFiles should continue despite permission errors on subdirectories', async () => {
+    const { scanFiles } = await import('../dev-entry.js');
+    
+    const testDir = createTempDir();
+    try {
+      // Create a normal directory with a file
+      mkdirSync(join(testDir, 'good'), { recursive: true });
+      writeFileSync(join(testDir, 'good', 'file.ts'), 'export const x = 1');
+      
+      // Create a file at root level
+      writeFileSync(join(testDir, 'root.ts'), 'export const x = 1');
+      
+      // Create a directory that will fail to be read (remove all permissions)
+      mkdirSync(join(testDir, 'bad'), { recursive: true });
+      writeFileSync(join(testDir, 'bad', 'bad.ts'), 'export const x = 1');
+      // Remove read+execute permissions to simulate permission error
+      const { chmodSync } = await import('fs');
+      chmodSync(join(testDir, 'bad'), 0o000);
+      
+      const files: string[] = [];
+      // Scan should not throw despite the unreadable directory
+      await scanFiles(testDir, files, 5);
+      
+      // Should include files from good directories
+      expect(files).toContain(join(testDir, 'root.ts'));
+      expect(files).toContain(join(testDir, 'good', 'file.ts'));
+      // Should not include files from the bad directory (unreadable)
+      expect(files).not.toContain(join(testDir, 'bad', 'bad.ts'));
+    } finally {
+      // Restore permissions for cleanup
+      try {
+        const { chmodSync } = await import('fs');
+        chmodSync(join(testDir, 'bad'), 0o755);
+      } catch {}
+      cleanupTempDir(testDir);
+    }
+  });
+
   test('should handle empty directory gracefully', async () => {
     const { scanFiles } = await import('../dev-entry.js');
     

@@ -70,15 +70,19 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 10, curre
     return
   }
   const promises = dirHandle.map(async (entry) => {
-    const fullPath = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      // Skip node_modules, .git, and other common large directories (but allow .github)
-      if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
-      await scanFiles(fullPath, out, maxDepth, currentDepth + 1)
-      return
-    }
-    if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
-      out.push(fullPath)
+    try {
+      const fullPath = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        // Skip node_modules, .git, and other common large directories (but allow .github)
+        if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
+        await scanFiles(fullPath, out, maxDepth, currentDepth + 1)
+        return
+      }
+      if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
+        out.push(fullPath)
+      }
+    } catch {
+      // Gracefully skip this entry (e.g., permission error, I/O failure)
     }
   })
   await Promise.all(promises)
