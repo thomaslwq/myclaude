@@ -125,17 +125,14 @@ async function appendSessionLogImpl(
         } else {
           // Server didn't return x-last-uuid (e.g. v1 endpoint). Re-fetch
           // the session to discover the current head of the append chain.
-          // Use fetchSessionLogsFromUrlRaw (the raw HTTP function) instead
-          // of fetchSessionLogsFromUrl (which is meant to be called through
-          // the sequential wrapper), because we are already executing inside
-          // the sequential wrapper's context. Routing through the wrapper
-          // again would create a reentrant call that depends on the
-          // sequential utility's reentrancy support — a fragile
-          // implementation detail that could cause a deadlock if the
-          // utility ever changes to use a standard lock.
+          // We call fetchSessionLogsFromUrl here, which goes through the
+          // sequential wrapper. This is safe because the sequential utility
+          // explicitly supports reentrancy: if the wrapped function calls
+          // back into the wrapper, the inner call executes immediately
+          // rather than queuing, avoiding a deadlock.
           let logs: Entry[] | null = null
           try {
-            logs = await fetchSessionLogsFromUrlRaw(sessionId, url, headers)
+            logs = await fetchSessionLogsFromUrl(sessionId, url, headers)
           } catch (fetchError) {
             logError(
               new Error(
@@ -498,15 +495,15 @@ export async function getTeleportEvents(
 }
 
 /**
- * Shared implementation for fetching session logs from a URL
+ * Fetch session logs from the server. This function is meant to be called
+ * through the per-session sequential wrapper to ensure atomicity with
+ * concurrent append operations. It is safe to call from within the
+ * sequential wrapper's context (e.g. during 409 recovery in
+ * appendSessionLogImpl) because the sequential utility explicitly
+ * supports reentrancy: nested calls execute immediately rather than
+ * queuing, avoiding a deadlock.
  */
-/**
- * Raw HTTP fetch of session logs from the server, without any sequential
- * wrapper. This is the low-level implementation that can be called safely
- * from within the sequential wrapper's context (e.g. during 409 recovery
- * in appendSessionLogImpl) without risk of reentrancy deadlock.
- */
-async function fetchSessionLogsFromUrlRaw(
+async function fetchSessionLogsFromUrl(
   sessionId: string,
   url: string,
   headers: Record<string, string>,
@@ -571,20 +568,6 @@ async function fetchSessionLogsFromUrlRaw(
     })
     return null
   }
-}
-
-/**
- * Fetch session logs from the server. This function is meant to be called
- * through the per-session sequential wrapper to ensure atomicity with
- * concurrent append operations. Use fetchSessionLogsFromUrlRaw directly
- * when already inside the sequential wrapper's context.
- */
-async function fetchSessionLogsFromUrl(
-  sessionId: string,
-  url: string,
-  headers: Record<string, string>,
-): Promise<Entry[] | null> {
-  return fetchSessionLogsFromUrlRaw(sessionId, url, headers)
 }
 
 /**
