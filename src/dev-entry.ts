@@ -41,6 +41,11 @@ export type MissingImport = {
 // Cache for file contents to avoid re-reading unchanged files
 const fileContentCache = new Map<string, { content: string; mtime: number }>()
 
+// Cache for directory scan results to avoid full re-scan on every call
+// Used in the fallback path when git diff is not available
+const scanCache = new Map<string, { files: string[]; timestamp: number }>()
+const SCAN_CACHE_TTL_MS = 60_000 // 1 minute TTL for scan cache
+
 async function getFileContent(filePath: string): Promise<string | null> {
   try {
     const { stat } = await import('fs/promises')
@@ -183,8 +188,16 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
     // Only scan changed files and their import dependencies
     files.push(...changedFiles)
   } else {
-    // Fall back to full directory scan with depth limit
-    await scanFiles(resolve('src'), files, 10)
+    // Fall back to full directory scan with depth limit, using cache
+    const srcDir = resolve('src')
+    const now = Date.now()
+    const cached = scanCache.get(srcDir)
+    if (cached && (now - cached.timestamp) < SCAN_CACHE_TTL_MS) {
+      files.push(...cached.files)
+    } else {
+      await scanFiles(srcDir, files, 10)
+      scanCache.set(srcDir, { files: [...files], timestamp: now })
+    }
   }
   
   const missing: MissingImport[] = []
