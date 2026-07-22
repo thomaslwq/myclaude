@@ -59,8 +59,8 @@ const dumpState = new Map<string, DumpState>()
 
 // Queue to serialize dumpRequest calls per session to prevent race conditions
 const dumpRequestQueue = new Map<string, Array<() => Promise<void>>>()
-// Per-session flag to prevent concurrent queue processing
-const processingFlags = new Set<string>()
+// Per-session promise to serialize queue processing (replaces fragile flag-based mechanism)
+const processingPromises = new Map<string, Promise<void>>()
 
 function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => Promise<void>): void {
   if (!dumpRequestQueue.has(agentIdOrSessionId)) {
@@ -69,68 +69,31 @@ function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => Promise<
   dumpRequestQueue.get(agentIdOrSessionId)!.push(callback)
   
   // If not already processing this session's queue, start processing.
-  // The flag check and set are synchronous (atomic in JavaScript), so concurrent
-  // enqueues will only start one processing loop. The while loop inside
-  // processQueue will pick up any items added while processing is ongoing.
-  if (!processingFlags.has(agentIdOrSessionId)) {
-    processingFlags.add(agentIdOrSessionId)
-    // Call processQueue directly (non-awaited) to start processing immediately.
-    // The async function will yield to the event loop at await points.
-    processQueue(agentIdOrSessionId)
-  }
-}
-
-async function processQueue(agentIdOrSessionId: string): Promise<void> {
-  try {
-    // Keep processing until the queue is empty. New items added while processing
-    // will be picked up in subsequent iterations of the outer loop.
-    // This iterative approach avoids stack growth from recursion.
-    while (true) {
-      // Inner loop: process all currently queued items
+  // The promise ensures serial execution without race conditions.
+  // This is simpler and more robust than the previous flag-based approach.
+  if (!processingPromises.has(agentIdOrSessionId)) {
+    const promise = (async () => {
       while (true) {
         const queue = dumpRequestQueue.get(agentIdOrSessionId)
         if (!queue || queue.length === 0) {
           break
         }
-
-        const callback = queue.shift()!
+        const cb = queue.shift()!
         try {
-          await callback()
+          await cb()
         } catch (err) {
           logForDebugging(`dumpPrompts.processQueue: callback threw: ${err}`, { level: 'error' })
         }
       }
-
-      // Re-check if new items were added while we were processing.
-      // Clear the flag FIRST to avoid a TOCTOU race condition: if we checked
-      // the queue length and then deleted the queue, a new callback enqueued
-      // between the check and the deletion would see the flag still set and
-      // not start a new processQueue — causing the callback to be lost.
-      // By clearing the flag first, enqueueDumpRequest will start a new
-      // processQueue if a callback is enqueued after we clear the flag.
-      processingFlags.delete(agentIdOrSessionId)
-      const queue = dumpRequestQueue.get(agentIdOrSessionId)
-      if (!queue || queue.length === 0) {
-        // No items — exit without deleting the queue entry.
-        // The flag is already cleared, so enqueueDumpRequest will start
-        // a new processQueue if a callback is added. Keeping the empty
-        // queue entry ensures the new processQueue can find it.
-        return
-      }
-      // Items were found after clearing the flag. They could have been added
-      // before the flag was cleared (during the inner loop's last await), in which
-      // case enqueueDumpRequest did NOT start a new processQueue because the flag
-      // was still set. To prevent TOCTOU loss, re-acquire the flag and continue
-      // processing. If enqueueDumpRequest already started a new processQueue, it
-      // will see the flag is set and return immediately, avoiding duplicates.
-      processingFlags.add(agentIdOrSessionId)
-      // Continue the outer loop to process remaining items
-    }
-  } catch (err) {
-    // If an unexpected error occurs, clean up so the queue is not permanently blocked
-    logError(`processQueue: failed for ${agentIdOrSessionId}`, err)
-    dumpRequestQueue.delete(agentIdOrSessionId)
-    processingFlags.delete(agentIdOrSessionId)
+    })()
+      .catch((err) => {
+        logError(`processQueue: failed for ${agentIdOrSessionId}`, err)
+        dumpRequestQueue.delete(agentIdOrSessionId)
+      })
+      .finally(() => {
+        processingPromises.delete(agentIdOrSessionId)
+      })
+    processingPromises.set(agentIdOrSessionId, promise)
   }
 }
 

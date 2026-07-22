@@ -114,10 +114,20 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
                 return freshResult
               }
               // Transient failure — return the cached value (lodash still has it)
-              return memoized(...args)
+              // Only fall back to the cached value if it exists, otherwise return
+              // the failure result directly without caching it in lodash memoize.
+              if (memoized.cache.has(args[0])) {
+                return memoized(...args)
+              }
+              return freshResult
             } catch (error) {
               // Transient error — return the cached value (lodash still has it)
-              return memoized(...args)
+              // Only fall back to the cached value if it exists, otherwise return
+              // the failure result directly without caching it in lodash memoize.
+              if (memoized.cache.has(args[0])) {
+                return memoized(...args)
+              }
+              return { success: false } as any
             }
           } finally {
             // Clean up the pending promise so future calls can start a fresh refresh
