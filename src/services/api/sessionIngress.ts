@@ -468,11 +468,14 @@ export async function getTeleportEvents(
     }
 
     pages++
+    // Validate cursor: must be a non-empty string. Empty string ('') or
+    // non-string values (e.g., number) would either cause infinite loops
+    // (server echoes back the same page) or unexpected query-param behavior.
     // == null covers both `null` and `undefined` — the proto omits the
     // field at end-of-stream, but some serializers emit `null`. Strict
     // `=== undefined` would loop forever on `null` (cursor=null in query
     // params stringifies to "null", which the server rejects or echoes).
-    if (next_cursor == null) {
+    if (next_cursor == null || typeof next_cursor !== 'string' || next_cursor === '') {
       break
     }
     previousCursor = cursor
