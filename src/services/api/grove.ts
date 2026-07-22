@@ -87,7 +87,17 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
 
         // Otherwise, start a new refresh and store the promise
         const refreshPromise = (async () => {
+          let timeoutId: ReturnType<typeof setTimeout> | null = null
           try {
+            // Create a timeout promise to prevent deadlocks if fn never settles
+            const timeoutMs = 10000 // 10 seconds timeout for refresh
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              timeoutId = setTimeout(
+                () => reject(new Error(`Refresh timeout after ${timeoutMs}ms for key: ${key}`)),
+                timeoutMs,
+              )
+            })
+
             // Double-check: another call may have already refreshed the cache
             // while we were setting up the promise.
             const now2 = Date.now()
@@ -100,7 +110,7 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
             // Do NOT clear the underlying lodash cache beforehand, so that if the
             // refresh fails (transient error) the old cached value is preserved.
             try {
-              const freshResult = await fn(...args)
+              const freshResult = await Promise.race([fn(...args), timeoutPromise])
               if (
                 freshResult &&
                 typeof freshResult === 'object' &&
@@ -130,12 +140,26 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
               return { success: false } as any
             }
           } finally {
-            // Clean up the pending promise so future calls can start a fresh refresh
-            pendingRefreshes.delete(key)
+            // Clean up the timeout if it was set and hasn't fired yet
+            if (timeoutId) {
+              clearTimeout(timeoutId)
+            }
           }
         })()
 
+        // Set the promise in the map before attaching cleanup to ensure
+        // the cleanup callback runs after the set, even if the promise
+        // settles synchronously (e.g., if fn throws synchronously).
         pendingRefreshes.set(key, refreshPromise)
+
+        // Use .finally() to ensure cleanup happens even if the promise
+        // settles synchronously before pendingRefreshes.set() was called.
+        // The .finally() callback is scheduled as a microtask, so it will
+        // run after the current synchronous execution, including the set().
+        refreshPromise.finally(() => {
+          pendingRefreshes.delete(key)
+        })
+
         return refreshPromise
       } finally {
         release()
