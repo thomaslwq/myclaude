@@ -104,6 +104,10 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
             const now2 = Date.now()
             if (lastCachedAt !== 0 && now2 - lastCachedAt < ttlMs) {
               // Cache was refreshed by another call — use the cached value.
+              // Use cache.get() directly instead of calling memoized() to avoid
+              // re-entering the wrapped function and triggering another refresh.
+              const cached = memoized.cache.get(args[0])
+              if (cached !== undefined) return cached
               return memoized(...args)
             }
 
@@ -129,16 +133,20 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
               // Transient failure — return the cached value (lodash still has it)
               // Only fall back to the cached value if it exists, otherwise return
               // the failure result directly without caching it in lodash memoize.
+              // Use cache.get() directly instead of calling memoized() to avoid
+              // re-entering the wrapped function and triggering another refresh.
               if (memoized.cache.has(args[0])) {
-                return memoized(...args)
+                return memoized.cache.get(args[0])
               }
               return freshResult
             } catch (error) {
               // Transient error — return the cached value (lodash still has it)
               // Only fall back to the cached value if it exists, otherwise return
               // the failure result directly without caching it in lodash memoize.
+              // Use cache.get() directly instead of calling memoized() to avoid
+              // re-entering the wrapped function and triggering another refresh.
               if (memoized.cache.has(args[0])) {
-                return memoized(...args)
+                return memoized.cache.get(args[0])
               }
               return { success: false } as any
             }
