@@ -372,14 +372,19 @@ export function createDumpPromptsFetch(
             } finally {
               reader.releaseLock()
             }
-            // Process any remaining data in the buffer
+            // Process any remaining data in the buffer.
+            // The incomplete buffer contains the trailing data after the last \n\n.
+            // This could be a complete event (without trailing \n\n) or a partial event.
+            // Try to parse it as a complete event first; if that fails, include
+            // the raw data as a best-effort to avoid silently dropping data.
             if (incomplete.trim()) {
-              for (const event of incomplete.split('\n\n')) {
-                const chunk = parseEventData(event)
-                if (chunk !== null) {
-                  // Write chunk directly to file to avoid memory accumulation
-                  chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
-                }
+              const chunk = parseEventData(incomplete)
+              if (chunk !== null) {
+                chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: chunk }))
+              } else {
+                // Stream ended with a partial/incomplete event — include raw data
+                // so it's not silently lost during debugging.
+                chunkEntries.push(jsonStringify({ type: 'chunk', timestamp, data: incomplete }))
               }
             }
             // Flush any remaining chunks
