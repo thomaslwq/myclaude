@@ -40,9 +40,6 @@ export function migrateAutoUpdatesToSettings(): void {
       already_had_env_var: !!userSettings.env?.DISABLE_AUTOUPDATER,
     })
 
-    // explicitly set, so this takes effect immediately
-    process.env.DISABLE_AUTOUPDATER = '1'
-
     // Remove autoUpdates from global config after successful migration
     saveGlobalConfig(current => {
       const {
