@@ -118,7 +118,9 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
                 freshResult.success === true
               ) {
                 // Success — update the lodash cache with the fresh result
-                originalClear()
+                // Only delete the specific key instead of clearing the entire cache
+                // to avoid evicting other valid entries.
+                memoized.cache.delete(args[0])
                 memoized.cache.set(args[0], freshResult)
                 lastCachedAt = Date.now()
                 return freshResult

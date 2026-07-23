@@ -7,6 +7,7 @@ import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { logError } from '../../utils/log.js'
+import { Mutex } from 'async-mutex'
 
 /**
  * Parse SSE event data lines into a JSON object.
@@ -61,6 +62,8 @@ const dumpState = new Map<string, DumpState>()
 const dumpRequestQueue = new Map<string, Array<() => Promise<void>>>()
 // Per-session promise to serialize queue processing (replaces fragile flag-based mechanism)
 const processingPromises = new Map<string, Promise<void>>()
+// Per-session mutex to protect the check-and-set of processingPromises from race conditions
+const enqueueMutexes = new Map<string, Mutex>()
 
 function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => Promise<void>): void {
   if (!dumpRequestQueue.has(agentIdOrSessionId)) {
@@ -68,33 +71,40 @@ function enqueueDumpRequest(agentIdOrSessionId: string, callback: () => Promise<
   }
   dumpRequestQueue.get(agentIdOrSessionId)!.push(callback)
   
-  // If not already processing this session's queue, start processing.
-  // The promise ensures serial execution without race conditions.
-  // This is simpler and more robust than the previous flag-based approach.
-  if (!processingPromises.has(agentIdOrSessionId)) {
-    const promise = (async () => {
-      while (true) {
-        const queue = dumpRequestQueue.get(agentIdOrSessionId)
-        if (!queue || queue.length === 0) {
-          break
+  // Use a per-session mutex to ensure the check-and-set of processingPromises
+  // is atomic. This prevents two concurrent calls from both passing the has() check
+  // and creating duplicate processing loops.
+  const mutex = enqueueMutexes.get(agentIdOrSessionId) ?? new Mutex()
+  enqueueMutexes.set(agentIdOrSessionId, mutex)
+  
+  mutex.runExclusive(async () => {
+    if (!processingPromises.has(agentIdOrSessionId)) {
+      const promise = (async () => {
+        while (true) {
+          const queue = dumpRequestQueue.get(agentIdOrSessionId)
+          if (!queue || queue.length === 0) {
+            break
+          }
+          const cb = queue.shift()!
+          try {
+            await cb()
+          } catch (err) {
+            logForDebugging(`dumpPrompts.processQueue: callback threw: ${err}`, { level: 'error' })
+          }
         }
-        const cb = queue.shift()!
-        try {
-          await cb()
-        } catch (err) {
-          logForDebugging(`dumpPrompts.processQueue: callback threw: ${err}`, { level: 'error' })
-        }
-      }
-    })()
-      .catch((err) => {
-        logError(`processQueue: failed for ${agentIdOrSessionId}`, err)
-        dumpRequestQueue.delete(agentIdOrSessionId)
-      })
-      .finally(() => {
-        processingPromises.delete(agentIdOrSessionId)
-      })
-    processingPromises.set(agentIdOrSessionId, promise)
-  }
+      })()
+        .catch((err) => {
+          logError(`processQueue: failed for ${agentIdOrSessionId}`, err)
+          dumpRequestQueue.delete(agentIdOrSessionId)
+        })
+        .finally(() => {
+          processingPromises.delete(agentIdOrSessionId)
+        })
+      processingPromises.set(agentIdOrSessionId, promise)
+    }
+  }).catch((err) => {
+    logError(`enqueueDumpRequest: mutex acquisition failed for ${agentIdOrSessionId}`, err)
+  })
 }
 
 export function getLastApiRequests(): Array<{
