@@ -125,18 +125,17 @@ async function appendSessionLogImpl(
         } else {
           // Server didn't return x-last-uuid (e.g. v1 endpoint). Re-fetch
           // the session to discover the current head of the append chain.
-          // We call fetchSessionLogsFromUrl directly (not through the per-session
-          // sequential wrapper) because we are already executing inside the
-          // sequential wrapper's exclusive context — the wrapper ensures that
-          // only one operation (append or fetch) runs at a time per session.
-          // Calling the sequential wrapper reentrantly is not supported by the
-          // current sequential utility and would deadlock, so we call the inner
-          // function directly. This is safe because the sequential wrapper
-          // already serializes all operations per session, preventing concurrent
-          // appends from interleaving during this re-fetch.
+          // The sequential wrapper now supports reentrancy, so we can safely
+          // call through the wrapper even though we are already executing
+          // inside the wrapper's exclusive context. This ensures that any
+          // operations inside fetchSessionLogsFromUrl that might call back
+          // into the sequential wrapper (e.g. logging or diagnostics) will
+          // not deadlock, as reentrant calls execute immediately within the
+          // same serialized context.
           let logs: Entry[] | null = null
           try {
-            logs = await fetchSessionLogsFromUrl(sessionId, url, headers)
+            const sequential = getOrCreateSequential(sessionId)
+            logs = await sequential(sessionId, url, headers, true) as Entry[] | null
           } catch (fetchError) {
             logError(
               new Error(
@@ -501,11 +500,9 @@ export async function getTeleportEvents(
 /**
  * Fetch session logs from the server. This function is meant to be called
  * through the per-session sequential wrapper to ensure atomicity with
- * concurrent append operations. In 409 recovery, it is called directly
- * (not through the wrapper) because the sequential utility does not support
- * reentrancy and would deadlock if called from within the wrapper's context.
- * This is safe because the wrapper already serializes all operations per
- * session, preventing concurrent appends from interleaving during this re-fetch.
+ * concurrent append operations. The sequential utility now supports
+ * reentrancy, so it is safe to call through the wrapper even during 409
+ * recovery when we are already executing inside the wrapper's context.
  */
 async function fetchSessionLogsFromUrl(
   sessionId: string,

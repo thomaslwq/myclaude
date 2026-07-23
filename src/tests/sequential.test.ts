@@ -85,4 +85,35 @@ describe('sequential wrapper', () => {
     const appendResult2 = await wrapped({ type: 'text', content: 'world' }, 'https://api.example.com/session', { Authorization: 'Bearer token' })
     expect(appendResult2).toBe(true)
   })
+
+  test('should support reentrancy without deadlocking', async () => {
+    // Simulate the reentrancy scenario: the wrapped function calls back
+    // into the sequential wrapper (e.g. during 409 recovery, the append
+    // function calls the wrapper to fetch session logs).
+    const executionOrder: string[] = []
+
+    const fn = async (op: string, callback?: () => Promise<void>) => {
+      executionOrder.push(`enter-${op}`)
+      if (callback) {
+        await callback()
+      }
+      executionOrder.push(`exit-${op}`)
+      return op
+    }
+
+    const wrapped = sequential(fn)
+
+    // Outer call invokes a reentrant inner call
+    const result = await wrapped('outer', async () => {
+      // This is a reentrant call — we're inside the wrapped function
+      // calling the wrapper again. This must not deadlock.
+      const innerResult = await wrapped('inner', undefined)
+      expect(innerResult).toBe('inner')
+    })
+
+    expect(result).toBe('outer')
+    // The outer function should start, then the inner call executes
+    // reentrantly, then the outer function finishes
+    expect(executionOrder).toEqual(['enter-outer', 'enter-inner', 'exit-inner', 'exit-outer'])
+  })
 })
