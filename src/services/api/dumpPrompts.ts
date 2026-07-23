@@ -352,20 +352,33 @@ export function createDumpPromptsFetch(
                     }
                   }
                   
-                  // Prevent unbounded buffer growth — if the incomplete part exceeds
-                  // the limit, truncate it
+                  // Prevent unbounded buffer growth — truncate at line boundary
+                  // to preserve event integrity
                   if (incomplete.length > MAX_BUFFER_SIZE) {
                     logForDebugging('dumpPrompts: incomplete buffer exceeds max size, truncating', { level: 'warn' })
-                    incomplete = incomplete.slice(-MAX_BUFFER_SIZE)
+                    const truncateStart = incomplete.length - MAX_BUFFER_SIZE
+                    const lastNewline = incomplete.lastIndexOf('\n', truncateStart)
+                    if (lastNewline !== -1 && lastNewline > truncateStart - 1000) {
+                      incomplete = incomplete.slice(lastNewline + 1)
+                    } else {
+                      incomplete = incomplete.slice(-MAX_BUFFER_SIZE)
+                    }
                   }
                 } else {
                   // No complete events found — keep everything as incomplete
                   incomplete = combined
                   
-                  // Prevent unbounded buffer growth
+                  // Prevent unbounded buffer growth — truncate at line boundary
+                  // to preserve event integrity
                   if (incomplete.length > MAX_BUFFER_SIZE) {
                     logForDebugging('dumpPrompts: buffer exceeded max size, truncating', { level: 'warn' })
-                    incomplete = incomplete.slice(-MAX_BUFFER_SIZE)
+                    const truncateStart = incomplete.length - MAX_BUFFER_SIZE
+                    const lastNewline = incomplete.lastIndexOf('\n', truncateStart)
+                    if (lastNewline !== -1 && lastNewline > truncateStart - 1000) {
+                      incomplete = incomplete.slice(lastNewline + 1)
+                    } else {
+                      incomplete = incomplete.slice(-MAX_BUFFER_SIZE)
+                    }
                   }
                 }
               }
