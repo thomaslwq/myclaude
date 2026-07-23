@@ -1,3 +1,4 @@
+import { logError } from '../utils/log.js'
 import {
   getSettingsForSource,
   updateSettingsForSource,
@@ -16,30 +17,34 @@ import {
  * settings here would cause infinite re-runs + silent global promotion.
  */
 export function migrateFennecToOpus(): void {
-  if (process.env.USER_TYPE !== 'ant') {
-    return
-  }
-
-  const settings = getSettingsForSource('userSettings')
-
-  const model = settings?.model
-  if (typeof model === 'string') {
-    if (model.startsWith('fennec-latest[1m]')) {
-      updateSettingsForSource('userSettings', {
-        model: 'opus[1m]',
-      })
-    } else if (model.startsWith('fennec-latest')) {
-      updateSettingsForSource('userSettings', {
-        model: 'opus',
-      })
-    } else if (
-      model.startsWith('fennec-fast-latest') ||
-      model.startsWith('opus-4-5-fast')
-    ) {
-      updateSettingsForSource('userSettings', {
-        model: 'opus[1m]',
-        fastMode: true,
-      })
+  try {
+    if (process.env.USER_TYPE !== 'ant') {
+      return
     }
+
+    const settings = getSettingsForSource('userSettings')
+
+    const model = settings?.model
+    if (typeof model === 'string') {
+      if (model.startsWith('fennec-latest[1m]')) {
+        updateSettingsForSource('userSettings', {
+          model: 'opus[1m]',
+        })
+      } else if (model.startsWith('fennec-latest')) {
+        updateSettingsForSource('userSettings', {
+          model: 'opus',
+        })
+      } else if (
+        model.startsWith('fennec-fast-latest') ||
+        model.startsWith('opus-4-5-fast')
+      ) {
+        updateSettingsForSource('userSettings', {
+          model: 'opus[1m]',
+          fastMode: true,
+        })
+      }
+    }
+  } catch (error) {
+    logError(new Error(`Failed to migrate fennec to opus: ${error}`))
   }
 }
