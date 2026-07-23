@@ -90,18 +90,12 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     }
 
     // Remove migrated fields from project config
-    if (
-      fieldsToRemove.includes('enableAllProjectMcpServers') ||
-      fieldsToRemove.includes('enabledMcpjsonServers') ||
-      fieldsToRemove.includes('disabledMcpjsonServers')
-    ) {
+    if (fieldsToRemove.length > 0) {
       saveCurrentProjectConfig(current => {
-        const {
-          enableAllProjectMcpServers: _enableAll,
-          enabledMcpjsonServers: _enabledServers,
-          disabledMcpjsonServers: _disabledServers,
-          ...configWithoutFields
-        } = current
+        const configWithoutFields = { ...current }
+        for (const field of fieldsToRemove) {
+          delete configWithoutFields[field]
+        }
         return configWithoutFields
       })
     }
