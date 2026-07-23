@@ -49,15 +49,10 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
 
   const originalClear = memoized.cache.clear.bind(memoized.cache)
 
-  /**
-   * Map of in-flight promises keyed by the first argument.
-   * This replaces the old mutex-based approach, avoiding potential deadlocks
-   * if the refresh function ever re-enters the memoized function.
-   */
-  const pendingRefreshes = new Map<string, Promise<any>>()
-
-  // Per-key mutexes to prevent unnecessary blocking when different keys are used
-  const keyMutexes = new Map<string, Mutex>()
+  // Track a single in-flight refresh promise to prevent duplicate concurrent refreshes.
+  // Since both callers (getGroveSettings, getGroveNoticeConfig) take no arguments,
+  // a single promise is sufficient and avoids the complexity of per-key mutexes.
+  let pendingRefresh: Promise<any> | null = null
 
   // Override the original function to check TTL
   const wrapped = (async (...args: any[]) => {
@@ -65,120 +60,44 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
     const cacheExpired = lastCachedAt === 0 || now - lastCachedAt >= ttlMs
 
     if (cacheExpired) {
-      const key = String(args[0] ?? '_default')
-
-      // Get or create a per-key mutex to atomically check if a refresh is
-      // already in progress and start a new one if not. This prevents duplicate
-      // API calls when two concurrent calls both pass the cacheExpired check
-      // before either sets the pending promise, while avoiding unnecessary
-      // blocking between different keys.
-      let keyMutex = keyMutexes.get(key)
-      if (!keyMutex) {
-        keyMutex = new Mutex()
-        keyMutexes.set(key, keyMutex)
+      // If a refresh is already in progress, wait for it instead of starting a new one
+      if (pendingRefresh) {
+        return pendingRefresh
       }
-      const release = await keyMutex.acquire()
-      try {
-        // Double-check inside the mutex: another call may have already started a refresh
-        const existing = pendingRefreshes.get(key)
-        if (existing) {
-          return existing
-        }
 
-        // Otherwise, start a new refresh and store the promise
-        const refreshPromise = (async () => {
-          let timeoutId: ReturnType<typeof setTimeout> | null = null
-          try {
-            // Create a timeout promise to prevent deadlocks if fn never settles
-            // Use a multiple of the API timeout to ensure the HTTP request has time to complete
-            const timeoutMs = GROVE_API_TIMEOUT_MS * 3
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              timeoutId = setTimeout(
-                () => reject(new Error(`Refresh timeout after ${timeoutMs}ms for key: ${key}`)),
-                timeoutMs,
-              )
-            })
-
-            // Double-check: another call may have already refreshed the cache
-            // while we were setting up the promise.
-            const now2 = Date.now()
-            if (lastCachedAt !== 0 && now2 - lastCachedAt < ttlMs) {
-              // Cache was refreshed by another call — use the cached value.
-              // Use cache.get() directly instead of calling memoized() to avoid
-              // re-entering the wrapped function and triggering another refresh.
-              const cached = memoized.cache.get(args[0])
-              if (cached !== undefined) return cached
-              return memoized(...args)
-            }
-
-            // Cache expired — try to refresh by calling the original function directly.
-            // Do NOT clear the underlying lodash cache beforehand, so that if the
-            // refresh fails (transient error) the old cached value is preserved.
-            try {
-              const freshResult = await Promise.race([fn(...args), timeoutPromise])
-              if (
-                freshResult &&
-                typeof freshResult === 'object' &&
-                'success' in freshResult &&
-                freshResult.success === true
-              ) {
-                // Success — update the lodash cache with the fresh result
-                // Only delete the specific key instead of clearing the entire cache
-                // to avoid evicting other valid entries.
-                memoized.cache.delete(args[0])
-                memoized.cache.set(args[0], freshResult)
-                lastCachedAt = Date.now()
-                return freshResult
-              }
-              // Transient failure — return the cached value (lodash still has it)
-              // Only fall back to the cached value if it exists, otherwise return
-              // the failure result directly without caching it in lodash memoize.
-              // Use cache.get() directly instead of calling memoized() to avoid
-              // re-entering the wrapped function and triggering another refresh.
-              if (memoized.cache.has(args[0])) {
-                return memoized.cache.get(args[0])
-              }
-              return freshResult
-            } catch (error) {
-              // Transient error — return the cached value (lodash still has it)
-              // Only fall back to the cached value if it exists, otherwise return
-              // the failure result directly without caching it in lodash memoize.
-              // Use cache.get() directly instead of calling memoized() to avoid
-              // re-entering the wrapped function and triggering another refresh.
-              if (memoized.cache.has(args[0])) {
-                return memoized.cache.get(args[0])
-              }
-              return { success: false } as any
-            }
-          } finally {
-            // Clean up the timeout if it was set and hasn't fired yet
-            if (timeoutId) {
-              clearTimeout(timeoutId)
-            }
+      // Start a new refresh
+      pendingRefresh = (async () => {
+        try {
+          const freshResult = await fn(...args)
+          if (
+            freshResult &&
+            typeof freshResult === 'object' &&
+            'success' in freshResult &&
+            freshResult.success === true
+          ) {
+            // Success — update the lodash cache with the fresh result
+            memoized.cache.delete(args[0])
+            memoized.cache.set(args[0], freshResult)
+            lastCachedAt = Date.now()
+            return freshResult
           }
-        })()
+          // Transient failure — return the cached value if it exists, otherwise return the failure
+          if (memoized.cache.has(args[0])) {
+            return memoized.cache.get(args[0])
+          }
+          return freshResult
+        } catch (error) {
+          // Transient error — return the cached value if it exists
+          if (memoized.cache.has(args[0])) {
+            return memoized.cache.get(args[0])
+          }
+          return { success: false } as any
+        } finally {
+          pendingRefresh = null
+        }
+      })()
 
-        // Set the promise in the map before attaching cleanup to ensure
-        // the cleanup callback runs after the set, even if the promise
-        // settles synchronously (e.g., if fn throws synchronously).
-        pendingRefreshes.set(key, refreshPromise)
-
-        // Use .finally() to ensure cleanup happens even if the promise
-        // settles synchronously before pendingRefreshes.set() was called.
-        // The .finally() callback is scheduled as a microtask, so it will
-        // run after the current synchronous execution, including the set().
-        refreshPromise.finally(() => {
-          pendingRefreshes.delete(key)
-        })
-
-        return refreshPromise
-      } finally {
-        release()
-        // Clean up the per-key mutex to prevent memory leaks from unbounded
-        // key accumulation. The mutex is no longer needed after the refresh
-        // completes, and a new one will be created if needed for future refreshes.
-        keyMutexes.delete(key)
-      }
+      return pendingRefresh
     }
 
     try {
@@ -191,15 +110,6 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
       ) {
         // Only update timestamp on success
         lastCachedAt = Date.now()
-      } else if (
-        result &&
-        typeof result === 'object' &&
-        'success' in result &&
-        result.success === false
-      ) {
-        // Do NOT update lastCachedAt on transient failure — this allows the
-        // cache to be retried sooner (next time cacheExpired check runs).
-        // The old cached value is preserved in the lodash cache.
       }
       return result
     } catch (error) {
@@ -215,8 +125,7 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
     clear: () => {
       originalClear()
       lastCachedAt = 0
-      // Clear all per-key mutexes to prevent memory leaks
-      keyMutexes.clear()
+      pendingRefresh = null
     },
   }
 
