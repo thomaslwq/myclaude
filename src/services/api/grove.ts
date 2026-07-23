@@ -90,7 +90,8 @@ function memoizeWithTTL<T extends (...args: any[]) => Promise<any>>(
           let timeoutId: ReturnType<typeof setTimeout> | null = null
           try {
             // Create a timeout promise to prevent deadlocks if fn never settles
-            const timeoutMs = 10000 // 10 seconds timeout for refresh
+            // Use a multiple of the API timeout to ensure the HTTP request has time to complete
+            const timeoutMs = GROVE_API_TIMEOUT_MS * 3
             const timeoutPromise = new Promise<never>((_, reject) => {
               timeoutId = setTimeout(
                 () => reject(new Error(`Refresh timeout after ${timeoutMs}ms for key: ${key}`)),
