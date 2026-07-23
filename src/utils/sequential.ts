@@ -13,9 +13,12 @@ type QueueItem<T extends unknown[], R> = {
  * This is useful for operations that must be performed sequentially, such as
  * file writes or database updates that could cause conflicts if executed concurrently.
  *
- * The wrapper is reentrant: if the wrapped function calls back into the sequential
- * wrapper (e.g. during error recovery), the inner call executes immediately rather
- * than queuing, avoiding a deadlock.
+ * NOTE: The wrapper does NOT support reentrancy. If the wrapped function calls back
+ * into the sequential wrapper (e.g. during error recovery), it will deadlock because
+ * the queue is blocked waiting for the current operation to complete. Callers that
+ * need to perform nested operations should call the inner function directly, ensuring
+ * that the sequential wrapper's serialization guarantee is sufficient to prevent
+ * concurrent interleaving.
  *
  * @param fn - The async function to wrap with sequential execution
  * @returns A wrapped version of the function that executes calls sequentially

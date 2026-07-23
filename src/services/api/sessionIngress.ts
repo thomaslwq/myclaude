@@ -130,7 +130,10 @@ async function appendSessionLogImpl(
           // sequential wrapper's exclusive context — the wrapper ensures that
           // only one operation (append or fetch) runs at a time per session.
           // Calling the sequential wrapper reentrantly is not supported by the
-          // current sequential utility, so we call the inner function directly.
+          // current sequential utility and would deadlock, so we call the inner
+          // function directly. This is safe because the sequential wrapper
+          // already serializes all operations per session, preventing concurrent
+          // appends from interleaving during this re-fetch.
           let logs: Entry[] | null = null
           try {
             logs = await fetchSessionLogsFromUrl(sessionId, url, headers)
@@ -498,11 +501,11 @@ export async function getTeleportEvents(
 /**
  * Fetch session logs from the server. This function is meant to be called
  * through the per-session sequential wrapper to ensure atomicity with
- * concurrent append operations. It is safe to call from within the
- * sequential wrapper's context (e.g. during 409 recovery in
- * appendSessionLogImpl) because the sequential utility explicitly
- * supports reentrancy: nested calls execute immediately rather than
- * queuing, avoiding a deadlock.
+ * concurrent append operations. In 409 recovery, it is called directly
+ * (not through the wrapper) because the sequential utility does not support
+ * reentrancy and would deadlock if called from within the wrapper's context.
+ * This is safe because the wrapper already serializes all operations per
+ * session, preventing concurrent appends from interleaving during this re-fetch.
  */
 async function fetchSessionLogsFromUrl(
   sessionId: string,
