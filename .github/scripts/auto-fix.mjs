@@ -122,6 +122,59 @@ function getDiff() {
          runCmd('git diff --cached --no-color', { ignoreError: true }).stdout;
 }
 
+// ── Secret Scanner ───────────────────────────────────────────────────────────
+
+/**
+ * High-confidence secret patterns ported from gitleaks.
+ * Scans content and returns human-readable rule names for any matches.
+ * The actual matched values are NEVER returned — only rule IDs.
+ */
+function scanForSecrets(content) {
+  const patterns = [
+    { id: 'npm-access-token',        re: /npm_[a-zA-Z0-9]{36}/ },
+    { id: 'github-pat',              re: /ghp_[0-9a-zA-Z]{36}/ },
+    { id: 'github-oauth',            re: /gho_[0-9a-zA-Z]{36}/ },
+    { id: 'github-app-token',        re: /(?:ghu|ghs)_[0-9a-zA-Z]{36}/ },
+    { id: 'github-fine-grained-pat', re: /github_pat_\w{82}/ },
+    { id: 'github-refresh-token',    re: /ghr_[0-9a-zA-Z]{36}/ },
+    { id: 'gitlab-pat',              re: /glpat-[\w-]{20}/ },
+    { id: 'gitlab-deploy-token',     re: /gldt-[0-9a-zA-Z_\-]{20}/ },
+    { id: 'openai-api-key',          re: /sk-(?:proj|svcacct|admin)-(?:[A-Za-z0-9_-]{58,74})T3BlbkFJ(?:[A-Za-z0-9_-]{58,74})\b/ },
+    { id: 'openai-legacy-key',       re: /sk-[a-zA-Z0-9]{20,50}T3BlbkFJ[a-zA-Z0-9]{20,50}/ },
+    { id: 'anthropic-api-key',       re: /sk-ant-api03-[a-zA-Z0-9_-]{93}AA/ },
+    { id: 'aws-access-key',          re: /(?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z2-7]{16}/ },
+    { id: 'gcp-api-key',             re: /AIza[\w-]{35}/ },
+    { id: 'huggingface-access-token',re: /hf_[a-zA-Z]{34}/ },
+    { id: 'slack-bot-token',         re: /xoxb-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*/ },
+    { id: 'slack-user-token',        re: /xox[pe](?:-[0-9]{10,13}){3}-[a-zA-Z0-9-]{28,34}/ },
+    { id: 'stripe-access-token',     re: /(?:sk|rk)_(?:test|live|prod)_[a-zA-Z0-9]{10,99}/ },
+    { id: 'private-key',             re: /-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\s\S-]{64,}?-----END[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----/i },
+    { id: 'jwt-token',               re: /eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/ },
+    { id: 'heroku-api-key',          re: /[hH][eE][rR][oO][kK][uU].*?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/ },
+    { id: 'generic-api-key',         re: /(?:api[_-]?key|apikey|api[_-]?secret)[\s"':=]+[A-Za-z0-9_\-!@#$%^&*()+]{16,}/i },
+  ];
+
+  const seen = new Set();
+  const matches = [];
+  for (const { id, re } of patterns) {
+    if (!seen.has(id) && re.test(content)) {
+      seen.add(id);
+      matches.push(id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+    }
+  }
+  return matches;
+}
+
+/**
+ * Scan staged (git add-ed) changes for secrets before committing.
+ * Returns an array of human-readable rule labels, or empty array if clean.
+ */
+function scanStagedForSecrets() {
+  const diff = runCmd('git diff --cached --no-color', { ignoreError: true }).stdout;
+  if (!diff) return [];
+  return scanForSecrets(diff);
+}
+
 // ── LLM API Client ──────────────────────────────────────────────────────────
 
 /**
@@ -704,6 +757,21 @@ async function main() {
 
       // Stage all changes
       runCmd('git add -A', { ignoreError: true });
+
+      // ── Secret scanning: block commit if any secrets detected ──
+      const secretMatches = scanStagedForSecrets();
+      if (secretMatches.length > 0) {
+        log.warn(`⚠️  Issue #${number}: Blocked commit — secrets detected in staged changes:`);
+        for (const label of secretMatches) {
+          log.warn(`    • ${label}`);
+        }
+        log.warn('  Unstaging changes and skipping this issue to avoid leaking credentials.');
+        log.warn('  Review the changes manually before committing.');
+        runCmd('git reset HEAD -- .', { ignoreError: true });
+        // Don't count this as fixed; skip to next issue
+        result.fixed = false;
+        continue;
+      }
 
       // Create commit
       const commitMsg = `fix: auto-resolve issue #${number}
