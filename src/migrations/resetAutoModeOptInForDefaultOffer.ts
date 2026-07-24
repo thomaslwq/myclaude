@@ -1,4 +1,7 @@
-import { feature } from 'bun:bundle'
+// Feature flag polyfill - all features default to false
+// This is a fallback for when running outside of Bun's compile-time macro system
+const feature = (name: string): boolean => false;
+
 import { logEvent } from '../services/analytics/index.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { logError } from '../utils/log.js'
