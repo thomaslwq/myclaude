@@ -60,7 +60,7 @@ describe('migrateSonnet45ToSonnet46', () => {
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should not run if user is not a subscriber', () => {
+  it('should migrate non-subscriber first-party users from sonnet-4-5 to sonnet', () => {
     mockIsProSubscriber.mockReturnValue(false)
     mockIsMaxSubscriber.mockReturnValue(false)
     mockIsTeamPremiumSubscriber.mockReturnValue(false)
@@ -68,7 +68,10 @@ describe('migrateSonnet45ToSonnet46', () => {
 
     migrateSonnet45ToSonnet46()
 
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'sonnet' },
+    )
   })
 
   it('should migrate claude-sonnet-4-5-20250929 to sonnet', () => {
