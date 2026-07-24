@@ -48,30 +48,36 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     }
 
     // Migrate enabledMcpjsonServers if it exists
-    if (hasEnabledServers && projectConfig.enabledMcpjsonServers) {
-      const existingEnabledServers =
-        existingSettings.enabledMcpjsonServers || []
-      // Merge the servers (avoiding duplicates)
-      updates.enabledMcpjsonServers = [
-        ...new Set([
-          ...existingEnabledServers,
-          ...projectConfig.enabledMcpjsonServers,
-        ]),
-      ]
+    if (hasEnabledServers) {
+      // Only merge into settings if the project config has actual servers to add
+      if (projectConfig.enabledMcpjsonServers && projectConfig.enabledMcpjsonServers.length > 0) {
+        const existingEnabledServers =
+          existingSettings.enabledMcpjsonServers || []
+        // Merge the servers (avoiding duplicates)
+        updates.enabledMcpjsonServers = [
+          ...new Set([
+            ...existingEnabledServers,
+            ...projectConfig.enabledMcpjsonServers,
+          ]),
+        ]
+      }
       fieldsToRemove.push('enabledMcpjsonServers')
     }
 
     // Migrate disabledMcpjsonServers if it exists
-    if (hasDisabledServers && projectConfig.disabledMcpjsonServers) {
-      const existingDisabledServers =
-        existingSettings.disabledMcpjsonServers || []
-      // Merge the servers (avoiding duplicates)
-      updates.disabledMcpjsonServers = [
-        ...new Set([
-          ...existingDisabledServers,
-          ...projectConfig.disabledMcpjsonServers,
-        ]),
-      ]
+    if (hasDisabledServers) {
+      // Only merge into settings if the project config has actual servers to add
+      if (projectConfig.disabledMcpjsonServers && projectConfig.disabledMcpjsonServers.length > 0) {
+        const existingDisabledServers =
+          existingSettings.disabledMcpjsonServers || []
+        // Merge the servers (avoiding duplicates)
+        updates.disabledMcpjsonServers = [
+          ...new Set([
+            ...existingDisabledServers,
+            ...projectConfig.disabledMcpjsonServers,
+          ]),
+        ]
+      }
       fieldsToRemove.push('disabledMcpjsonServers')
     }
 
