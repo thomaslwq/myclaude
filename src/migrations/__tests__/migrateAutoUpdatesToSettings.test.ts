@@ -94,6 +94,33 @@ describe('migrateAutoUpdatesToSettings', () => {
     )
   })
 
+  it('should preserve other env vars when setting DISABLE_AUTOUPDATER', () => {
+    mockGetGlobalConfig.mockReturnValue({
+      autoUpdates: false,
+      autoUpdatesProtectedForNative: false,
+    })
+    mockGetSettingsForSource.mockReturnValue({
+      env: {
+        MY_CUSTOM_VAR: 'my-value',
+        OTHER_VAR: 'other-value',
+      },
+    })
+
+    migrateAutoUpdatesToSettings()
+
+    // Other env vars should be preserved alongside DISABLE_AUTOUPDATER
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      {
+        env: {
+          MY_CUSTOM_VAR: 'my-value',
+          OTHER_VAR: 'other-value',
+          DISABLE_AUTOUPDATER: '1',
+        },
+      },
+    )
+  })
+
   it('should not run if autoUpdates is not false', () => {
     mockGetGlobalConfig.mockReturnValue({
       autoUpdates: true,
