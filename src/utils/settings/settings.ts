@@ -410,8 +410,8 @@ export function getPolicySettingsOrigin():
  * Merges `settings` into the existing settings for `source` using lodash mergeWith.
  *
  * To delete a key from a record field (e.g. enabledPlugins, extraKnownMarketplaces),
- * set it to `undefined` — do NOT use `delete`. mergeWith only detects deletion when
- * the key is present with an explicit `undefined` value.
+ * set it to `undefined` — do NOT use `delete`. Keys with `undefined` values are
+ * removed from the existing settings before the merge.
  */
 export function updateSettingsForSource(
   source: EditableSettingSource,
@@ -470,20 +470,33 @@ export function updateSettingsForSource(
       }
     }
 
+    // Pre-process: lodash mergeWith skips undefined source values entirely,
+    // so the customizer's deletion logic never fires. Instead, we remove
+    // undefined-valued keys from the incoming settings, delete them from
+    // existingSettings, and pass a clean object to mergeWith.
+    const srcKeys = Object.keys(settings) as (keyof SettingsJson)[]
+    const nonUndefinedSettings: Record<string, unknown> = {}
+    for (const key of srcKeys) {
+      const value = settings[key]
+      if (value === undefined) {
+        // Delete the key from existingSettings so it's removed from the file
+        if (existingSettings) {
+          delete (existingSettings as Record<string, unknown>)[key as string]
+        }
+      } else {
+        nonUndefinedSettings[key as string] = value
+      }
+    }
+
     const updatedSettings = mergeWith(
       existingSettings || {},
-      settings,
+      nonUndefinedSettings,
       (
         _objValue: unknown,
         srcValue: unknown,
         key: string | number | symbol,
         object: Record<string | number | symbol, unknown>,
       ) => {
-        // Handle undefined as deletion
-        if (srcValue === undefined && object && typeof key === 'string') {
-          delete object[key]
-          return undefined
-        }
         // For arrays, always replace with the provided array
         // This puts the responsibility on the caller to compute the desired final state
         if (Array.isArray(srcValue)) {
