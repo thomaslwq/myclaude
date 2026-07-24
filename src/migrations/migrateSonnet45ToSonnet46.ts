@@ -36,18 +36,20 @@ export function migrateSonnet45ToSonnet46(): void {
   }
 
   const model = getSettingsForSource('userSettings')?.model
-  if (
-    model !== 'claude-sonnet-4-5-20250929' &&
-    model !== 'claude-sonnet-4-5-20250929[1m]' &&
-    model !== 'sonnet-4-5-20250929' &&
-    model !== 'sonnet-4-5-20250929[1m]'
-  ) {
+  if (typeof model !== 'string') {
     return
   }
 
-  const has1m = model.endsWith('[1m]')
+  // Match base model strings: claude-sonnet-4-5-20250929 or sonnet-4-5-20250929
+  // Optionally followed by a context window suffix like [1m], [100k], [200k], etc.
+  const match = model.match(/^(?:claude-)?(sonnet-4-5-20250929)(?:\[(.+?)\])?$/)
+  if (!match) {
+    return
+  }
+
+  const suffix = match[2] ? `[${match[2]}]` : ''
   updateSettingsForSource('userSettings', {
-    model: has1m ? 'sonnet[1m]' : 'sonnet',
+    model: suffix ? `sonnet${suffix}` : 'sonnet',
   })
 
   // Skip notification for brand-new users — they never experienced the old default
@@ -62,6 +64,6 @@ export function migrateSonnet45ToSonnet46(): void {
   logEvent('tengu_sonnet45_to_46_migration', {
     from_model:
       model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    has_1m: has1m,
+    has_1m: suffix === '[1m]',
   })
 }
