@@ -12,10 +12,12 @@ import {
  * - fennec-fast-latest → opus[1m] + fast mode
  * - opus-4-5-fast → opus + fast mode
  *
- * Only touches userSettings. Reading and writing the same source keeps this
- * idempotent without a completion flag. Fennec aliases in project/local/policy
- * settings are left alone — we can't rewrite those, and reading merged
- * settings here would cause infinite re-runs + silent global promotion.
+ * Reads each editable source individually (userSettings, projectSettings,
+ * localSettings) so that fennec aliases are migrated wherever they appear.
+ * Policy and flag settings are left alone — those are not user-writable or
+ * are ephemeral.
+ *
+ * Idempotent: only writes when a source contains a fennec alias.
  */
 export function migrateFennecToOpus(): void {
   try {
@@ -23,23 +25,33 @@ export function migrateFennecToOpus(): void {
       return
     }
 
-    const settings = getSettingsForSource('userSettings')
+    // Sources to check — in order of increasing precedence.
+    // PolicySettings and flagSettings are excluded:
+    // - policySettings is not user-writable and shouldn't be rewritten
+    // - flagSettings is ephemeral (CLI --settings) and not stored back
+    const sources = ['userSettings', 'projectSettings', 'localSettings'] as const
 
-    const model = settings?.model
-    if (typeof model === 'string') {
+    for (const source of sources) {
+      const settings = getSettingsForSource(source)
+
+      const model = settings?.model
+      if (typeof model !== 'string') {
+        continue
+      }
+
       if (model.startsWith('fennec-latest[1m]')) {
-        updateSettingsForSource('userSettings', {
+        updateSettingsForSource(source, {
           model: 'opus[1m]',
         })
       } else if (model.startsWith('fennec-latest')) {
-        updateSettingsForSource('userSettings', {
+        updateSettingsForSource(source, {
           model: 'opus',
         })
       } else if (
         model.startsWith('fennec-fast-latest') ||
         model.startsWith('opus-4-5-fast')
       ) {
-        updateSettingsForSource('userSettings', {
+        updateSettingsForSource(source, {
           model: 'opus[1m]',
           fastMode: true,
         })

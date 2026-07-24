@@ -91,6 +91,100 @@ describe('migrateFennecToOpus', () => {
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
+  it('should migrate fennec-latest in projectSettings', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    // Return different models for different sources
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return { model: 'opus' }
+      if (source === 'projectSettings') return { model: 'fennec-latest' }
+      if (source === 'localSettings') return null
+      return null
+    })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'projectSettings',
+      { model: 'opus' },
+    )
+  })
+
+  it('should migrate fennec-latest[1m] in localSettings', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return { model: 'opus' }
+      if (source === 'projectSettings') return null
+      if (source === 'localSettings') return { model: 'fennec-latest[1m]' }
+      return null
+    })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'localSettings',
+      { model: 'opus[1m]' },
+    )
+  })
+
+  it('should migrate fennec-fast-latest in projectSettings with fastMode', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return { model: 'opus' }
+      if (source === 'projectSettings') return { model: 'fennec-fast-latest' }
+      if (source === 'localSettings') return null
+      return null
+    })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'projectSettings',
+      { model: 'opus[1m]', fastMode: true },
+    )
+  })
+
+  it('should migrate both projectSettings and localSettings when both have fennec aliases', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return { model: 'opus' }
+      if (source === 'projectSettings') return { model: 'fennec-latest' }
+      if (source === 'localSettings') return { model: 'fennec-latest[1m]' }
+      return null
+    })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'projectSettings',
+      { model: 'opus' },
+    )
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'localSettings',
+      { model: 'opus[1m]' },
+    )
+  })
+
+  it('should not touch policySettings or flagSettings', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return { model: 'opus' }
+      if (source === 'projectSettings') return null
+      if (source === 'localSettings') return null
+      if (source === 'policySettings') return { model: 'fennec-latest' }
+      if (source === 'flagSettings') return { model: 'fennec-latest' }
+      return null
+    })
+
+    migrateFennecToOpus()
+
+    // updateSettingsForSource should only be called for userSettings (no fennec),
+    // projectSettings, and localSettings — NOT policySettings or flagSettings
+    const policyOrFlag = mockUpdateSettingsForSource.mock.calls.filter(
+      ([source]: [string]) => source === 'policySettings' || source === 'flagSettings',
+    )
+    expect(policyOrFlag).toHaveLength(0)
+  })
+
   it('should not update if model does not start with fennec', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'gpt-4' })
