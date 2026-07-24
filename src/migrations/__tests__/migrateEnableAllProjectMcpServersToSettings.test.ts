@@ -56,10 +56,8 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Run migration
     migrateEnableAllProjectMcpServersToSettings()
 
-    // Verify that only enableAllProjectMcpServers was removed
+    // Verify that only enableAllProjectMcpServers was removed, and empty arrays are also cleaned up
     expect(projectConfigStore).toEqual({
-      enabledMcpjsonServers: [],
-      disabledMcpjsonServers: [],
       otherField: 'keep-me',
     })
   })
@@ -79,9 +77,8 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Run migration
     migrateEnableAllProjectMcpServersToSettings()
 
-    // Verify that only enableAllProjectMcpServers and enabledMcpjsonServers were removed
+    // Verify that only enableAllProjectMcpServers and enabledMcpjsonServers were removed, and empty arrays are also cleaned up
     expect(projectConfigStore).toEqual({
-      disabledMcpjsonServers: [],
       otherField: 'keep-me',
     })
   })

@@ -1,7 +1,3 @@
-// Feature flag polyfill - all features default to false
-// This is a fallback for when running outside of Bun's compile-time macro system
-const feature = (name: string): boolean => false;
-
 import { logEvent } from '../services/analytics/index.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { logError } from '../utils/log.js'
@@ -24,31 +20,33 @@ import {
  * migration would defeat itself. In practice the ~40 target ants are all
  * 'enabled' (they reached the old dialog via bare Shift+Tab, which requires
  * 'enabled'), but the guard makes it safe regardless.
+ *
+ * The migration body always executes when called — the feature flag was removed
+ * because it was a hardcoded `false` fallback that made the migration dead code
+ * outside of Bun's compile-time macro system.
  */
 export function resetAutoModeOptInForDefaultOffer(): void {
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
-    const config = getGlobalConfig()
-    if (config.hasResetAutoModeOptInForDefaultOffer) return
-    if (getAutoModeEnabledState() !== 'enabled') return
+  const config = getGlobalConfig()
+  if (config.hasResetAutoModeOptInForDefaultOffer) return
+  if (getAutoModeEnabledState() !== 'enabled') return
 
-    try {
-      const user = getSettingsForSource('userSettings')
-      if (
-        user?.skipAutoPermissionPrompt &&
-        user?.permissions?.defaultMode !== 'auto'
-      ) {
-        updateSettingsForSource('userSettings', {
-          skipAutoPermissionPrompt: undefined,
-        })
-        logEvent('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
-      }
-
-      saveGlobalConfig(c => {
-        if (c.hasResetAutoModeOptInForDefaultOffer) return c
-        return { ...c, hasResetAutoModeOptInForDefaultOffer: true }
+  try {
+    const user = getSettingsForSource('userSettings')
+    if (
+      user?.skipAutoPermissionPrompt &&
+      user?.permissions?.defaultMode !== 'auto'
+    ) {
+      updateSettingsForSource('userSettings', {
+        skipAutoPermissionPrompt: undefined,
       })
-    } catch (error) {
-      logError(new Error(`Failed to reset auto mode opt-in: ${error}`))
+      logEvent('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
     }
+
+    saveGlobalConfig(c => {
+      if (c.hasResetAutoModeOptInForDefaultOffer) return c
+      return { ...c, hasResetAutoModeOptInForDefaultOffer: true }
+    })
+  } catch (error) {
+    logError(new Error(`Failed to reset auto mode opt-in: ${error}`))
   }
 }
