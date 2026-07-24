@@ -43,16 +43,11 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       | 'disabledMcpjsonServers'
     > = []
 
-    // Migrate enableAllProjectMcpServers if it exists and hasn't been migrated
-    if (
-      hasEnableAll &&
-      existingSettings.enableAllProjectMcpServers === undefined
-    ) {
+    // Migrate enableAllProjectMcpServers if it exists
+    // Always migrate the project config value to settings, preferring the project-level value
+    if (hasEnableAll) {
       updates.enableAllProjectMcpServers =
         projectConfig.enableAllProjectMcpServers
-      fieldsToRemove.push('enableAllProjectMcpServers')
-    } else if (hasEnableAll) {
-      // Already migrated, just mark for removal
       fieldsToRemove.push('enableAllProjectMcpServers')
     }
 
