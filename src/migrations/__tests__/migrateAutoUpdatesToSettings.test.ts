@@ -70,6 +70,30 @@ describe('migrateAutoUpdatesToSettings', () => {
     )
   })
 
+  it('should respect existing DISABLE_AUTOUPDATER value in user settings', () => {
+    mockGetGlobalConfig.mockReturnValue({
+      autoUpdates: false,
+      autoUpdatesProtectedForNative: false,
+    })
+    mockGetSettingsForSource.mockReturnValue({
+      env: {
+        DISABLE_AUTOUPDATER: '0', // User explicitly wants to enable auto-updates
+      },
+    })
+
+    migrateAutoUpdatesToSettings()
+
+    // Should NOT overwrite the user's existing value
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      expect.objectContaining({
+        env: {
+          DISABLE_AUTOUPDATER: '0', // User's value should be preserved
+        },
+      }),
+    )
+  })
+
   it('should not run if autoUpdates is not false', () => {
     mockGetGlobalConfig.mockReturnValue({
       autoUpdates: true,

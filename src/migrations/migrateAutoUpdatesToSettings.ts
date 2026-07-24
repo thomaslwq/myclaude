@@ -25,12 +25,12 @@ export function migrateAutoUpdatesToSettings(): void {
   try {
     const userSettings = getSettingsForSource('userSettings') || {}
 
-    // Always set DISABLE_AUTOUPDATER to preserve user intent
-    // We need to overwrite even if it exists, to ensure the migration is complete
+    // Only set DISABLE_AUTOUPDATER if user hasn't already set it explicitly
+    // This respects existing user preference while still migrating the disabled state
     updateSettingsForSource('userSettings', {
       env: {
         ...userSettings.env,
-        DISABLE_AUTOUPDATER: '1',
+        DISABLE_AUTOUPDATER: userSettings.env?.DISABLE_AUTOUPDATER ?? '1',
       },
     })
 
