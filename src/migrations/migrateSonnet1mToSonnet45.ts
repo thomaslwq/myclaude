@@ -1,3 +1,4 @@
+import { logError } from '../utils/log.js'
 import {
   getMainLoopModelOverride,
   setMainLoopModelOverride,
@@ -28,21 +29,25 @@ export function migrateSonnet1mToSonnet45(): void {
     return
   }
 
-  const model = getSettingsForSource('userSettings')?.model
-  if (model === 'sonnet[1m]') {
-    updateSettingsForSource('userSettings', {
-      model: 'sonnet-4-5-20250929[1m]',
-    })
-  }
+  try {
+    const model = getSettingsForSource('userSettings')?.model
+    if (model === 'sonnet[1m]') {
+      updateSettingsForSource('userSettings', {
+        model: 'sonnet-4-5-20250929[1m]',
+      })
+    }
 
-  // Also migrate the in-memory override if already set
-  const override = getMainLoopModelOverride()
-  if (override === 'sonnet[1m]') {
-    setMainLoopModelOverride('sonnet-4-5-20250929[1m]')
-  }
+    // Also migrate the in-memory override if already set
+    const override = getMainLoopModelOverride()
+    if (override === 'sonnet[1m]') {
+      setMainLoopModelOverride('sonnet-4-5-20250929[1m]')
+    }
 
-  saveGlobalConfig(current => ({
-    ...current,
-    sonnet1m45MigrationComplete: true,
-  }))
+    saveGlobalConfig(current => ({
+      ...current,
+      sonnet1m45MigrationComplete: true,
+    }))
+  } catch (error) {
+    logError(new Error(`Failed to migrate sonnet[1m] to sonnet-4-5-20250929[1m]: ${error}`))
+  }
 }
