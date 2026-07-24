@@ -1,4 +1,5 @@
 import { logError } from '../utils/log.js'
+import { getAPIProvider } from '../utils/model/providers.js'
 import {
   getSettingsForSource,
   updateSettingsForSource,
@@ -18,7 +19,7 @@ import {
  */
 export function migrateFennecToOpus(): void {
   try {
-    if (process.env.USER_TYPE !== 'ant') {
+    if (getAPIProvider() !== 'firstParty') {
       return
     }
 
