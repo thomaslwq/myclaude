@@ -68,10 +68,10 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Dynamic import after mocks are set up
     const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 
-    // Mock project config with only enableAllProjectMcpServers
+    // Mock project config with enableAllProjectMcpServers and enabledMcpjsonServers
     projectConfigStore = {
       enableAllProjectMcpServers: true,
-      enabledMcpjsonServers: [],
+      enabledMcpjsonServers: ['server1', 'server2'],
       disabledMcpjsonServers: [],
       otherField: 'keep-me',
     }
@@ -79,9 +79,8 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Run migration
     migrateEnableAllProjectMcpServersToSettings()
 
-    // Verify that only enableAllProjectMcpServers was removed
+    // Verify that only enableAllProjectMcpServers and enabledMcpjsonServers were removed
     expect(projectConfigStore).toEqual({
-      enabledMcpjsonServers: [],
       disabledMcpjsonServers: [],
       otherField: 'keep-me',
     })
