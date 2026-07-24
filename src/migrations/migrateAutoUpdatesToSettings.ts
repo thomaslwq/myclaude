@@ -28,7 +28,6 @@ export function migrateAutoUpdatesToSettings(): void {
     // Always set DISABLE_AUTOUPDATER to preserve user intent
     // We need to overwrite even if it exists, to ensure the migration is complete
     updateSettingsForSource('userSettings', {
-      ...userSettings,
       env: {
         ...userSettings.env,
         DISABLE_AUTOUPDATER: '1',
