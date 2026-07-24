@@ -95,7 +95,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       otherField: 'keep-me',
     }
 
-    // Mock settings with enableAllProjectMcpServers set to false (different value)
+    // Mock settings with enableAllProjectMcpServers set to false
     settingsStore = {
       localSettings: {
         enableAllProjectMcpServers: false,
@@ -227,5 +227,72 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     expect(projectConfigStore.enableAllProjectMcpServers).toBeUndefined()
     expect(projectConfigStore.enabledMcpjsonServers).toBeUndefined()
     expect(projectConfigStore.disabledMcpjsonServers).toBeUndefined()
+  })
+
+  // ── Red: Test that a server in both enabled and disabled lists is resolved ──
+  test('should remove a server from disabled list if it is also in enabled list (mutual exclusivity)', async () => {
+    // Dynamic import after mocks are set up
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock project config with a server in BOTH enabled and disabled lists
+    projectConfigStore = {
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1', 'server2'],
+      disabledMcpjsonServers: ['server2', 'server3'],
+      otherField: 'keep-me',
+    }
+
+    // Run migration
+    migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify that server2 appears only in enabled list, not in disabled list
+    expect(settingsStore.localSettings.enabledMcpjsonServers).toContain('server1')
+    expect(settingsStore.localSettings.enabledMcpjsonServers).toContain('server2')
+    expect(settingsStore.localSettings.disabledMcpjsonServers).not.toContain('server2')
+    expect(settingsStore.localSettings.disabledMcpjsonServers).toContain('server3')
+    // Verify that server2 is not in both lists
+    for (const server of (settingsStore.localSettings.enabledMcpjsonServers || [])) {
+      expect(settingsStore.localSettings.disabledMcpjsonServers).not.toContain(server)
+    }
+  })
+
+  test('should handle overlap between existing settings and project config enabled/disabled lists', async () => {
+    // Dynamic import after mocks are set up
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock project config
+    projectConfigStore = {
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['serverA', 'serverB'],
+      disabledMcpjsonServers: ['serverB', 'serverC'],
+      otherField: 'keep-me',
+    }
+
+    // Mock existing settings with overlapping servers
+    settingsStore = {
+      localSettings: {
+        enabledMcpjsonServers: ['serverB', 'serverD'],
+        disabledMcpjsonServers: ['serverA', 'serverE'],
+      },
+    }
+
+    // Run migration
+    migrateEnableAllProjectMcpServersToSettings()
+
+    // After migration, no server should appear in both enabled and disabled lists
+    const enabled = settingsStore.localSettings.enabledMcpjsonServers || []
+    const disabled = settingsStore.localSettings.disabledMcpjsonServers || []
+    for (const server of enabled) {
+      expect(disabled).not.toContain(server)
+    }
+    for (const server of disabled) {
+      expect(enabled).not.toContain(server)
+    }
+    // All servers should be accounted for somewhere (enabled wins over disabled)
+    expect(enabled).toContain('serverA')
+    expect(enabled).toContain('serverB')
+    expect(enabled).toContain('serverD')
+    expect(disabled).toContain('serverC')
+    expect(disabled).toContain('serverE')
   })
 })

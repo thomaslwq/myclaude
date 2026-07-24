@@ -75,6 +75,15 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       fieldsToRemove.push('disabledMcpjsonServers')
     }
 
+    // Ensure mutual exclusivity: if a server is in both enabled and disabled lists,
+    // remove it from the disabled list (enabled takes precedence)
+    if (updates.enabledMcpjsonServers && updates.disabledMcpjsonServers) {
+      const enabledSet = new Set(updates.enabledMcpjsonServers)
+      updates.disabledMcpjsonServers = updates.disabledMcpjsonServers.filter(
+        server => !enabledSet.has(server)
+      )
+    }
+
     // Update settings if there are any updates
     if (Object.keys(updates).length > 0) {
       updateSettingsForSource('localSettings', updates)
