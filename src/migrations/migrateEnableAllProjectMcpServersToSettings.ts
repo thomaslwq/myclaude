@@ -84,12 +84,9 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       )
     }
 
-    // Update settings if there are any updates
-    if (Object.keys(updates).length > 0) {
-      updateSettingsForSource('localSettings', updates)
-    }
-
-    // Remove migrated fields from project config
+    // Remove migrated fields from project config FIRST to ensure atomicity
+    // If a crash occurs after this but before settings update, the system
+    // will be left in a safe state (project config has old data, settings don't have migrated data yet)
     if (fieldsToRemove.length > 0) {
       saveCurrentProjectConfig(current => {
         const updated = { ...current }
@@ -98,6 +95,11 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
         }
         return updated
       })
+    }
+
+    // Update settings if there are any updates
+    if (Object.keys(updates).length > 0) {
+      updateSettingsForSource('localSettings', updates)
     }
 
     logEvent('migration_complete', {
