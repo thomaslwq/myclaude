@@ -2,7 +2,7 @@ import { logEvent } from '../services/analytics/index.js'
 import { isProSubscriber } from '../utils/auth.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { getAPIProvider } from '../utils/model/providers.js'
-import { getSettings_DEPRECATED } from '../utils/settings/settings.js'
+import { getSettingsForSource } from '../utils/settings/settings.js'
 
 export function resetProToOpusDefault(): void {
   const config = getGlobalConfig()
@@ -23,10 +23,10 @@ export function resetProToOpusDefault(): void {
     return
   }
 
-  const settings = getSettings_DEPRECATED()
+  const userSettings = getSettingsForSource('userSettings')
 
-  // Only show notification if user was on default (no custom model setting)
-  if (settings?.model === undefined) {
+  // Only show notification if user was on default (no custom model setting in userSettings)
+  if (userSettings?.model === undefined) {
     const opusProMigrationTimestamp = Date.now()
     saveGlobalConfig(current => ({
       ...current,
