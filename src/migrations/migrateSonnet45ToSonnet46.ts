@@ -2,7 +2,7 @@ import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
 } from '../services/analytics/index.js'
-import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
+import { saveGlobalConfig } from '../utils/config.js'
 import { getAPIProvider } from '../utils/model/providers.js'
 import {
   getSettingsForSource,
@@ -43,14 +43,13 @@ export function migrateSonnet45ToSonnet46(): void {
     model: suffix ? `sonnet${suffix}` : 'sonnet',
   })
 
-  // Skip notification for brand-new users — they never experienced the old default
-  const config = getGlobalConfig()
-  if (config.numStartups > 1) {
-    saveGlobalConfig(current => ({
-      ...current,
-      sonnet45To46MigrationTimestamp: Date.now(),
-    }))
-  }
+  // Record the migration timestamp so the notification hook can show a one-time notice.
+  // This is always saved when the migration actually changes the model. Brand-new users
+  // won't have Sonnet 4.5 in their userSettings, so the migration will return early above.
+  saveGlobalConfig(current => ({
+    ...current,
+    sonnet45To46MigrationTimestamp: Date.now(),
+  }))
 
   logEvent('tengu_sonnet45_to_46_migration', {
     from_model:
