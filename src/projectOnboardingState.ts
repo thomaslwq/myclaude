@@ -15,13 +15,28 @@ export type Step = {
   isEnabled: boolean
 }
 
+// Cache the filesystem-heavy checks so they aren't recomputed on every prompt submit.
+// The workspace state (directory emptiness, CLAUDE.md existence) is stable within a
+// session — the cwd doesn't change and CLAUDE.md isn't created/deleted mid-session by
+// the user. The cache is cleared when the user explicitly runs /init.
+let cachedSteps: Step[] | null = null
+
+/** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
+export function clearCachedSteps(): void {
+  cachedSteps = null
+}
+
 export function getSteps(): Step[] {
+  if (cachedSteps) {
+    return cachedSteps
+  }
+
   const hasClaudeMd = getFsImplementation().existsSync(
     join(getCwd(), 'CLAUDE.md'),
   )
   const isWorkspaceDirEmpty = isDirEmpty(getCwd())
 
-  return [
+  cachedSteps = [
     {
       key: 'workspace',
       text: 'Ask Claude to create a new app or clone a repository',
@@ -37,6 +52,8 @@ export function getSteps(): Step[] {
       isEnabled: !isWorkspaceDirEmpty,
     },
   ]
+
+  return cachedSteps
 }
 
 export function isProjectOnboardingComplete(): boolean {

@@ -1,6 +1,9 @@
 import { feature } from 'bun:bundle'
 import type { Command } from '../commands.js'
-import { maybeMarkProjectOnboardingComplete } from '../projectOnboardingState.js'
+import {
+  maybeMarkProjectOnboardingComplete,
+  clearCachedSteps,
+} from '../projectOnboardingState.js'
 import { isEnvTruthy } from '../utils/envUtils.js'
 
 const OLD_INIT_PROMPT = `Please analyze this codebase and create a CLAUDE.md file, which will be given to future instances of Claude Code to operate in this repository.
@@ -237,6 +240,7 @@ const command = {
   progressMessage: 'analyzing your codebase',
   source: 'builtin',
   async getPromptForCommand() {
+    clearCachedSteps()
     maybeMarkProjectOnboardingComplete()
 
     return [
