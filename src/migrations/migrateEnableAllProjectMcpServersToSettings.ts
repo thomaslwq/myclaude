@@ -102,10 +102,14 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
     // Only set updates if there are actual changes from existing settings
     // This prevents overwriting other fields in the settings file
-    if (hasEnabledServers || existingEnabledServers.length > 0) {
+    // Also check if existing settings had the field to handle cases where mutual exclusivity
+    // filtering removes all entries (e.g., all disabled servers are also in enabled list)
+    const existingHadEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
+    const existingHadDisabledServers = Array.isArray(existingSettings.disabledMcpjsonServers)
+    if (hasEnabledServers || existingEnabledServers.length > 0 || existingHadEnabledServers) {
       updates.enabledMcpjsonServers = existingEnabledServers
     }
-    if (hasDisabledServers || filteredDisabledServers.length > 0) {
+    if (hasDisabledServers || filteredDisabledServers.length > 0 || existingHadDisabledServers) {
       updates.disabledMcpjsonServers = filteredDisabledServers
     }
 
