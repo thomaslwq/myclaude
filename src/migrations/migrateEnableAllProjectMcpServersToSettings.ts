@@ -132,7 +132,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       })
     }
 
-    logEvent('migration_complete', {
+    logEvent('tengu_migrate_enable_all_project_mcp_servers_to_settings', {
       migration: 'enableAllProjectMcpServersToSettings',
       fieldsMigrated: fieldsToRemove.join(','),
     })
