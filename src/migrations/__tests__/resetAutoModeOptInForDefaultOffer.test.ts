@@ -90,6 +90,19 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
+  it('should not clear skipAutoPermissionPrompt when permissions is undefined', () => {
+    mockGetSettingsForSource.mockReturnValue({
+      skipAutoPermissionPrompt: true,
+      // permissions is undefined
+    })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+    expect(mockLogEvent).not.toHaveBeenCalled()
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+  })
+
   it('should not clear skipAutoPermissionPrompt when skipAutoPermissionPrompt is not set', () => {
     mockGetSettingsForSource.mockReturnValue({
       permissions: { defaultMode: 'ask' },

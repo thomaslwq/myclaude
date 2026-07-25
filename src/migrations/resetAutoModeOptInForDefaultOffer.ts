@@ -34,6 +34,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
     const user = getSettingsForSource('userSettings')
     if (
       user?.skipAutoPermissionPrompt &&
+      user?.permissions &&
       user?.permissions?.defaultMode !== 'auto'
     ) {
       updateSettingsForSource('userSettings', {

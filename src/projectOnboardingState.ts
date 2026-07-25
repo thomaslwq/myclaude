@@ -1,4 +1,3 @@
-import memoize from 'lodash-es/memoize.js'
 import { join } from 'path'
 import {
   getCurrentProjectConfig,
@@ -60,7 +59,7 @@ export function maybeMarkProjectOnboardingComplete(): void {
   }
 }
 
-export const shouldShowProjectOnboarding = memoize((): boolean => {
+export function shouldShowProjectOnboarding(): boolean {
   const projectConfig = getCurrentProjectConfig()
   // Short-circuit on cached config before isProjectOnboardingComplete()
   // hits the filesystem — this runs during first render.
@@ -73,7 +72,7 @@ export const shouldShowProjectOnboarding = memoize((): boolean => {
   }
 
   return !isProjectOnboardingComplete()
-})
+}
 
 export function incrementProjectOnboardingSeenCount(): void {
   saveCurrentProjectConfig(current => ({
