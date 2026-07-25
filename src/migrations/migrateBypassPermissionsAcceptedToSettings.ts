@@ -2,6 +2,7 @@ import { logEvent } from '../services/analytics/index.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { logError } from '../utils/log.js'
 import {
+  getSettingsForSource,
   hasSkipDangerousModePermissionPrompt,
   updateSettingsForSource,
 } from '../utils/settings/settings.js'
@@ -20,9 +21,18 @@ export function migrateBypassPermissionsAcceptedToSettings(): void {
 
   try {
     if (!hasSkipDangerousModePermissionPrompt()) {
-      updateSettingsForSource('userSettings', {
-        skipDangerousModePermissionPrompt: true,
-      })
+      // Only migrate if the user has not explicitly opted out (set to false)
+      const userExplicitlyOptedOut =
+        getSettingsForSource('userSettings')?.skipDangerousModePermissionPrompt === false ||
+        getSettingsForSource('localSettings')?.skipDangerousModePermissionPrompt === false ||
+        getSettingsForSource('flagSettings')?.skipDangerousModePermissionPrompt === false ||
+        getSettingsForSource('policySettings')?.skipDangerousModePermissionPrompt === false
+
+      if (!userExplicitlyOptedOut) {
+        updateSettingsForSource('userSettings', {
+          skipDangerousModePermissionPrompt: true,
+        })
+      }
     }
 
     logEvent('tengu_migrate_bypass_permissions_accepted', {})
