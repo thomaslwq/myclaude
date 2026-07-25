@@ -13,6 +13,13 @@ import {
  * Migration: Move MCP server approval fields from project config to local settings
  * This migrates both enableAllProjectMcpServers and enabledMcpjsonServers to the
  * settings system for better management and consistency.
+ *
+ * Merge behavior:
+ * - Existing settings arrays are preserved in order with new servers appended
+ * - Duplicates are removed (first occurrence wins, preserving original order)
+ * - Mutual exclusivity is enforced: a server in enabledMcpjsonServers is always
+ *   removed from disabledMcpjsonServers, even if the conflict existed before migration
+ * - Other settings fields are never overwritten
  */
 export function migrateEnableAllProjectMcpServersToSettings(): void {
   const projectConfig = getCurrentProjectConfig()
@@ -47,47 +54,59 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       fieldsToRemove.push('enableAllProjectMcpServers')
     }
 
-    // Migrate enabledMcpjsonServers if it exists
+    // Start with existing settings arrays as the base
+    const existingEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
+      ? [...existingSettings.enabledMcpjsonServers]
+      : []
+    const existingDisabledServers = Array.isArray(existingSettings.disabledMcpjsonServers)
+      ? [...existingSettings.disabledMcpjsonServers]
+      : []
+
+    // Merge enabledMcpjsonServers if it exists in project config
     if (hasEnabledServers) {
-      // Only merge into settings if the project config has actual servers to add
-      if (projectConfig.enabledMcpjsonServers && projectConfig.enabledMcpjsonServers.length > 0) {
-        const existingEnabledServers =
-          existingSettings.enabledMcpjsonServers || []
-        // Merge the servers (avoiding duplicates)
-        updates.enabledMcpjsonServers = [
-          ...new Set([
-            ...existingEnabledServers,
-            ...projectConfig.enabledMcpjsonServers,
-          ]),
-        ]
+      if (Array.isArray(projectConfig.enabledMcpjsonServers) && projectConfig.enabledMcpjsonServers.length > 0) {
+        // Merge the servers, preserving order and avoiding duplicates
+        // First occurrence wins: existing items keep their position, new items are appended
+        const seen = new Set(existingEnabledServers)
+        for (const server of projectConfig.enabledMcpjsonServers) {
+          if (!seen.has(server)) {
+            existingEnabledServers.push(server)
+            seen.add(server)
+          }
+        }
       }
       fieldsToRemove.push('enabledMcpjsonServers')
     }
 
-    // Migrate disabledMcpjsonServers if it exists
+    // Merge disabledMcpjsonServers if it exists in project config
     if (hasDisabledServers) {
-      // Only merge into settings if the project config has actual servers to add
-      if (projectConfig.disabledMcpjsonServers && projectConfig.disabledMcpjsonServers.length > 0) {
-        const existingDisabledServers =
-          existingSettings.disabledMcpjsonServers || []
-        // Merge the servers (avoiding duplicates)
-        updates.disabledMcpjsonServers = [
-          ...new Set([
-            ...existingDisabledServers,
-            ...projectConfig.disabledMcpjsonServers,
-          ]),
-        ]
+      if (Array.isArray(projectConfig.disabledMcpjsonServers) && projectConfig.disabledMcpjsonServers.length > 0) {
+        // Merge the servers, preserving order and avoiding duplicates
+        const seen = new Set(existingDisabledServers)
+        for (const server of projectConfig.disabledMcpjsonServers) {
+          if (!seen.has(server)) {
+            existingDisabledServers.push(server)
+            seen.add(server)
+          }
+        }
       }
       fieldsToRemove.push('disabledMcpjsonServers')
     }
 
     // Ensure mutual exclusivity: if a server is in both enabled and disabled lists,
-    // remove it from the disabled list (enabled takes precedence)
-    if (updates.enabledMcpjsonServers && updates.disabledMcpjsonServers) {
-      const enabledSet = new Set(updates.enabledMcpjsonServers)
-      updates.disabledMcpjsonServers = updates.disabledMcpjsonServers.filter(
-        server => !enabledSet.has(server)
-      )
+    // the enabled list takes precedence. This applies to both existing and incoming data.
+    const enabledSet = new Set(existingEnabledServers)
+    const filteredDisabledServers = existingDisabledServers.filter(
+      server => !enabledSet.has(server)
+    )
+
+    // Only set updates if there are actual changes from existing settings
+    // This prevents overwriting other fields in the settings file
+    if (hasEnabledServers || existingEnabledServers.length > 0) {
+      updates.enabledMcpjsonServers = existingEnabledServers
+    }
+    if (hasDisabledServers || filteredDisabledServers.length > 0) {
+      updates.disabledMcpjsonServers = filteredDisabledServers
     }
 
     // Update settings FIRST to ensure data is safely stored before removing from project config
