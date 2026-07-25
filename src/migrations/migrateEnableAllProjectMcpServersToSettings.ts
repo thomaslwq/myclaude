@@ -100,6 +100,18 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       server => !enabledSet.has(server)
     )
 
+    // Log when mutual exclusivity enforcement silently removes servers from the disabled list
+    // to avoid silently overwriting user configuration that was deliberately set
+    const removedServers = existingDisabledServers.filter(server =>
+      enabledSet.has(server)
+    )
+    if (removedServers.length > 0) {
+      logEvent('tengu_migrate_mcp_server_mutual_exclusivity', {
+        migration: 'enableAllProjectMcpServersToSettings',
+        removedServers: removedServers.join(','),
+      })
+    }
+
     // Only set updates if there are actual changes from existing settings
     // This prevents overwriting other fields in the settings file
     // Also check if existing settings had the field to handle cases where mutual exclusivity

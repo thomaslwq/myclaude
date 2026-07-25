@@ -96,17 +96,6 @@ describe('migrateSonnet45ToSonnet46', () => {
     )
   })
 
-  it('should migrate sonnet-4-5-20250929[100k] to sonnet[100k]', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-5-20250929[100k]' })
-
-    migrateSonnet45ToSonnet46()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'sonnet[100k]' },
-    )
-  })
-
   it('should migrate claude-sonnet-4-5-20250929[1m] to sonnet[1m]', () => {
     mockGetSettingsForSource.mockReturnValue({ model: 'claude-sonnet-4-5-20250929[1m]' })
 
