@@ -58,9 +58,21 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate fennec-fast-latest to opus[1m] with fastMode', () => {
+  it('should migrate fennec-fast-latest to opus with fastMode (no suffix)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus', fastMode: true },
+    )
+  })
+
+  it('should migrate fennec-fast-latest[1m] to opus[1m] with fastMode', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1m]' })
 
     migrateFennecToOpus()
 
@@ -70,9 +82,33 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate opus-4-5-fast to opus[1m] with fastMode', () => {
+  it('should migrate fennec-fast-latest[OTHER] preserving suffix', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[2m]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[2m]', fastMode: true },
+    )
+  })
+
+  it('should migrate opus-4-5-fast to opus with fastMode (no suffix)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus', fastMode: true },
+    )
+  })
+
+  it('should migrate opus-4-5-fast[1m] to opus[1m] with fastMode', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[1m]' })
 
     migrateFennecToOpus()
 
@@ -139,7 +175,7 @@ describe('migrateFennecToOpus', () => {
 
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'projectSettings',
-      { model: 'opus[1m]', fastMode: true },
+      { model: 'opus', fastMode: true },
     )
   })
 

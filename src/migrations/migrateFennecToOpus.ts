@@ -9,8 +9,8 @@ import {
  * Migrate users on removed fennec model aliases to their new Opus 4.6 aliases.
  * - fennec-latest → opus
  * - fennec-latest[1m] → opus[1m]
- * - fennec-fast-latest → opus[1m] + fast mode
- * - opus-4-5-fast → opus + fast mode
+ * - fennec-fast-latest → opus + fast mode (suffix preserved if present)
+ * - opus-4-5-fast → opus + fast mode (suffix preserved if present)
  *
  * Reads each editable source individually (userSettings, projectSettings,
  * localSettings) so that fennec aliases are migrated wherever they appear.
@@ -51,8 +51,10 @@ export function migrateFennecToOpus(): void {
         model.startsWith('fennec-fast-latest') ||
         model.startsWith('opus-4-5-fast')
       ) {
+        // Preserve any suffix (e.g., [1m], [2m]) from the original model name
+        const suffix = model.includes('[') ? model.substring(model.indexOf('[')) : ''
         updateSettingsForSource(source, {
-          model: 'opus[1m]',
+          model: `opus${suffix}`,
           fastMode: true,
         })
       }
