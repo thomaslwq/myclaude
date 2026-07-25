@@ -230,6 +230,54 @@ describe('migrateFennecToOpus', () => {
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
+  it('should preserve fastMode: false when migrating fennec-fast-latest', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest', fastMode: false })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus', fastMode: false },
+    )
+  })
+
+  it('should preserve fastMode: false when migrating fennec-fast-latest[1m]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1m]', fastMode: false })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1m]', fastMode: false },
+    )
+  })
+
+  it('should preserve fastMode: false when migrating opus-4-5-fast', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast', fastMode: false })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus', fastMode: false },
+    )
+  })
+
+  it('should preserve fastMode: false when migrating opus-4-5-fast[1m]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[1m]', fastMode: false })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1m]', fastMode: false },
+    )
+  })
+
   it('should handle errors gracefully when getSettingsForSource throws', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockImplementation(() => {
