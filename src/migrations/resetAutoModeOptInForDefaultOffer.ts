@@ -4,8 +4,12 @@ import { logError } from '../utils/log.js'
 import { getAutoModeEnabledState } from '../utils/permissions/permissionSetup.js'
 import {
   getSettingsForSource,
+  getInitialSettings,
   updateSettingsForSource,
 } from '../utils/settings/settings.js'
+import {
+  type EditableSettingSource,
+} from '../utils/settings/constants.js'
 
 /**
  * One-shot migration: clear skipAutoPermissionPrompt for users who accepted
@@ -31,15 +35,30 @@ export function resetAutoModeOptInForDefaultOffer(): void {
   if (getAutoModeEnabledState() !== 'enabled') return
 
   try {
-    const user = getSettingsForSource('userSettings')
+    // Check if skipAutoPermissionPrompt is set in ANY source
+    const sourcesToCheck: EditableSettingSource[] = ['userSettings', 'localSettings', 'projectSettings']
+    const hasSkipInAnySource = sourcesToCheck.some(
+      source => getSettingsForSource(source)?.skipAutoPermissionPrompt,
+    )
+
+    // Check the effective defaultMode from merged settings (highest-priority wins)
+    const effectiveSettings = getInitialSettings()
+    const effectiveDefaultMode = effectiveSettings?.permissions?.defaultMode
+
     if (
-      user?.skipAutoPermissionPrompt &&
-      user?.permissions &&
-      user?.permissions?.defaultMode != null && user?.permissions?.defaultMode !== 'auto'
+      hasSkipInAnySource &&
+      effectiveDefaultMode != null &&
+      effectiveDefaultMode !== 'auto'
     ) {
-      updateSettingsForSource('userSettings', {
-        skipAutoPermissionPrompt: undefined,
-      })
+      // Clear skipAutoPermissionPrompt from all editable sources where it's set
+      for (const source of sourcesToCheck) {
+        const settings = getSettingsForSource(source)
+        if (settings?.skipAutoPermissionPrompt) {
+          updateSettingsForSource(source, {
+            skipAutoPermissionPrompt: undefined,
+          })
+        }
+      }
       logEvent('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
     }
 

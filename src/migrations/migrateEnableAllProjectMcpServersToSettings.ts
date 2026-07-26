@@ -123,10 +123,10 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // filtering removes all entries (e.g., all disabled servers are also in enabled list)
     const existingHadEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
     const existingHadDisabledServers = Array.isArray(existingSettings.disabledMcpjsonServers)
-    if (hasEnabledServers || existingEnabledServers.length > 0 || existingHadEnabledServers) {
+    if (existingEnabledServers.length > 0 || existingHadEnabledServers) {
       updates.enabledMcpjsonServers = existingEnabledServers
     }
-    if (hasDisabledServers || filteredDisabledServers.length > 0 || existingHadDisabledServers) {
+    if (filteredDisabledServers.length > 0 || existingHadDisabledServers) {
       updates.disabledMcpjsonServers = filteredDisabledServers
     }
 

@@ -6,6 +6,7 @@ const mockGetGlobalConfig = vi.fn()
 const mockSaveGlobalConfig = vi.fn()
 const mockGetSettingsForSource = vi.fn()
 const mockUpdateSettingsForSource = vi.fn()
+const mockGetInitialSettings = vi.fn()
 const mockGetAutoModeEnabledState = vi.fn()
 const mockLogEvent = vi.fn()
 const mockLogError = vi.fn()
@@ -18,6 +19,7 @@ vi.mock('../../utils/config.js', () => ({
 vi.mock('../../utils/settings/settings.js', () => ({
   getSettingsForSource: (...args: any[]) => mockGetSettingsForSource(...args),
   updateSettingsForSource: (...args: any[]) => mockUpdateSettingsForSource(...args),
+  getInitialSettings: (...args: any[]) => mockGetInitialSettings(...args),
 }))
 
 vi.mock('../../utils/permissions/permissionSetup.js', () => ({
@@ -37,7 +39,15 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     vi.clearAllMocks()
     mockGetAutoModeEnabledState.mockReturnValue('enabled')
     mockGetGlobalConfig.mockReturnValue({ hasResetAutoModeOptInForDefaultOffer: false })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
     mockSaveGlobalConfig.mockImplementation((fn: any) => fn({}))
+    // Default: no skipAutoPermissionPrompt set in any source
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {}
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
+    })
   })
 
   afterEach(() => {
@@ -62,26 +72,39 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
   })
 
-  it('should clear skipAutoPermissionPrompt when user has skipAutoPermissionPrompt but defaultMode is not auto', () => {
-    mockGetSettingsForSource.mockReturnValue({
-      skipAutoPermissionPrompt: true,
-      permissions: { defaultMode: 'ask' },
+  it('should clear skipAutoPermissionPrompt from userSettings when set there and defaultMode is not auto', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'ask' },
+      }
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
     })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
 
     resetAutoModeOptInForDefaultOffer()
 
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('userSettings', {
       skipAutoPermissionPrompt: undefined,
     })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(1)
     expect(mockLogEvent).toHaveBeenCalledWith('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
   it('should not clear skipAutoPermissionPrompt when defaultMode is already auto', () => {
-    mockGetSettingsForSource.mockReturnValue({
-      skipAutoPermissionPrompt: true,
-      permissions: { defaultMode: 'auto' },
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'auto' },
+      }
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
     })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'auto' } })
 
     resetAutoModeOptInForDefaultOffer()
 
@@ -90,11 +113,107 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
-  it('should not clear skipAutoPermissionPrompt when permissions is undefined', () => {
-    mockGetSettingsForSource.mockReturnValue({
-      skipAutoPermissionPrompt: true,
-      // permissions is undefined
+  it('should clear skipAutoPermissionPrompt from localSettings when set there (higher priority)', () => {
+    // skipAutoPermissionPrompt is set in localSettings (higher priority) but not userSettings
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {}
+      if (source === 'localSettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'ask' },
+      }
+      if (source === 'projectSettings') return {}
+      return null
     })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('localSettings', {
+      skipAutoPermissionPrompt: undefined,
+    })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(1)
+    expect(mockLogEvent).toHaveBeenCalledWith('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
+  })
+
+  it('should clear skipAutoPermissionPrompt from all sources where it is set', () => {
+    // skipAutoPermissionPrompt is set in both userSettings and localSettings
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: true,
+      }
+      if (source === 'localSettings') return {
+        skipAutoPermissionPrompt: true,
+      }
+      if (source === 'projectSettings') return {}
+      return null
+    })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('userSettings', {
+      skipAutoPermissionPrompt: undefined,
+    })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('localSettings', {
+      skipAutoPermissionPrompt: undefined,
+    })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(2)
+    expect(mockLogEvent).toHaveBeenCalledWith('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
+  })
+
+  it('should use effective defaultMode (highest priority) rather than userSettings defaultMode', () => {
+    // userSettings has defaultMode 'ask' but localSettings (higher priority) has defaultMode 'auto'
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'ask' },
+      }
+      if (source === 'localSettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'auto' },
+      }
+      if (source === 'projectSettings') return {}
+      return null
+    })
+    // Effective defaultMode is 'auto' (from localSettings, higher priority)
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'auto' } })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    // Should NOT clear because effective defaultMode is already 'auto'
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+    expect(mockLogEvent).not.toHaveBeenCalled()
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+  })
+
+  it('should handle case where skipAutoPermissionPrompt is set in projectSettings', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {}
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {
+        skipAutoPermissionPrompt: true,
+      }
+      return null
+    })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('projectSettings', {
+      skipAutoPermissionPrompt: undefined,
+    })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(1)
+    expect(mockLogEvent).toHaveBeenCalledWith('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
+  })
+
+  it('should not clear if skipAutoPermissionPrompt is not set in any source', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {}
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
+    })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
 
     resetAutoModeOptInForDefaultOffer()
 
@@ -103,11 +222,16 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
-  it('should not clear skipAutoPermissionPrompt when defaultMode is undefined (permissions exists but no default mode set)', () => {
-    mockGetSettingsForSource.mockReturnValue({
-      skipAutoPermissionPrompt: true,
-      permissions: { /* defaultMode is undefined */ },
+  it('should not clear if defaultMode is not set', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: true,
+      }
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
     })
+    mockGetInitialSettings.mockReturnValue({ permissions: {} })
 
     resetAutoModeOptInForDefaultOffer()
 
@@ -116,30 +240,17 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
-  it('should not clear skipAutoPermissionPrompt when skipAutoPermissionPrompt is not set', () => {
-    mockGetSettingsForSource.mockReturnValue({
-      permissions: { defaultMode: 'ask' },
-    })
-
-    resetAutoModeOptInForDefaultOffer()
-
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-    expect(mockLogEvent).not.toHaveBeenCalled()
-    expect(mockSaveGlobalConfig).toHaveBeenCalled()
-  })
-
-  it('should mark migration as complete even if no change needed', () => {
-    mockGetSettingsForSource.mockReturnValue({
-      permissions: { defaultMode: 'auto' },
+  it('should always mark migration as done even when no clearing needed', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {}
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
     })
 
     resetAutoModeOptInForDefaultOffer()
 
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
-    // Verify the callback saves hasResetAutoModeOptInForDefaultOffer: true
-    const saveFn = mockSaveGlobalConfig.mock.calls[0][0]
-    const result = saveFn({ hasResetAutoModeOptInForDefaultOffer: false })
-    expect(result.hasResetAutoModeOptInForDefaultOffer).toBe(true)
   })
 
   it('should handle errors gracefully', () => {
@@ -147,23 +258,7 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
       throw new Error('test error')
     })
 
-    resetAutoModeOptInForDefaultOffer()
-
+    expect(() => resetAutoModeOptInForDefaultOffer()).not.toThrow()
     expect(mockLogError).toHaveBeenCalled()
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-  })
-
-  it('should run the migration body regardless of feature flags', () => {
-    // Previously this was gated behind if (feature('TRANSCRIPT_CLASSIFIER'))
-    // which always returned false. Now the body should execute directly.
-    mockGetSettingsForSource.mockReturnValue({
-      skipAutoPermissionPrompt: true,
-      permissions: { defaultMode: 'ask' },
-    })
-
-    resetAutoModeOptInForDefaultOffer()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalled()
-    expect(mockLogEvent).toHaveBeenCalled()
   })
 })

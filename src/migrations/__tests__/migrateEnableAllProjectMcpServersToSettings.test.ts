@@ -558,4 +558,33 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Verify that only the first logEvent was called (the mutual exclusivity one)
     expect(logEventSpy).toHaveBeenCalledTimes(1)
   })
+
+  test('should not introduce empty arrays into settings when project config has empty arrays and settings previously lacked them', async () => {
+    // Dynamic import after mocks are set up
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock existing settings without enabledMcpjsonServers or disabledMcpjsonServers
+    settingsStore.localSettings = {
+      otherSetting: 'some-value',
+    }
+
+    // Mock project config with empty arrays
+    projectConfigStore = {
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: [],
+      disabledMcpjsonServers: [],
+      otherField: 'keep-me',
+    }
+
+    // Run migration
+    migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify that settings ONLY got enableAllProjectMcpServers, not empty arrays
+    expect(settingsStore.localSettings).toEqual({
+      otherSetting: 'some-value',
+      enableAllProjectMcpServers: true,
+    })
+    expect(settingsStore.localSettings.enabledMcpjsonServers).toBeUndefined()
+    expect(settingsStore.localSettings.disabledMcpjsonServers).toBeUndefined()
+  })
 })
