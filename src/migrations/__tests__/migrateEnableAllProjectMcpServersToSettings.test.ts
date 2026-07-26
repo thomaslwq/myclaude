@@ -4,10 +4,12 @@ import { join } from 'path'
 // ── Mock config ────────────────────────────────────────────────────
 let projectConfigStore: Record<string, any> = {}
 let settingsStore: Record<string, any> = {}
+let logEventMock: ReturnType<typeof mock> = mock(() => {})
 
 beforeEach(() => {
   projectConfigStore = {}
   settingsStore = {}
+  logEventMock = mock(() => {})
 
   // Setup mocks for all tests
   mock.module(join(import.meta.dir, '../../utils/config.js'), () => ({
@@ -36,7 +38,7 @@ beforeEach(() => {
   }))
 
   mock.module(join(import.meta.dir, '../../services/analytics/index.js'), () => ({
-    logEvent: () => {},
+    logEvent: logEventMock,
   }))
 })
 
@@ -511,12 +513,6 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
   })
 
   test('should log event when servers are silently removed from disabled list', async () => {
-    // Spy on logEvent
-    const logEventSpy = mock(() => {})
-    mock.module(join(import.meta.dir, '../../services/analytics/index.js'), () => ({
-      logEvent: logEventSpy,
-    }))
-
     const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 
     // Mock project config with overlapping servers
@@ -529,21 +525,15 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that logEvent was called 2 times: removed from disabled event and completion event
-    expect(logEventSpy).toHaveBeenCalledTimes(2)
-    const logEventCall = logEventSpy.mock.calls[0]?.[0] || ''
-    const logEventMetadata = logEventSpy.mock.calls[0]?.[1] || {}
+    expect(logEventMock).toHaveBeenCalledTimes(2)
+    const logEventCall = logEventMock.mock.calls[0]?.[0] || ''
+    const logEventMetadata = logEventMock.mock.calls[0]?.[1] || {}
     expect(logEventCall).toBe('tengu_migrate_mcp_server_removed_from_disabled')
     expect(logEventMetadata.removedServers).toContain('serverA')
     expect(logEventMetadata.removedServers).not.toContain('serverC')
   })
 
   test('should not log event when no servers are removed from disabled list', async () => {
-    // Spy on logEvent
-    const logEventSpy = mock(() => {})
-    mock.module(join(import.meta.dir, '../../services/analytics/index.js'), () => ({
-      logEvent: logEventSpy,
-    }))
-
     const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 
     // Mock project config with no overlapping servers
@@ -556,7 +546,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that only the completion event was called (no servers removed)
-    expect(logEventSpy).toHaveBeenCalledTimes(1)
+    expect(logEventMock).toHaveBeenCalledTimes(1)
   })
 
   test('should not introduce empty arrays into settings when project config has empty arrays and settings previously lacked them', async () => {
