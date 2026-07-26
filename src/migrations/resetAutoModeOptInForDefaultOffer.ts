@@ -35,7 +35,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
     if (
       user?.skipAutoPermissionPrompt &&
       user?.permissions &&
-      user?.permissions?.defaultMode !== 'auto'
+      user?.permissions?.defaultMode != null && user?.permissions?.defaultMode !== 'auto'
     ) {
       updateSettingsForSource('userSettings', {
         skipAutoPermissionPrompt: undefined,
