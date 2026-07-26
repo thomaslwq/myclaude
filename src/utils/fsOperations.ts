@@ -557,8 +557,13 @@ export const NodeFsOperations: FsOperations = {
 
   isDirEmptySync(dirPath) {
     using _ = slowLogging`fs.isDirEmptySync(${dirPath})`
-    const files = this.readdirSync(dirPath)
-    return files.length === 0
+    const dir = fs.opendirSync(dirPath)
+    try {
+      const firstEntry = dir.readSync()
+      return firstEntry === null
+    } finally {
+      dir.closeSync()
+    }
   },
 
   rmdirSync(dirPath) {
