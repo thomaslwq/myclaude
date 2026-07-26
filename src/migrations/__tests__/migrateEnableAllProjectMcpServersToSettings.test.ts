@@ -216,7 +216,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Mock project config with no conflicting servers
     projectConfigStore = {
       enabledMcpjsonServers: ['newServer1'],
-      disabledMcpjsonServers: ['newServer2'],
+      disabledMcpjsonServers: ['newDisabled'],
     }
 
     // Run migration
@@ -224,7 +224,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
 
     // Verify that servers in enabled list are removed from disabled list (even if they existed before)
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existingEnabled', 'conflictingServer', 'newServer1'])
-    expect(settingsStore.localSettings.disabledMcpjsonServers).toEqual(['existingDisabled', 'newServer2'])
+    expect(settingsStore.localSettings.disabledMcpjsonServers).toEqual(['existingDisabled', 'newDisabled'])
   })
 
   test('should not overwrite other settings fields', async () => {
