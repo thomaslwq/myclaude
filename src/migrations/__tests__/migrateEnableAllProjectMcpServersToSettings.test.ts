@@ -510,57 +510,52 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existing1', 'valid1', 'valid2'])
   })
 
-  test('should warn via console.warn when servers are silently removed from disabled list', async () => {
-    // Spy on console.warn
-    const warnSpy = mock(() => {})
-    const originalWarn = console.warn
-    console.warn = warnSpy
+  test('should log event when servers are silently removed from disabled list', async () => {
+    // Spy on logEvent
+    const logEventSpy = mock(() => {})
+    mock.module(join(import.meta.dir, '../../services/analytics/index.js'), () => ({
+      logEvent: logEventSpy,
+    }))
 
-    try {
-      const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 
-      // Mock project config with overlapping servers
-      projectConfigStore = {
-        enabledMcpjsonServers: ['serverA', 'serverB'],
-        disabledMcpjsonServers: ['serverA', 'serverC'],
-      }
-
-      // Run migration
-      migrateEnableAllProjectMcpServersToSettings()
-
-      // Verify that console.warn was called with the removed server
-      expect(warnSpy).toHaveBeenCalledTimes(1)
-      const warnMessage = warnSpy.mock.calls[0]?.[0] || ''
-      expect(warnMessage).toContain('serverA')
-      expect(warnMessage).not.toContain('serverC')
-      expect(warnMessage).toContain('disabled list')
-    } finally {
-      console.warn = originalWarn
+    // Mock project config with overlapping servers
+    projectConfigStore = {
+      enabledMcpjsonServers: ['serverA', 'serverB'],
+      disabledMcpjsonServers: ['serverA', 'serverC'],
     }
+
+    // Run migration
+    migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify that logEvent was called 3 times: original mutual exclusivity event, removed from disabled event, and completion event
+    expect(logEventSpy).toHaveBeenCalledTimes(3)
+    const logEventCall = logEventSpy.mock.calls[1]?.[0] || ''
+    const logEventMetadata = logEventSpy.mock.calls[1]?.[1] || {}
+    expect(logEventCall).toBe('tengu_migrate_mcp_server_removed_from_disabled')
+    expect(logEventMetadata.removedServers).toContain('serverA')
+    expect(logEventMetadata.removedServers).not.toContain('serverC')
   })
 
-  test('should not warn when no servers are removed from disabled list', async () => {
-    // Spy on console.warn
-    const warnSpy = mock(() => {})
-    const originalWarn = console.warn
-    console.warn = warnSpy
+  test('should not log event when no servers are removed from disabled list', async () => {
+    // Spy on logEvent
+    const logEventSpy = mock(() => {})
+    mock.module(join(import.meta.dir, '../../services/analytics/index.js'), () => ({
+      logEvent: logEventSpy,
+    }))
 
-    try {
-      const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 
-      // Mock project config with no overlapping servers
-      projectConfigStore = {
-        enabledMcpjsonServers: ['serverA', 'serverB'],
-        disabledMcpjsonServers: ['serverC', 'serverD'],
-      }
-
-      // Run migration
-      migrateEnableAllProjectMcpServersToSettings()
-
-      // Verify that console.warn was NOT called
-      expect(warnSpy).toHaveBeenCalledTimes(0)
-    } finally {
-      console.warn = originalWarn
+    // Mock project config with no overlapping servers
+    projectConfigStore = {
+      enabledMcpjsonServers: ['serverA', 'serverB'],
+      disabledMcpjsonServers: ['serverC', 'serverD'],
     }
+
+    // Run migration
+    migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify that only the first logEvent was called (the mutual exclusivity one)
+    expect(logEventSpy).toHaveBeenCalledTimes(1)
   })
 })

@@ -110,9 +110,11 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
         migration: 'enableAllProjectMcpServersToSettings',
         removedServers: removedServers.join(','),
       })
-      console.warn(
-        `[Migration] The following MCP servers were removed from the disabled list because they are also in the enabled list: ${removedServers.join(', ')}`
-      )
+      logEvent('tengu_migrate_mcp_server_removed_from_disabled', {
+        migration: 'enableAllProjectMcpServersToSettings',
+        removedServers: removedServers.join(','),
+        message: `The following MCP servers were removed from the disabled list because they are also in the enabled list: ${removedServers.join(', ')}`,
+      })
     }
 
     // Only set updates if there are actual changes from existing settings
