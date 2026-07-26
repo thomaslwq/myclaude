@@ -528,10 +528,10 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Run migration
     migrateEnableAllProjectMcpServersToSettings()
 
-    // Verify that logEvent was called 3 times: original mutual exclusivity event, removed from disabled event, and completion event
-    expect(logEventSpy).toHaveBeenCalledTimes(3)
-    const logEventCall = logEventSpy.mock.calls[1]?.[0] || ''
-    const logEventMetadata = logEventSpy.mock.calls[1]?.[1] || {}
+    // Verify that logEvent was called 2 times: removed from disabled event and completion event
+    expect(logEventSpy).toHaveBeenCalledTimes(2)
+    const logEventCall = logEventSpy.mock.calls[0]?.[0] || ''
+    const logEventMetadata = logEventSpy.mock.calls[0]?.[1] || {}
     expect(logEventCall).toBe('tengu_migrate_mcp_server_removed_from_disabled')
     expect(logEventMetadata.removedServers).toContain('serverA')
     expect(logEventMetadata.removedServers).not.toContain('serverC')
@@ -555,7 +555,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Run migration
     migrateEnableAllProjectMcpServersToSettings()
 
-    // Verify that only the first logEvent was called (the mutual exclusivity one)
+    // Verify that only the completion event was called (no servers removed)
     expect(logEventSpy).toHaveBeenCalledTimes(1)
   })
 

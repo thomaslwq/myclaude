@@ -106,10 +106,6 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       enabledSet.has(server)
     )
     if (removedServers.length > 0) {
-      logEvent('tengu_migrate_mcp_server_mutual_exclusivity', {
-        migration: 'enableAllProjectMcpServersToSettings',
-        removedServers: removedServers.join(','),
-      })
       logEvent('tengu_migrate_mcp_server_removed_from_disabled', {
         migration: 'enableAllProjectMcpServersToSettings',
         removedServers: removedServers.join(','),
