@@ -113,7 +113,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       logEvent('tengu_migrate_mcp_server_removed_from_disabled', {
         migration: 'enableAllProjectMcpServersToSettings',
         removedServers: removedServers.join(','),
-        message: `The following MCP servers were removed from the disabled list because they are also in the enabled list: ${removedServers.join(', ')}`,
+        message: 'MCP servers removed from disabled list due to mutual exclusivity',
       })
     }
 
