@@ -4,7 +4,7 @@ import {
   saveCurrentProjectConfig,
 } from './utils/config.js'
 import { getCwd } from './utils/cwd.js'
-import { isDirEmpty } from './utils/file.js'
+import { isDirEmpty, getFileModificationTime } from './utils/file.js'
 import { getFsImplementation } from './utils/fsOperations.js'
 
 export type Step = {
@@ -19,22 +19,73 @@ export type Step = {
 // The workspace state (directory emptiness, CLAUDE.md existence) is stable within a
 // session — the cwd doesn't change and CLAUDE.md isn't created/deleted mid-session by
 // the user. The cache is cleared when the user explicitly runs /init.
+//
+// To handle the case where the user manually creates CLAUDE.md or changes workspace
+// contents (e.g., by cloning a repo), we also track the mtime of CLAUDE.md and the
+// directory itself. If either mtime changes, the cache is invalidated.
 let cachedSteps: Step[] | null = null
+let cachedClaudeMdMtime: number | null = null
+let cachedDirMtime: number | null = null
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
+  cachedClaudeMdMtime = null
+  cachedDirMtime = null
+}
+
+/** Check if the cached steps are still valid by comparing file mtimes. */
+function isCacheValid(): boolean {
+  if (!cachedSteps) return false
+
+  const cwd = getCwd()
+  const claudeMdPath = join(cwd, 'CLAUDE.md')
+
+  // Check CLAUDE.md mtime if it exists
+  const fs = getFsImplementation()
+  try {
+    const currentClaudeMdMtime = fs.existsSync(claudeMdPath)
+      ? getFileModificationTime(claudeMdPath)
+      : -1
+    if (currentClaudeMdMtime !== cachedClaudeMdMtime) return false
+  } catch {
+    // If we can't stat it, invalidate to be safe
+    return false
+  }
+
+  // Check directory mtime (changes when files are added/removed)
+  try {
+    const currentDirMtime = getFileModificationTime(cwd)
+    if (currentDirMtime !== cachedDirMtime) return false
+  } catch {
+    return false
+  }
+
+  return true
 }
 
 export function getSteps(): Step[] {
-  if (cachedSteps) {
-    return cachedSteps
+  if (isCacheValid()) {
+    return cachedSteps!
   }
 
-  const hasClaudeMd = getFsImplementation().existsSync(
-    join(getCwd(), 'CLAUDE.md'),
-  )
-  const isWorkspaceDirEmpty = isDirEmpty(getCwd())
+  const cwd = getCwd()
+  const fs = getFsImplementation()
+  const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
+  const isWorkspaceDirEmpty = isDirEmpty(cwd)
+
+  // Track mtimes for cache invalidation
+  const claudeMdPath = join(cwd, 'CLAUDE.md')
+  try {
+    cachedClaudeMdMtime = hasClaudeMd ? getFileModificationTime(claudeMdPath) : -1
+  } catch {
+    cachedClaudeMdMtime = -1
+  }
+  try {
+    cachedDirMtime = getFileModificationTime(cwd)
+  } catch {
+    cachedDirMtime = -1
+  }
 
   cachedSteps = [
     {
