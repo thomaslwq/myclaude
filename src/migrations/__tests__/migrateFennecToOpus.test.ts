@@ -46,6 +46,18 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
+  it('should migrate fennec-latest[OTHER] preserving suffix', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[2m]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[2m]' },
+    )
+  })
+
   it('should migrate fennec-latest to opus', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest' })

@@ -39,13 +39,11 @@ export function migrateFennecToOpus(): void {
         continue
       }
 
-      if (model.startsWith('fennec-latest[1m]')) {
+      if (model.startsWith('fennec-latest')) {
+        // Preserve any suffix (e.g., [1m], [2m]) from the original model name
+        const suffix = model.includes('[') ? model.substring(model.indexOf('[')) : ''
         updateSettingsForSource(source, {
-          model: 'opus[1m]',
-        })
-      } else if (model.startsWith('fennec-latest')) {
-        updateSettingsForSource(source, {
-          model: 'opus',
+          model: `opus${suffix}`,
         })
       } else if (
         model.startsWith('fennec-fast-latest') ||
