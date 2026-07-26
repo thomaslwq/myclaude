@@ -27,14 +27,32 @@ let cachedSteps: Step[] | null = null
 let cachedClaudeMdMtime: number | null = null
 let cachedDirMtime: number | null = null
 
+/**
+ * Timestamp (ms) when the cache was last populated. Used as a fallback
+ * for filesystems where mtime may not change reliably (e.g., network mounts,
+ * FUSE, containers with coarse timestamp resolution).
+ */
+let cachedAt: number | null = null
+
+/** Maximum age of the cache in milliseconds before forcing a re-check. */
+const CACHE_MAX_AGE_MS = 30_000
+
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
   cachedClaudeMdMtime = null
   cachedDirMtime = null
+  cachedAt = null
 }
 
-/** Check if the cached steps are still valid by comparing file mtimes. */
+/**
+ * Check if the cached steps are still valid.
+ *
+ * Primary: compare file mtimes. If mtime has changed, the cache is stale.
+ * Fallback: if mtimes are unchanged but the cache is older than CACHE_MAX_AGE_MS,
+ * re-read the actual file/directory state. This handles filesystems where mtime
+ * may not change reliably (e.g., network mounts, FUSE, containers).
+ */
 function isCacheValid(): boolean {
   if (!cachedSteps) return false
 
@@ -58,6 +76,12 @@ function isCacheValid(): boolean {
     const currentDirMtime = getFileModificationTime(cwd)
     if (currentDirMtime !== cachedDirMtime) return false
   } catch {
+    return false
+  }
+
+  // Fallback: if the cache is older than the max age, force a re-check
+  // to handle filesystems where mtime may not change reliably.
+  if (cachedAt !== null && Date.now() - cachedAt > CACHE_MAX_AGE_MS) {
     return false
   }
 
@@ -86,6 +110,8 @@ export function getSteps(): Step[] {
   } catch {
     cachedDirMtime = -1
   }
+
+  cachedAt = Date.now()
 
   cachedSteps = [
     {
