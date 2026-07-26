@@ -53,12 +53,16 @@ export function migrateFennecToOpus(): void {
       ) {
         // Preserve any suffix (e.g., [1m], [2m]) from the original model name
         const suffix = model.includes('[') ? model.substring(model.indexOf('[')) : ''
-        // Preserve the existing fastMode setting if it exists, default to true for new users
+        // Preserve the existing fastMode setting if it exists, otherwise omit it
+        // to avoid overwriting the implicit default behavior
         const existingFastMode = settings?.fastMode
-        updateSettingsForSource(source, {
+        const update: { model: string; fastMode?: boolean } = {
           model: `opus${suffix}`,
-          fastMode: existingFastMode !== undefined ? existingFastMode : true,
-        })
+        }
+        if (existingFastMode !== undefined) {
+          update.fastMode = existingFastMode
+        }
+        updateSettingsForSource(source, update)
       }
     }
   } catch (error) {
