@@ -16,6 +16,9 @@ export function migrateReplBridgeEnabledToRemoteControlAtStartup(): void {
     if (oldValue === undefined) return prev
     if (prev.remoteControlAtStartup !== undefined) return prev
     const { 'replBridgeEnabled': _, ...next } = prev
-    return { ...next, remoteControlAtStartup: Boolean(oldValue) }
+    // Use explicit string check to avoid Boolean('false') === true bug
+    const newValue =
+      typeof oldValue === 'string' ? oldValue === 'true' : Boolean(oldValue)
+    return { ...next, remoteControlAtStartup: newValue }
   })
 }

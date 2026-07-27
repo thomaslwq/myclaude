@@ -98,7 +98,6 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // Preserve the original disabled list as-is to avoid silently discarding user configuration.
     // A server may legitimately appear in both lists during a transition period or due to
     // intentional user configuration. The migration should not override user intent.
-    const filteredDisabledServers = [...existingDisabledServers]
 
     // Log a warning when a server appears in both enabled and disabled lists
     // so the user/admin can be aware of the potential inconsistency
@@ -123,8 +122,8 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     if (existingEnabledServers.length > 0 || existingHadEnabledServers) {
       updates.enabledMcpjsonServers = existingEnabledServers
     }
-    if (filteredDisabledServers.length > 0 || existingHadDisabledServers) {
-      updates.disabledMcpjsonServers = filteredDisabledServers
+    if (existingDisabledServers.length > 0 || existingHadDisabledServers) {
+      updates.disabledMcpjsonServers = existingDisabledServers
     }
 
     // Update settings FIRST to ensure data is safely stored before removing from project config
