@@ -37,6 +37,16 @@ The `MYCLAUDE_*` variants are aliases that map to `CLAUDE_CODE_*` internally.
 2. Explain user-visible impact in PR description
 3. Include validation steps
 
+## Managing Technical Debt (TODO Comments)
+
+To prevent accumulation of dead code and unresolved TODOs:
+
+1. **Track TODOs**: All TODO comments should be tracked in [TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md) with a checkbox item.
+2. **Convert to Issues**: Before adding a new TODO, consider filing a GitHub issue instead.
+3. **Reference Issues**: When a TODO is associated with a specific issue, include the issue number: `// TODO(#1234): description`.
+4. **Clean Up**: When resolving a TODO, remove the comment and mark the item in TECHNICAL_DEBT.md as complete.
+5. **Review**: During code review, flag new TODOs that should be tracked or converted to issues.
+
 ## License
 
 MIT - see [LICENSE](LICENSE)
