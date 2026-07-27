@@ -17,8 +17,10 @@ import {
  * Merge behavior:
  * - Existing settings arrays are preserved in order with new servers appended
  * - Duplicates are removed (first occurrence wins, preserving original order)
- * - Mutual exclusivity is enforced: a server in enabledMcpjsonServers is always
- *   removed from disabledMcpjsonServers, even if the conflict existed before migration
+ * - The disabled list is preserved as-is and is NOT filtered for mutual exclusivity.
+ *   Previously, servers in enabledMcpjsonServers were removed from disabledMcpjsonServers,
+ *   which silently discarded user configuration. Now the original disabled list is kept intact.
+ * - A warning event is logged when a server appears in both lists, but no action is taken.
  * - Other settings fields are never overwritten
  */
 export function migrateEnableAllProjectMcpServersToSettings(): void {
@@ -93,23 +95,22 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       fieldsToRemove.push('disabledMcpjsonServers')
     }
 
-    // Ensure mutual exclusivity: if a server is in both enabled and disabled lists,
-    // the enabled list takes precedence. This applies to both existing and incoming data.
-    const enabledSet = new Set(existingEnabledServers)
-    const filteredDisabledServers = existingDisabledServers.filter(
-      server => !enabledSet.has(server)
-    )
+    // Preserve the original disabled list as-is to avoid silently discarding user configuration.
+    // A server may legitimately appear in both lists during a transition period or due to
+    // intentional user configuration. The migration should not override user intent.
+    const filteredDisabledServers = [...existingDisabledServers]
 
-    // Log when mutual exclusivity enforcement silently removes servers from the disabled list
-    // to avoid silently overwriting user configuration that was deliberately set
-    const removedServers = existingDisabledServers.filter(server =>
+    // Log a warning when a server appears in both enabled and disabled lists
+    // so the user/admin can be aware of the potential inconsistency
+    const enabledSet = new Set(existingEnabledServers)
+    const overlappingServers = existingDisabledServers.filter(server =>
       enabledSet.has(server)
     )
-    if (removedServers.length > 0) {
-      logEvent('tengu_migrate_mcp_server_removed_from_disabled', {
+    if (overlappingServers.length > 0) {
+      logEvent('tengu_migrate_mcp_server_overlap_in_both_lists', {
         migration: 'enableAllProjectMcpServersToSettings',
-        removedServers: removedServers.join(','),
-        message: 'MCP servers removed from disabled list due to mutual exclusivity',
+        overlappingServers: overlappingServers.join(','),
+        message: 'MCP server(s) appear in both enabled and disabled lists. Preserving original disabled list as configured.',
       })
     }
 
