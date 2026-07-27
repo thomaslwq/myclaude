@@ -2,6 +2,8 @@ import { logEvent } from '../services/analytics/index.js'
 import {
   getCurrentProjectConfig,
   saveCurrentProjectConfig,
+  getGlobalConfig,
+  saveGlobalConfig,
 } from '../utils/config.js'
 import { logError } from '../utils/log.js'
 import {
@@ -22,8 +24,17 @@ import {
  *   takes precedence. This resolves the ambiguous configuration.
  * - A warning event is logged when a server appears in both lists, and the conflict is resolved.
  * - Other settings fields are never overwritten
+ *
+ * Idempotency: Uses a global config flag `hasCompletedMcpServerMigration` to ensure
+ * the migration runs only once, preventing duplicate log events and re-merging.
  */
 export function migrateEnableAllProjectMcpServersToSettings(): void {
+  // Check if migration has already completed successfully
+  const globalConfig = getGlobalConfig()
+  if (globalConfig.hasCompletedMcpServerMigration) {
+    return
+  }
+
   const projectConfig = getCurrentProjectConfig()
 
   // Check if any field exists in project config
@@ -32,6 +43,8 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   const hasDisabledServers = Array.isArray(projectConfig.disabledMcpjsonServers)
 
   if (!hasEnableAll && !hasEnabledServers && !hasDisabledServers) {
+    // No fields to migrate, but mark as completed to avoid unnecessary checks
+    saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
     return
   }
 
@@ -122,33 +135,42 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // This prevents overwriting other fields in the settings file
     // Also check if existing settings had the field to handle cases where mutual exclusivity
     // filtering removes all entries (e.g., all disabled servers are also in enabled list)
+    // Only set the field if:
+    // - Settings already had it (preserve existing data even if empty), OR
+    // - The project config has a non-empty array to migrate
     const existingHadEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
     const existingHadDisabledServers = Array.isArray(existingSettings.disabledMcpjsonServers)
-    if (existingEnabledServers.length > 0 || existingHadEnabledServers) {
+
+    const hasNonEmptyEnabledServers =
+      hasEnabledServers &&
+      Array.isArray(projectConfig.enabledMcpjsonServers) &&
+      projectConfig.enabledMcpjsonServers.length > 0
+    const hasNonEmptyDisabledServers =
+      hasDisabledServers &&
+      Array.isArray(projectConfig.disabledMcpjsonServers) &&
+      projectConfig.disabledMcpjsonServers.length > 0
+
+    if (existingHadEnabledServers || hasNonEmptyEnabledServers) {
       updates.enabledMcpjsonServers = existingEnabledServers
     }
-    if (existingDisabledServers.length > 0 || existingHadDisabledServers) {
+    if (existingHadDisabledServers || hasNonEmptyDisabledServers) {
       updates.disabledMcpjsonServers = existingDisabledServers
     }
 
-    // Update settings FIRST to ensure data is safely stored before removing from project config
-    // If a crash occurs after settings update but before project config removal, the data
-    // is preserved in settings and the migration can be safely re-run or the system will
-    // use the settings value. This is the safe order (write to new location first, then delete old).
-    if (Object.keys(updates).length > 0) {
-      updateSettingsForSource('localSettings', updates)
-    }
+    // Apply updates to settings
+    updateSettingsForSource('localSettings', updates)
 
-    // Remove migrated fields from project config after settings are safely updated
-    if (fieldsToRemove.length > 0) {
-      saveCurrentProjectConfig(current => {
-        const updated = { ...current }
-        for (const field of fieldsToRemove) {
-          delete updated[field]
-        }
-        return updated
-      })
-    }
+    // Remove migrated fields from project config
+    saveCurrentProjectConfig((config: Record<string, any>) => {
+      const updated = { ...config }
+      for (const field of fieldsToRemove) {
+        delete updated[field]
+      }
+      return updated
+    })
+
+    // Mark migration as completed in global config
+    saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
 
     logEvent('tengu_migrate_enable_all_project_mcp_servers_to_settings', {
       migration: 'enableAllProjectMcpServersToSettings',

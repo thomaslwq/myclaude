@@ -3,11 +3,13 @@ import { join } from 'path'
 
 // ── Mock config ────────────────────────────────────────────────────
 let projectConfigStore: Record<string, any> = {}
+let globalConfigStore: Record<string, any> = {}
 let settingsStore: Record<string, any> = {}
 let logEventMock: ReturnType<typeof mock> = mock(() => {})
 
 beforeEach(() => {
   projectConfigStore = {}
+  globalConfigStore = {}
   settingsStore = {}
   logEventMock = mock(() => {})
 
@@ -19,6 +21,14 @@ beforeEach(() => {
         projectConfigStore = updater(projectConfigStore)
       } else {
         projectConfigStore = { ...projectConfigStore, ...updater }
+      }
+    },
+    getGlobalConfig: () => ({ ...globalConfigStore }),
+    saveGlobalConfig: (updater: any) => {
+      if (typeof updater === 'function') {
+        globalConfigStore = updater(globalConfigStore)
+      } else {
+        globalConfigStore = { ...globalConfigStore, ...updater }
       }
     },
   }))
