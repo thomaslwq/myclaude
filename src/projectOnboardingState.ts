@@ -63,7 +63,7 @@ function isCacheValid(): boolean {
   const fs = getFsImplementation()
   try {
     const currentClaudeMdMtime = fs.existsSync(claudeMdPath)
-      ? getFileModificationTime(claudeMdPath)
+      ? getFileModificationTime(claudeMdPath) ?? -1
       : -1
     if (currentClaudeMdMtime !== cachedClaudeMdMtime) return false
   } catch {
@@ -73,7 +73,7 @@ function isCacheValid(): boolean {
 
   // Check directory mtime (changes when files are added/removed)
   try {
-    const currentDirMtime = getFileModificationTime(cwd)
+    const currentDirMtime = getFileModificationTime(cwd) ?? -1
     if (currentDirMtime !== cachedDirMtime) return false
   } catch {
     return false
