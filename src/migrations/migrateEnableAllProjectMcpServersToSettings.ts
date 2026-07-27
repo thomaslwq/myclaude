@@ -48,8 +48,13 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     return
   }
 
+  // Save original state for rollback in case of failure
+  const originalSettings = getSettingsForSource('localSettings') || {}
+  const originalProjectConfig = { ...projectConfig }
+  const originalSettingsKeys = new Set(Object.keys(originalSettings))
+
   try {
-    const existingSettings = getSettingsForSource('localSettings') || {}
+    const existingSettings = originalSettings
     const updates: Partial<{
       enableAllProjectMcpServers: boolean
       enabledMcpjsonServers: string[]
@@ -177,6 +182,31 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       fieldsMigrated: fieldsToRemove.join(','),
     })
   } catch (error) {
-    logError('Failed to migrate MCP server settings', error)
+    // Rollback: restore original state in case of failure
+    logError('Failed to migrate MCP server settings, rolling back', error)
+    try {
+      // Compute rollback updates: restore original values and remove any fields that were added by migration
+      const rollbackUpdates: Record<string, unknown> = { ...originalSettings }
+      // Figure out which keys were added by migration (exist in current settings but not in original)
+      const currentSettings = getSettingsForSource('localSettings') || {}
+      for (const key of Object.keys(currentSettings)) {
+        if (!originalSettingsKeys.has(key)) {
+          // Key was added by migration - set to undefined to delete it
+          rollbackUpdates[key] = undefined
+        }
+      }
+      updateSettingsForSource('localSettings', rollbackUpdates)
+    } catch (rollbackError) {
+      logError('Rollback of settings failed', rollbackError)
+    }
+    try {
+      saveCurrentProjectConfig((config: Record<string, any>) => ({
+        ...config,
+        ...originalProjectConfig,
+      }))
+    } catch (rollbackError) {
+      logError('Rollback of project config failed', rollbackError)
+    }
+    logError('Rollback complete (may have partial failures): original MCP server settings restoration attempted', error)
   }
 }

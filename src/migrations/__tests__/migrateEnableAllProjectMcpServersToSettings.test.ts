@@ -590,4 +590,131 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     expect(settingsStore.localSettings.enabledMcpjsonServers).toBeUndefined()
     expect(settingsStore.localSettings.disabledMcpjsonServers).toBeUndefined()
   })
+
+  test('should rollback on updateSettingsForSource failure and NOT mark migration as completed', async () => {
+    // Dynamic import after mocks are set up
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock project config with fields to migrate
+    projectConfigStore = {
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1', 'server2'],
+      disabledMcpjsonServers: ['server3'],
+      otherField: 'keep-me',
+    }
+
+    // Mock settings with existing data
+    settingsStore.localSettings = {
+      otherSetting: 'some-value',
+      enabledMcpjsonServers: ['existing1'],
+    }
+
+    // Mock updateSettingsForSource to throw on first call (migration), succeed on subsequent calls (rollback)
+    let updateSettingsCallCount = 0
+    const updateSettingsMock = mock((source: string, updates: any) => {
+      updateSettingsCallCount++
+      if (updateSettingsCallCount === 1) {
+        throw new Error('Disk full')
+      }
+      // Rollback call succeeds
+      if (!settingsStore[source]) {
+        settingsStore[source] = {}
+      }
+      settingsStore[source] = { ...settingsStore[source], ...updates }
+    })
+
+    mock.module(join(import.meta.dir, '../../utils/settings/settings.js'), () => ({
+      getSettingsForSource: (source: string) => settingsStore[source] || {},
+      updateSettingsForSource: updateSettingsMock,
+    }))
+
+    // Run migration
+    migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify that updateSettingsForSource was called twice (migration + rollback)
+    expect(updateSettingsCallCount).toBe(2)
+
+    // Verify that migration flag was NOT set (should remain undefined)
+    expect(globalConfigStore.hasCompletedMcpServerMigration).toBeUndefined()
+
+    // Verify that original settings were restored (rollback)
+    expect(settingsStore.localSettings).toEqual({
+      otherSetting: 'some-value',
+      enabledMcpjsonServers: ['existing1'],
+    })
+
+    // Verify that original project config was restored
+    expect(projectConfigStore).toEqual({
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1', 'server2'],
+      disabledMcpjsonServers: ['server3'],
+      otherField: 'keep-me',
+    })
+  })
+
+  test('should rollback on saveCurrentProjectConfig failure and NOT mark migration as completed', async () => {
+    // Dynamic import after mocks are set up
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock project config with fields to migrate
+    projectConfigStore = {
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1'],
+      otherField: 'keep-me',
+    }
+
+    // Mock settings with existing data
+    settingsStore.localSettings = {
+      otherSetting: 'some-value',
+    }
+
+    // Mock saveCurrentProjectConfig to throw on first call (migration), succeed on subsequent calls (rollback)
+    let saveProjectConfigCallCount = 0
+    const saveProjectConfigMock = mock((updater: any) => {
+      saveProjectConfigCallCount++
+      if (saveProjectConfigCallCount === 1) {
+        throw new Error('Permission denied')
+      }
+      // Rollback call succeeds
+      if (typeof updater === 'function') {
+        projectConfigStore = updater(projectConfigStore)
+      } else {
+        projectConfigStore = { ...projectConfigStore, ...updater }
+      }
+    })
+
+    mock.module(join(import.meta.dir, '../../utils/config.js'), () => ({
+      getCurrentProjectConfig: () => ({ ...projectConfigStore }),
+      saveCurrentProjectConfig: saveProjectConfigMock,
+      getGlobalConfig: () => ({ ...globalConfigStore }),
+      saveGlobalConfig: (updater: any) => {
+        if (typeof updater === 'function') {
+          globalConfigStore = updater(globalConfigStore)
+        } else {
+          globalConfigStore = { ...globalConfigStore, ...updater }
+        }
+      },
+    }))
+
+    // Run migration
+    migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify that saveCurrentProjectConfig was called twice (migration + rollback)
+    expect(saveProjectConfigCallCount).toBe(2)
+
+    // Verify that migration flag was NOT set (should remain false)
+    expect(globalConfigStore.hasCompletedMcpServerMigration).toBeUndefined()
+
+    // Verify that original settings were restored (rollback removed the migration-added fields)
+    expect(settingsStore.localSettings).toEqual({
+      otherSetting: 'some-value',
+    })
+
+    // Verify that original project config was restored (rollback)
+    expect(projectConfigStore).toEqual({
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1'],
+      otherField: 'keep-me',
+    })
+  })
 })
