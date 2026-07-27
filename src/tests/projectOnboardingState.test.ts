@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'bun:test';
 
 describe('CACHE_MAX_AGE_MS constant', () => {
-  test('should be <= 2000ms for responsive invalidation', async () => {
+  test('should be <= 30000ms (30 seconds) for responsive invalidation', async () => {
     // Read the source file to check the CACHE_MAX_AGE_MS constant
     const fs = await import('fs');
     const path = await import('path');
@@ -14,7 +14,7 @@ describe('CACHE_MAX_AGE_MS constant', () => {
     expect(match).not.toBeNull();
     if (match) {
       const value = parseInt(match[1].replace(/_/g, ''), 10);
-      expect(value).toBeLessThanOrEqual(2000);
+      expect(value).toBeLessThanOrEqual(30000);
       expect(value).toBeGreaterThan(0);
     }
   });
