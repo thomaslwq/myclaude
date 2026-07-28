@@ -249,4 +249,16 @@ describe('migrateFennecToOpus', () => {
       { model: 'opus[200k]', fastMode: false },
     )
   })
+
+  it('should migrate fennec-latest[1m] with trailing whitespace to opus[1m]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1m] ' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1m]' },
+    )
+  })
 })

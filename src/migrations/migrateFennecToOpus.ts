@@ -34,8 +34,8 @@ export function migrateFennecToOpus(): void {
     for (const source of sources) {
       const settings = getSettingsForSource(source)
 
-      const model = settings?.model
-      if (typeof model !== 'string') {
+      const model = (settings?.model ?? '').trim()
+      if (typeof model !== 'string' || model === '') {
         continue
       }
 
