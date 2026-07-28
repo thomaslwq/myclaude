@@ -185,36 +185,41 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // Rollback: restore original state in case of failure
     logError('Failed to migrate MCP server settings, rolling back', error)
 
-    // Track rollback result for atomicity: if either step fails, we throw so the caller
-    // knows the system may be in an inconsistent state.
+    // Save the current (migration-applied) settings state for potential undo
+    const currentSettings = getSettingsForSource('localSettings') || {}
+
     let rollbackFailed = false
 
+    // Build the rollback updates for settings (shared across rollback and potential undo)
+    const rollbackUpdates: Record<string, unknown> = {}
+    const migratedFields: Array<keyof typeof originalSettings> = [
+      'enableAllProjectMcpServers',
+      'enabledMcpjsonServers',
+      'disabledMcpjsonServers',
+    ]
+    for (const field of migratedFields) {
+      if (field in originalSettings) {
+        rollbackUpdates[field] = originalSettings[field]
+      } else {
+        // Field didn't exist before migration — set to undefined to delete it
+        // updateSettingsForSource handles undefined keys by deleting them from the file
+        rollbackUpdates[field] = undefined
+      }
+    }
+
+    // First, attempt rollback of settings
+    let settingsRollbackSucceeded = false
     try {
       // Only revert the specific fields that were migrated, not the entire settings object.
       // This preserves any concurrent changes to other keys made by other processes.
-      const rollbackUpdates: Record<string, unknown> = {}
-
-      // Restore original values for the fields that existed before migration
-      const migratedFields: Array<keyof typeof originalSettings> = [
-        'enableAllProjectMcpServers',
-        'enabledMcpjsonServers',
-        'disabledMcpjsonServers',
-      ]
-      for (const field of migratedFields) {
-        if (field in originalSettings) {
-          rollbackUpdates[field] = originalSettings[field]
-        } else {
-          // Field didn't exist before migration — set to undefined to delete it
-          rollbackUpdates[field] = undefined
-        }
-      }
-
       updateSettingsForSource('localSettings', rollbackUpdates)
+      settingsRollbackSucceeded = true
     } catch (rollbackError) {
       logError('Rollback of settings failed', rollbackError)
       rollbackFailed = true
     }
 
+    // Then, attempt rollback of project config
     try {
       saveCurrentProjectConfig((config: Record<string, any>) => ({
         ...config,
@@ -223,6 +228,18 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     } catch (rollbackError) {
       logError('Rollback of project config failed', rollbackError)
       rollbackFailed = true
+
+      // If settings rollback succeeded but project config rollback failed,
+      // undo the settings rollback to maintain consistency.
+      // This leaves both settings and project config in the migration-applied state,
+      // which is more consistent than having settings reverted and project config not.
+      if (settingsRollbackSucceeded) {
+        try {
+          updateSettingsForSource('localSettings', currentSettings)
+        } catch (undoError) {
+          logError('Failed to undo settings rollback after project config rollback failure', undoError)
+        }
+      }
     }
 
     if (rollbackFailed) {
