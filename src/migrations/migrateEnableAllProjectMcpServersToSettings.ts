@@ -184,6 +184,11 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   } catch (error) {
     // Rollback: restore original state in case of failure
     logError('Failed to migrate MCP server settings, rolling back', error)
+
+    // Track rollback result for atomicity: if either step fails, we throw so the caller
+    // knows the system may be in an inconsistent state.
+    let rollbackFailed = false
+
     try {
       // Only revert the specific fields that were migrated, not the entire settings object.
       // This preserves any concurrent changes to other keys made by other processes.
@@ -207,7 +212,9 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       updateSettingsForSource('localSettings', rollbackUpdates)
     } catch (rollbackError) {
       logError('Rollback of settings failed', rollbackError)
+      rollbackFailed = true
     }
+
     try {
       saveCurrentProjectConfig((config: Record<string, any>) => ({
         ...config,
@@ -215,7 +222,16 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       }))
     } catch (rollbackError) {
       logError('Rollback of project config failed', rollbackError)
+      rollbackFailed = true
     }
-    logError('Rollback complete (may have partial failures): original MCP server settings restoration attempted', error)
+
+    if (rollbackFailed) {
+      throw new Error(
+        'Migration failed and rollback was incomplete. The system may be in an inconsistent state. ' +
+        'Original error: ' + (error instanceof Error ? error.message : String(error))
+      )
+    }
+
+    logError('Rollback completed successfully: original MCP server settings restored', error)
   }
 }
