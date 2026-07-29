@@ -53,6 +53,13 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   const originalProjectConfig = { ...projectConfig }
   const originalSettingsKeys = new Set(Object.keys(originalSettings))
 
+  // Declare fieldsToRemove outside try block so it's accessible in the catch block for rollback
+  const fieldsToRemove: Array<
+    | 'enableAllProjectMcpServers'
+    | 'enabledMcpjsonServers'
+    | 'disabledMcpjsonServers'
+  > = []
+
   try {
     const existingSettings = originalSettings
     const updates: Partial<{
@@ -60,11 +67,6 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       enabledMcpjsonServers: string[]
       disabledMcpjsonServers: string[]
     }> = {}
-    const fieldsToRemove: Array<
-      | 'enableAllProjectMcpServers'
-      | 'enabledMcpjsonServers'
-      | 'disabledMcpjsonServers'
-    > = []
 
     // Migrate enableAllProjectMcpServers if it exists
     // Always migrate the project config value to settings, preferring the project-level value
@@ -220,11 +222,16 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     }
 
     // Then, attempt rollback of project config
+    // Only restore the specific fields that were migrated, not the entire project config.
+    // This preserves any concurrent changes to other keys made by other processes.
     try {
-      saveCurrentProjectConfig((config: Record<string, any>) => ({
-        ...config,
-        ...originalProjectConfig,
-      }))
+      saveCurrentProjectConfig((config: Record<string, any>) => {
+        const updated = { ...config }
+        for (const field of fieldsToRemove) {
+          updated[field] = originalProjectConfig[field]
+        }
+        return updated
+      })
     } catch (rollbackError) {
       logError('Rollback of project config failed', rollbackError)
       rollbackFailed = true
