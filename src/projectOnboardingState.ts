@@ -35,7 +35,7 @@ let cachedClaudeMdMtime: number | null = null
 let cachedAt: number | null = null
 
 /** Maximum age of the cache in milliseconds before forcing a re-check. */
-const CACHE_MAX_AGE_MS = 30_000
+const CACHE_MAX_AGE_MS = 1_000
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
