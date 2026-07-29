@@ -718,4 +718,78 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       otherField: 'keep-me',
     })
   })
+
+  test('should re-apply migrated state to settings when project config rollback fails after settings rollback succeeded', async () => {
+    // Dynamic import after mocks are set up
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock project config with fields to migrate
+    projectConfigStore = {
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1'],
+      otherField: 'keep-me',
+    }
+
+    // Mock settings with existing data
+    settingsStore.localSettings = {
+      otherSetting: 'some-value',
+    }
+
+    // Mock saveCurrentProjectConfig to throw on first call (migration) and third call (project config rollback),
+    // but succeed on second call (settings rollback)
+    let saveProjectConfigCallCount = 0
+    const saveProjectConfigMock = mock((updater: any) => {
+      saveProjectConfigCallCount++
+      if (saveProjectConfigCallCount === 1) {
+        throw new Error('Permission denied on migration')
+      }
+      if (saveProjectConfigCallCount === 2) {
+        throw new Error('Permission denied on project config rollback')
+      }
+      // Should not reach here
+      if (typeof updater === 'function') {
+        projectConfigStore = updater(projectConfigStore)
+      } else {
+        projectConfigStore = { ...projectConfigStore, ...updater }
+      }
+    })
+
+    mock.module(join(import.meta.dir, '../../utils/config.js'), () => ({
+      getCurrentProjectConfig: () => ({ ...projectConfigStore }),
+      saveCurrentProjectConfig: saveProjectConfigMock,
+      getGlobalConfig: () => ({ ...globalConfigStore }),
+      saveGlobalConfig: (updater: any) => {
+        if (typeof updater === 'function') {
+          globalConfigStore = updater(globalConfigStore)
+        } else {
+          globalConfigStore = { ...globalConfigStore, ...updater }
+        }
+      },
+    }))
+
+    // Run migration - should throw because rollback is incomplete
+    expect(() => migrateEnableAllProjectMcpServersToSettings()).toThrow()
+
+    // Verify that saveCurrentProjectConfig was called twice (migration + project config rollback)
+    expect(saveProjectConfigCallCount).toBe(2)
+
+    // Verify that migration flag was NOT set (should remain false)
+    expect(globalConfigStore.hasCompletedMcpServerMigration).toBeUndefined()
+
+    // Verify that settings were re-applied with the migrated state (since settings rollback succeeded
+    // but project config rollback failed, the system should re-apply the migrated state to settings
+    // to maintain consistency)
+    expect(settingsStore.localSettings).toEqual({
+      otherSetting: 'some-value',
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1'],
+    })
+
+    // Verify that project config still has the original fields (migration failed, but rollback also failed)
+    expect(projectConfigStore).toEqual({
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1'],
+      otherField: 'keep-me',
+    })
+  })
 })
