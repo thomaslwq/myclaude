@@ -21,11 +21,13 @@ export type Step = {
 // the user. The cache is cleared when the user explicitly runs /init.
 //
 // To handle the case where the user manually creates CLAUDE.md or changes workspace
-// contents (e.g., by cloning a repo), we track the mtime of CLAUDE.md. If the mtime
-// changes, the cache is invalidated. A short time-based fallback ensures the cache
-// is refreshed quickly even on filesystems where directory mtime is unreliable.
+// contents (e.g., by cloning a repo), we track the mtime of both CLAUDE.md and the
+// workspace directory. If either mtime changes, the cache is invalidated. A short
+// time-based fallback ensures the cache is refreshed quickly even on filesystems
+// where mtime may not change reliably.
 let cachedSteps: Step[] | null = null
 let cachedClaudeMdMtime: number | null = null
+let cachedDirMtime: number | null = null
 
 /**
  * Timestamp (ms) when the cache was last populated. Used as a fallback
@@ -46,16 +48,18 @@ const CACHE_MAX_AGE_MS = 30_000
 export function clearCachedSteps(): void {
   cachedSteps = null
   cachedClaudeMdMtime = null
+  cachedDirMtime = null
   cachedAt = null
 }
 
 /**
  * Check if the cached steps are still valid.
  *
- * Primary: compare CLAUDE.md mtime. If it has changed, the cache is stale.
+ * Primary: compare CLAUDE.md mtime and directory mtime. If either has changed,
+ * the cache is stale.
  * Fallback: if the cache is older than CACHE_MAX_AGE_MS, re-read the actual
- * file/directory state. This handles filesystems where directory mtime may not
- * change reliably (e.g., ext4, FUSE, network mounts).
+ * file/directory state. This handles filesystems where mtime may not change
+ * reliably (e.g., ext4, FUSE, network mounts).
  */
 function isCacheValid(): boolean {
   if (!cachedSteps) return false
@@ -75,8 +79,18 @@ function isCacheValid(): boolean {
     return false
   }
 
-    // Fallback: if the cache is older than the max age, force a re-check
-  // to handle filesystems where directory mtime may not change reliably
+  // Check the directory mtime to detect content changes (files added/removed)
+  // that don't modify CLAUDE.md itself.
+  try {
+    const currentDirMtime = getFileModificationTime(cwd)
+    if (currentDirMtime !== cachedDirMtime) return false
+  } catch {
+    // If we can't stat the directory, invalidate to be safe
+    return false
+  }
+
+  // Fallback: if the cache is older than the max age, force a re-check
+  // to handle filesystems where mtime may not change reliably
   // (e.g., ext4, FUSE, network mounts).
   if (cachedAt !== null && Date.now() - cachedAt > CACHE_MAX_AGE_MS) {
     return false
@@ -101,6 +115,11 @@ export function getSteps(): Step[] {
     cachedClaudeMdMtime = hasClaudeMd ? getFileModificationTime(claudeMdPath) : -1
   } catch {
     cachedClaudeMdMtime = -1
+  }
+  try {
+    cachedDirMtime = getFileModificationTime(cwd)
+  } catch {
+    cachedDirMtime = -1
   }
   cachedAt = Date.now()
 

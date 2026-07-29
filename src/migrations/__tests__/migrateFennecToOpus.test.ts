@@ -34,6 +34,30 @@ describe('migrateFennecToOpus', () => {
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
+  it('should migrate fennec-latest[1] to opus[1]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1]' },
+    )
+  })
+
+  it('should migrate fennec-latest[100] to opus[100]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[100]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[100]' },
+    )
+  })
+
   it('should migrate fennec-latest[1m] to opus[1m]', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1m]' })
@@ -103,6 +127,30 @@ describe('migrateFennecToOpus', () => {
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'userSettings',
       { model: 'opus' },
+    )
+  })
+
+  it('should migrate fennec-fast-latest[1] to opus[1] without fastMode', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1]' },
+    )
+  })
+
+  it('should migrate fennec-fast-latest[100] to opus[100] without fastMode', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[100]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[100]' },
     )
   })
 
