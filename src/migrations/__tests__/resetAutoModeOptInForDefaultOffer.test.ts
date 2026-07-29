@@ -206,6 +206,53 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockLogEvent).toHaveBeenCalledWith('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
   })
 
+  it('should clear skipAutoPermissionPrompt from userSettings when explicitly set to false', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: false,
+        permissions: { defaultMode: 'ask' },
+      }
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
+    })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('userSettings', {
+      skipAutoPermissionPrompt: undefined,
+    })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(1)
+    expect(mockLogEvent).toHaveBeenCalledWith('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
+  })
+
+  it('should clear skipAutoPermissionPrompt from all sources even when some are false', () => {
+    // skipAutoPermissionPrompt is true in userSettings, false in localSettings
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: true,
+      }
+      if (source === 'localSettings') return {
+        skipAutoPermissionPrompt: false,
+      }
+      if (source === 'projectSettings') return {}
+      return null
+    })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('userSettings', {
+      skipAutoPermissionPrompt: undefined,
+    })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('localSettings', {
+      skipAutoPermissionPrompt: undefined,
+    })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(2)
+    expect(mockLogEvent).toHaveBeenCalledWith('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
+  })
+
   it('should not clear if skipAutoPermissionPrompt is not set in any source', () => {
     mockGetSettingsForSource.mockImplementation((source: string) => {
       if (source === 'userSettings') return {}
