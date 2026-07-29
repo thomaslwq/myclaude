@@ -562,7 +562,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     expect(logEventMock).toHaveBeenCalledTimes(1)
   })
 
-  test('should not introduce empty arrays into settings when project config has empty arrays and settings previously lacked them', async () => {
+  test('should preserve empty arrays in settings when project config has empty arrays', async () => {
     // Dynamic import after mocks are set up
     const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 
@@ -582,13 +582,14 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Run migration
     migrateEnableAllProjectMcpServersToSettings()
 
-    // Verify that settings ONLY got enableAllProjectMcpServers, not empty arrays
+    // Verify that empty arrays are preserved in settings to maintain semantic meaning
+    // (explicit list of zero servers) vs undefined which means "use defaults"
     expect(settingsStore.localSettings).toEqual({
       otherSetting: 'some-value',
       enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: [],
+      disabledMcpjsonServers: [],
     })
-    expect(settingsStore.localSettings.enabledMcpjsonServers).toBeUndefined()
-    expect(settingsStore.localSettings.disabledMcpjsonServers).toBeUndefined()
   })
 
   test('should rollback on updateSettingsForSource failure and NOT mark migration as completed', async () => {

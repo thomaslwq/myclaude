@@ -86,6 +86,8 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
     // Merge enabledMcpjsonServers if it exists in project config
     if (hasEnabledServers) {
+      // Preserve empty arrays to maintain semantic meaning (explicit list of zero servers)
+      // vs undefined which means "use defaults"
       if (Array.isArray(projectConfig.enabledMcpjsonServers) && projectConfig.enabledMcpjsonServers.length > 0) {
         // Merge the servers, preserving order and avoiding duplicates
         // First occurrence wins: existing items keep their position, new items are appended
@@ -144,23 +146,21 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // filtering removes all entries (e.g., all disabled servers are also in enabled list)
     // Only set the field if:
     // - Settings already had it (preserve existing data even if empty), OR
-    // - The project config has a non-empty array to migrate
+    // - The project config has an array to migrate (including empty arrays to preserve semantics)
     const existingHadEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
     const existingHadDisabledServers = Array.isArray(existingSettings.disabledMcpjsonServers)
 
-    const hasNonEmptyEnabledServers =
+    const hasEnabledServersArray =
       hasEnabledServers &&
-      Array.isArray(projectConfig.enabledMcpjsonServers) &&
-      projectConfig.enabledMcpjsonServers.length > 0
-    const hasNonEmptyDisabledServers =
+      Array.isArray(projectConfig.enabledMcpjsonServers)
+    const hasDisabledServersArray =
       hasDisabledServers &&
-      Array.isArray(projectConfig.disabledMcpjsonServers) &&
-      projectConfig.disabledMcpjsonServers.length > 0
+      Array.isArray(projectConfig.disabledMcpjsonServers)
 
-    if (existingHadEnabledServers || hasNonEmptyEnabledServers) {
+    if (existingHadEnabledServers || hasEnabledServersArray) {
       updates.enabledMcpjsonServers = existingEnabledServers
     }
-    if (existingHadDisabledServers || hasNonEmptyDisabledServers) {
+    if (existingHadDisabledServers || hasDisabledServersArray) {
       updates.disabledMcpjsonServers = existingDisabledServers
     }
 
