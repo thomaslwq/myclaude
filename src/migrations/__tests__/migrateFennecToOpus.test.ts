@@ -309,4 +309,40 @@ describe('migrateFennecToOpus', () => {
       { model: 'opus[1m]' },
     )
   })
+
+  it('should migrate fennec-latest with space inside suffix [1 m] to opus[1 m]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1 m]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1 m]' },
+    )
+  })
+
+  it('should migrate fennec-latest with leading space in suffix [ 100k] to opus[ 100k]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[ 100k]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[ 100k]' },
+    )
+  })
+
+  it('should migrate fennec-latest with trailing space in suffix [200k ] to opus[200k ]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[200k ]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[200k ]' },
+    )
+  })
 })
