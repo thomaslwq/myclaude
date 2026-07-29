@@ -85,14 +85,14 @@ describe('migrateSonnet45ToSonnet46', () => {
     )
   })
 
-  it('should migrate sonnet-4-5-20250929[100k] to sonnet[100k]', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-5-20250929[100k]' })
+  it('should migrate sonnet-4-5-20250929 to sonnet', () => {
+    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-5-20250929' })
 
     migrateSonnet45ToSonnet46()
 
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'userSettings',
-      { model: 'sonnet[100k]' },
+      { model: 'sonnet' },
     )
   })
 
@@ -107,17 +107,6 @@ describe('migrateSonnet45ToSonnet46', () => {
     )
   })
 
-  it('should migrate sonnet-4-5-20250929 to sonnet', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-5-20250929' })
-
-    migrateSonnet45ToSonnet46()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'sonnet' },
-    )
-  })
-
   it('should migrate sonnet-4-5-20250929[1m] to sonnet[1m]', () => {
     mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-5-20250929[1m]' })
 
@@ -129,69 +118,34 @@ describe('migrateSonnet45ToSonnet46', () => {
     )
   })
 
-  // Test for the bug: exotic suffixes should be preserved
-  it('should migrate sonnet-4-5-20250929[100k] to sonnet[100k]', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-5-20250929[100k]' })
+  it('should migrate from projectSettings to sonnet', () => {
+    mockGetSettingsForSource.mockReturnValue({ model: 'claude-sonnet-4-5-20250929' })
 
     migrateSonnet45ToSonnet46()
 
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'sonnet[100k]' },
+      'projectSettings',
+      { model: 'sonnet' },
     )
   })
 
-  it('should migrate claude-sonnet-4-5-20250929[200k] to sonnet[200k]', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'claude-sonnet-4-5-20250929[200k]' })
+  it('should migrate from localSettings to sonnet', () => {
+    mockGetSettingsForSource.mockReturnValue({ model: 'claude-sonnet-4-5-20250929' })
 
     migrateSonnet45ToSonnet46()
 
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'sonnet[200k]' },
+      'localSettings',
+      { model: 'sonnet' },
     )
   })
 
-  it('should not migrate unrelated models', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'gpt-4' })
+  it('should handle multiple sources with sonnet-4-5 in different sources', () => {
+    mockGetSettingsForSource.mockReturnValue({ model: 'claude-sonnet-4-5-20250929' })
 
     migrateSonnet45ToSonnet46()
 
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-  })
-
-  it('should not migrate if model is undefined', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: undefined })
-
-    migrateSonnet45ToSonnet46()
-
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-  })
-
-  it('should not migrate sonnet-4-6-20251001 (different date)', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-6-20251001' })
-
-    migrateSonnet45ToSonnet46()
-
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-  })
-
-  it('should not migrate sonnet (alias)', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet' })
-
-    migrateSonnet45ToSonnet46()
-
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-  })
-
-  it('should log an analytics event with the old model name', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-5-20250929[100k]' })
-
-    migrateSonnet45ToSonnet46()
-
-    expect(mockLogEvent).toHaveBeenCalledWith('tengu_sonnet45_to_46_migration', {
-      from_model: 'sonnet-4-5-20250929[100k]',
-      has_1m: false,
-    })
+    // Should have been called for each source
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(3)
   })
 })

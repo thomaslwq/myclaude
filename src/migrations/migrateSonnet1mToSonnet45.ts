@@ -30,11 +30,21 @@ export function migrateSonnet1mToSonnet45(): void {
   }
 
   try {
-    const model = getSettingsForSource('userSettings')?.model
-    if (model === 'sonnet[1m]') {
-      updateSettingsForSource('userSettings', {
-        model: 'sonnet-4-5-20250929[1m]',
-      })
+    // Sources to check — in order of increasing precedence.
+    // PolicySettings and flagSettings are excluded:
+    // - policySettings is not user-writable and shouldn't be rewritten
+    // - flagSettings is ephemeral (CLI --settings) and not stored back
+    const sources = ['userSettings', 'projectSettings', 'localSettings'] as const
+
+    let anyMigrated = false
+    for (const source of sources) {
+      const model = getSettingsForSource(source)?.model
+      if (model === 'sonnet[1m]') {
+        updateSettingsForSource(source, {
+          model: 'sonnet-4-5-20250929[1m]',
+        })
+        anyMigrated = true
+      }
     }
 
     // Also migrate the in-memory override if already set

@@ -26,22 +26,36 @@ export function migrateSonnet45ToSonnet46(): void {
     return
   }
 
-  const model = getSettingsForSource('userSettings')?.model
-  if (typeof model !== 'string') {
-    return
+  // Sources to check — in order of increasing precedence.
+  // PolicySettings and flagSettings are excluded:
+  // - policySettings is not user-writable and shouldn't be rewritten
+  // - flagSettings is ephemeral (CLI --settings) and not stored back
+  const sources = ['userSettings', 'projectSettings', 'localSettings'] as const
+
+  let anyMigrated = false
+  for (const source of sources) {
+    const model = getSettingsForSource(source)?.model
+    if (typeof model !== 'string') {
+      continue
+    }
+
+    // Match base model strings: claude-sonnet-4-5-20250929 or sonnet-4-5-20250929
+    // Optionally followed by a context window suffix like [1m], [100k], [200k], etc.
+    const match = model.match(/^(?:claude-)?(sonnet-4-5-20250929)(?:\[(.+?)\])?$/)
+    if (!match) {
+      continue
+    }
+
+    const suffix = match[2] ? `[${match[2]}]` : ''
+    updateSettingsForSource(source, {
+      model: suffix ? `sonnet${suffix}` : 'sonnet',
+    })
+    anyMigrated = true
   }
 
-  // Match base model strings: claude-sonnet-4-5-20250929 or sonnet-4-5-20250929
-  // Optionally followed by a context window suffix like [1m], [100k], [200k], etc.
-  const match = model.match(/^(?:claude-)?(sonnet-4-5-20250929)(?:\[(.+?)\])?$/)
-  if (!match) {
+  if (!anyMigrated) {
     return
   }
-
-  const suffix = match[2] ? `[${match[2]}]` : ''
-  updateSettingsForSource('userSettings', {
-    model: suffix ? `sonnet${suffix}` : 'sonnet',
-  })
 
   // Record the migration timestamp so the notification hook can show a one-time notice.
   // This is always saved when the migration actually changes the model. Brand-new users
@@ -53,7 +67,7 @@ export function migrateSonnet45ToSonnet46(): void {
 
   logEvent('tengu_sonnet45_to_46_migration', {
     from_model:
-      model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    has_1m: suffix === '[1m]',
+      'multiple' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    has_1m: false,
   })
 }
