@@ -187,9 +187,6 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // Rollback: restore original state in case of failure
     logError('Failed to migrate MCP server settings, rolling back', error)
 
-    // Save the current (migration-applied) settings state for potential undo
-    const currentSettings = getSettingsForSource('localSettings') || {}
-
     let rollbackFailed = false
 
     // Build the rollback updates for settings (shared across rollback and potential undo)
@@ -237,16 +234,16 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       rollbackFailed = true
 
       // If settings rollback succeeded but project config rollback failed,
-      // undo the settings rollback to maintain consistency.
-      // This leaves both settings and project config in the migration-applied state,
-      // which is more consistent than having settings reverted and project config not.
-      if (settingsRollbackSucceeded) {
-        try {
-          updateSettingsForSource('localSettings', currentSettings)
-        } catch (undoError) {
-          logError('Failed to undo settings rollback after project config rollback failure', undoError)
-        }
-      }
+      // do NOT attempt to undo the settings rollback by re-applying the migrated state.
+      // Doing so would overwrite any concurrent changes to other settings keys,
+      // causing data loss. Instead, log the error and let the system report the
+      // inconsistent state. The rollbackFailed flag is already set above, so the
+      // caller will be notified of the incomplete rollback.
+      logError(
+        'Settings rollback succeeded but project config rollback failed. ' +
+        'System is in an inconsistent state. Manual intervention may be required.',
+        rollbackError
+      )
     }
 
     if (rollbackFailed) {
