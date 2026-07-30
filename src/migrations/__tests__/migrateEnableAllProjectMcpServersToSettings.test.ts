@@ -719,7 +719,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     })
   })
 
-  test('should re-apply migrated state to settings when project config rollback fails after settings rollback succeeded', async () => {
+  test('should rollback settings and not re-apply when project config rollback fails after settings rollback succeeded', async () => {
     // Dynamic import after mocks are set up
     const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 
@@ -735,8 +735,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       otherSetting: 'some-value',
     }
 
-    // Mock saveCurrentProjectConfig to throw on first call (migration) and third call (project config rollback),
-    // but succeed on second call (settings rollback)
+    // Mock saveCurrentProjectConfig to throw on first call (migration) and second call (project config rollback)
     let saveProjectConfigCallCount = 0
     const saveProjectConfigMock = mock((updater: any) => {
       saveProjectConfigCallCount++
@@ -776,16 +775,12 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     // Verify that migration flag was NOT set (should remain false)
     expect(globalConfigStore.hasCompletedMcpServerMigration).toBeUndefined()
 
-    // Verify that settings were re-applied with the migrated state (since settings rollback succeeded
-    // but project config rollback failed, the system should re-apply the migrated state to settings
-    // to maintain consistency)
+    // Verify that settings were rolled back to original (no migration fields re-applied)
     expect(settingsStore.localSettings).toEqual({
       otherSetting: 'some-value',
-      enableAllProjectMcpServers: true,
-      enabledMcpjsonServers: ['server1'],
     })
 
-    // Verify that project config still has the original fields (migration failed, but rollback also failed)
+    // Verify that project config still has the original fields (migration never modified it)
     expect(projectConfigStore).toEqual({
       enableAllProjectMcpServers: true,
       enabledMcpjsonServers: ['server1'],

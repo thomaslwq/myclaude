@@ -196,19 +196,17 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       }
     }
 
-    // First, attempt rollback of settings
-    let settingsRollbackSucceeded = false
+    // Attempt rollback of settings
     try {
       // Only revert the specific fields that were migrated, not the entire settings object.
       // This preserves any concurrent changes to other keys made by other processes.
       updateSettingsForSource('localSettings', rollbackUpdates)
-      settingsRollbackSucceeded = true
     } catch (rollbackError) {
       logError('Rollback of settings failed', rollbackError)
       rollbackFailed = true
     }
 
-    // Then, attempt rollback of project config
+    // Attempt rollback of project config
     try {
       // Restore the original project config fields that were migrated
       saveCurrentProjectConfig((config: Record<string, any>) => {
@@ -221,37 +219,6 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     } catch (rollbackError) {
       logError('Rollback of project config failed', rollbackError)
       rollbackFailed = true
-
-      // If settings rollback succeeded but project config rollback failed,
-      // re-apply the migrated state to settings to restore system consistency.
-      // This is preferred over leaving the system in a partially migrated,
-      // partially rolled-back state. While this could overwrite concurrent changes
-      // to the specific migrated fields made by other processes, it prevents the
-      // more severe outcome of an inconsistent configuration where settings are
-      // rolled back but project config still has the migrated fields removed.
-      if (settingsRollbackSucceeded) {
-        try {
-          // Re-apply the migration updates to settings (these are the merged values)
-          updateSettingsForSource('localSettings', updates)
-          logError(
-            'Re-applied migrated state to settings after project config rollback failure. ' +
-            'System is now consistent (migration state re-applied).',
-            rollbackError
-          )
-        } catch (reapplyError) {
-          logError(
-            'Failed to re-apply migrated state to settings after project config rollback failure. ' +
-            'System is in an inconsistent state. Manual intervention may be required.',
-            reapplyError
-          )
-        }
-      } else {
-        logError(
-          'Settings rollback succeeded but project config rollback failed. ' +
-          'System is in an inconsistent state. Manual intervention may be required.',
-          rollbackError
-        )
-      }
     }
 
     if (rollbackFailed) {
