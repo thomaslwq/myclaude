@@ -126,13 +126,26 @@ describe('migrateSonnet1mToSonnet45', () => {
   })
 
   it('should handle multiple sources with sonnet[1m] in different sources', () => {
-    mockGetSettingsForSource.mockReturnValue({ model: 'sonnet[1m]' })
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return { model: 'sonnet[1m]' }
+      if (source === 'projectSettings') return { model: 'sonnet' }
+      if (source === 'localSettings') return { model: 'sonnet[1m]' }
+      return undefined
+    })
     mockGetMainLoopModelOverride.mockReturnValue(null)
 
     migrateSonnet1mToSonnet45()
 
-    // Should have been called for each source
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(3)
+    // Should have been called for userSettings and localSettings (which have sonnet[1m])
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(2)
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'sonnet-4-5-20250929[1m]' },
+    )
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'localSettings',
+      { model: 'sonnet-4-5-20250929[1m]' },
+    )
     expect(mockSaveGlobalConfig).toHaveBeenCalledWith(expect.any(Function))
     const saveFn = mockSaveGlobalConfig.mock.calls[0][0]
     expect(saveFn({})).toEqual({ sonnet1m45MigrationComplete: true })
