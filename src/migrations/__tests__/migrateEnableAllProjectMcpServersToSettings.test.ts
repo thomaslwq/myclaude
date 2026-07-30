@@ -34,12 +34,19 @@ beforeEach(() => {
   }))
 
   mock.module(join(import.meta.dir, '../../utils/settings/settings.js'), () => ({
-    getSettingsForSource: (source: string) => settingsStore[source] || {},
+    getSettingsForSource: (source: string) => ({ ...(settingsStore[source] || {}) }),
     updateSettingsForSource: (source: string, updates: any) => {
       if (!settingsStore[source]) {
         settingsStore[source] = {}
       }
-      settingsStore[source] = { ...settingsStore[source], ...updates }
+      // Match the real implementation: undefined values signal deletion
+      for (const key of Object.keys(updates)) {
+        if (updates[key] === undefined) {
+          delete settingsStore[source][key]
+        } else {
+          settingsStore[source][key] = updates[key]
+        }
+      }
     },
   }))
 
@@ -617,11 +624,17 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       if (updateSettingsCallCount === 1) {
         throw new Error('Disk full')
       }
-      // Rollback call succeeds
+      // Rollback call succeeds - handle undefined as deletion (match real implementation)
       if (!settingsStore[source]) {
         settingsStore[source] = {}
       }
-      settingsStore[source] = { ...settingsStore[source], ...updates }
+      for (const key of Object.keys(updates)) {
+        if (updates[key] === undefined) {
+          delete settingsStore[source][key]
+        } else {
+          settingsStore[source][key] = updates[key]
+        }
+      }
     })
 
     mock.module(join(import.meta.dir, '../../utils/settings/settings.js'), () => ({
