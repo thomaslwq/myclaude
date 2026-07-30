@@ -51,10 +51,9 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   // Save original state for rollback in case of failure
   const originalSettings = getSettingsForSource('localSettings') || {}
   const originalProjectConfig = { ...projectConfig }
-  const originalSettingsKeys = new Set(Object.keys(originalSettings))
 
-  // Declare fieldsToRemove outside try block so it's accessible in the catch block for rollback
-  const fieldsToRemove: Array<
+  // Track which fields we are migrating (for rollback)
+  const migratedFields: Array<
     | 'enableAllProjectMcpServers'
     | 'enabledMcpjsonServers'
     | 'disabledMcpjsonServers'
@@ -75,7 +74,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     if (hasEnableAll) {
       updates.enableAllProjectMcpServers =
         projectConfig.enableAllProjectMcpServers
-      fieldsToRemove.push('enableAllProjectMcpServers')
+      migratedFields.push('enableAllProjectMcpServers')
     }
 
     // Start with existing settings arrays as the base
@@ -101,7 +100,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
           }
         }
       }
-      fieldsToRemove.push('enabledMcpjsonServers')
+      migratedFields.push('enabledMcpjsonServers')
     }
 
     // Merge disabledMcpjsonServers if it exists in project config
@@ -116,7 +115,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
           }
         }
       }
-      fieldsToRemove.push('disabledMcpjsonServers')
+      migratedFields.push('disabledMcpjsonServers')
     }
 
     // Resolve overlapping servers: if a server appears in both enabled and disabled lists,
@@ -126,27 +125,21 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     const overlappingServers = existingDisabledServers.filter(server =>
       enabledSet.has(server)
     )
-    if (overlappingServers.length > 0) {
-      // Remove overlapping servers from the disabled list
-      const overlappingSet = new Set(overlappingServers)
-      for (let i = existingDisabledServers.length - 1; i >= 0; i--) {
-        if (overlappingSet.has(existingDisabledServers[i])) {
-          existingDisabledServers.splice(i, 1)
-        }
+    for (const server of overlappingServers) {
+      const index = existingDisabledServers.indexOf(server)
+      if (index !== -1) {
+        existingDisabledServers.splice(index, 1)
       }
+    }
 
+    // Log warning if overlapping servers were found
+    if (overlappingServers.length > 0) {
       logEvent('tengu_migrate_mcp_server_overlap_in_both_lists', {
-        migration: 'enableAllProjectMcpServersToSettings',
         overlappingServers: overlappingServers.join(','),
-        message: 'MCP server(s) appear in both enabled and disabled lists. Removed from disabled list to resolve conflict.',
       })
     }
 
-    // Only set updates if there are actual changes from existing settings
-    // This prevents overwriting other fields in the settings file
-    // Also check if existing settings had the field to handle cases where mutual exclusivity
-    // filtering removes all entries (e.g., all disabled servers are also in enabled list)
-    // Only set the field if:
+    // Determine which settings fields to include based on:
     // - Settings already had it (preserve existing data even if empty), OR
     // - The project config has an array to migrate (including empty arrays to preserve semantics)
     const existingHadEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
@@ -172,7 +165,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // Remove migrated fields from project config
     saveCurrentProjectConfig((config: Record<string, any>) => {
       const updated = { ...config }
-      for (const field of fieldsToRemove) {
+      for (const field of migratedFields) {
         delete updated[field]
       }
       return updated
@@ -183,7 +176,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
     logEvent('tengu_migrate_enable_all_project_mcp_servers_to_settings', {
       migration: 'enableAllProjectMcpServersToSettings',
-      fieldsMigrated: fieldsToRemove.join(','),
+      fieldsMigrated: migratedFields.join(','),
     })
   } catch (error) {
     // Rollback: restore original state in case of failure
@@ -191,13 +184,8 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
     let rollbackFailed = false
 
-    // Build the rollback updates for settings (shared across rollback and potential undo)
+    // Build the rollback updates for settings
     const rollbackUpdates: Record<string, unknown> = {}
-    const migratedFields: Array<keyof typeof originalSettings> = [
-      'enableAllProjectMcpServers',
-      'enabledMcpjsonServers',
-      'disabledMcpjsonServers',
-    ]
     for (const field of migratedFields) {
       if (field in originalSettings) {
         rollbackUpdates[field] = originalSettings[field]
@@ -221,12 +209,11 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     }
 
     // Then, attempt rollback of project config
-    // Only restore the specific fields that were migrated, not the entire project config.
-    // This preserves any concurrent changes to other keys made by other processes.
     try {
+      // Restore the original project config fields that were migrated
       saveCurrentProjectConfig((config: Record<string, any>) => {
         const updated = { ...config }
-        for (const field of fieldsToRemove) {
+        for (const field of migratedFields) {
           updated[field] = originalProjectConfig[field]
         }
         return updated
@@ -244,13 +231,8 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       // rolled back but project config still has the migrated fields removed.
       if (settingsRollbackSucceeded) {
         try {
-          const reapplyUpdates: Record<string, unknown> = {}
-          for (const field of migratedFields) {
-            if (updates[field as keyof typeof updates] !== undefined) {
-              reapplyUpdates[field] = updates[field as keyof typeof updates]
-            }
-          }
-          updateSettingsForSource('localSettings', reapplyUpdates)
+          // Re-apply the migration updates to settings (these are the merged values)
+          updateSettingsForSource('localSettings', updates)
           logError(
             'Re-applied migrated state to settings after project config rollback failure. ' +
             'System is now consistent (migration state re-applied).',

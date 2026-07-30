@@ -7,6 +7,22 @@ import { getCwd } from './utils/cwd.js'
 import { isDirEmpty, getFileModificationTime } from './utils/file.js'
 import { getFsImplementation } from './utils/fsOperations.js'
 
+/**
+ * Compute a fingerprint of a directory's contents to detect changes
+ * without relying on mtime (which may not update reliably on FUSE mounts,
+ * network filesystems, or containers with coarse timestamp resolution).
+ *
+ * The fingerprint is a sorted, newline-joined list of the immediate children
+ * (filenames only). This reliably detects file additions, removals, and
+ * renames. It does NOT detect content changes within existing files
+ * (those are covered by the CLAUDE.md mtime check).
+ */
+function getDirectoryFingerprint(dirPath: string): string {
+  const fs = getFsImplementation()
+  const entries = fs.readdirStringSync(dirPath)
+  return entries.sort().join('\n')
+}
+
 export type Step = {
   key: string
   text: string
@@ -27,7 +43,7 @@ export type Step = {
 // where mtime may not change reliably.
 let cachedSteps: Step[] | null = null
 let cachedClaudeMdMtime: number = -1
-let cachedDirMtime: number = -1
+let cachedDirFingerprint: string = ''
 
 /**
  * Timestamp (ms) when the cache was last populated. Used as a fallback
@@ -48,7 +64,7 @@ const CACHE_MAX_AGE_MS = 30_000
 export function clearCachedSteps(): void {
   cachedSteps = null
   cachedClaudeMdMtime = -1
-  cachedDirMtime = -1
+  cachedDirFingerprint = ''
   cachedAt = null
 }
 
@@ -79,13 +95,15 @@ function isCacheValid(): boolean {
     return false
   }
 
-  // Check the directory mtime to detect content changes (files added/removed)
-  // that don't modify CLAUDE.md itself.
+  // Check the directory fingerprint to detect content changes (files added/removed)
+  // that don't modify CLAUDE.md itself. This is more reliable than mtime,
+  // which may not update on FUSE mounts, network filesystems, or containers
+  // with coarse timestamp resolution.
   try {
-    const currentDirMtime = getFileModificationTime(cwd)
-    if (currentDirMtime !== cachedDirMtime) return false
+    const currentFingerprint = getDirectoryFingerprint(cwd)
+    if (currentFingerprint !== cachedDirFingerprint) return false
   } catch {
-    // If we can't stat the directory, invalidate to be safe
+    // If we can't read the directory, invalidate to be safe
     return false
   }
 
@@ -117,9 +135,9 @@ export function getSteps(): Step[] {
     cachedClaudeMdMtime = -1
   }
   try {
-    cachedDirMtime = getFileModificationTime(cwd)
+    cachedDirFingerprint = getDirectoryFingerprint(cwd)
   } catch {
-    cachedDirMtime = -1
+    cachedDirFingerprint = ''
   }
   cachedAt = Date.now()
 
