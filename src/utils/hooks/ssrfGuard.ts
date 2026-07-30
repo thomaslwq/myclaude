@@ -33,6 +33,9 @@ import { isIP } from 'net'
  *   fc00::/7         unique local
  *   fe80::/10        link-local
  *   ::ffff:<v4>      mapped IPv4 in a blocked range
+ *   ::<v4>           IPv4-compatible (deprecated but still valid)
+ *   2002:<v4>/48     6to4-embedded IPv4 in a blocked range
+ *   fe80::5efe:<v4>  ISATAP-embedded IPv4 in a blocked range
  *
  * Allowed (returns false):
  *   127.0.0.0/8      loopback (local dev hooks)
@@ -94,34 +97,83 @@ function isBlockedV6(address: string): boolean {
   // :: unspecified
   if (lower === '::') return true
 
-  // IPv4-mapped IPv6 (0:0:0:0:0:ffff:X:Y in any representation — ::ffff:a.b.c.d,
-  // ::ffff:XXXX:YYYY, expanded, or partially expanded). Extract the embedded
-  // IPv4 address and delegate to the v4 check. Without this, hex-form mapped
-  // addresses (e.g. ::ffff:a9fe:a9fe = 169.254.169.254) bypass the guard.
-  const mappedV4 = extractMappedIPv4(lower)
-  if (mappedV4 !== null) {
-    return isBlockedV4(mappedV4)
+  // Expand the address into 8 groups for uniform checking.
+  const g = expandIPv6Groups(lower)
+  if (!g) return false
+
+  // Extract embedded IPv4 from various embedding schemes.
+  const embeddedV4 = extractEmbeddedIPv4(g)
+  if (embeddedV4 !== null) {
+    return isBlockedV4(embeddedV4)
   }
 
   // fc00::/7 — unique local addresses (fc00:: through fdff::)
-  if (lower.startsWith('fc') || lower.startsWith('fd')) {
+  if (g[0]! >= 0xfc00 && g[0]! <= 0xfdff) {
     return true
   }
 
-  // fe80::/10 — link-local. The /10 means fe80 through febf, but the first
-  // hextet is always fe80 in practice (RFC 4291 requires the next 54 bits
-  // to be zero). Check both to be safe.
-  const firstHextet = lower.split(':')[0]
-  if (
-    firstHextet &&
-    firstHextet.length === 4 &&
-    firstHextet >= 'fe80' &&
-    firstHextet <= 'febf'
-  ) {
+  // fe80::/10 — link-local. The /10 means fe80 through febf.
+  if (g[0]! >= 0xfe80 && g[0]! <= 0xfebf) {
     return true
   }
 
   return false
+}
+
+/**
+ * Extract the embedded IPv4 address from an IPv6 address that uses one of
+ * the standard IPv4-embedding mechanisms:
+ *
+ *   - IPv4-mapped IPv6:  0:0:0:0:0:ffff:X:Y  (::ffff:a.b.c.d)
+ *   - IPv4-compatible:   0:0:0:0:0:0:X:Y      (::a.b.c.d, deprecated)
+ *   - 6to4:              2002:XX:YY::/48      (2002:abcd:efgh::)
+ *   - ISATAP:            fe80:0:0:0:0:5efe:X:Y  (fe80::5efe:a.b.c.d)
+ *
+ * Returns the dotted-decimal string, or null if no embedding is detected.
+ *
+ * `g` must be an array of 8 numbers (16-bit groups).
+ */
+function extractEmbeddedIPv4(g: number[]): string | null {
+  if (g.length !== 8) return null
+
+  // IPv4-mapped: 0:0:0:0:0:ffff:X:Y
+  if (
+    g[0] === 0 && g[1] === 0 && g[2] === 0 &&
+    g[3] === 0 && g[4] === 0 && g[5] === 0xffff
+  ) {
+    return composeV4(g[6]!, g[7]!)
+  }
+
+  // IPv4-compatible: 0:0:0:0:0:0:X:Y (deprecated but still valid)
+  if (
+    g[0] === 0 && g[1] === 0 && g[2] === 0 &&
+    g[3] === 0 && g[4] === 0 && g[5] === 0
+  ) {
+    return composeV4(g[6]!, g[7]!)
+  }
+
+  // 6to4: 2002:XX:YY::/48 where XX:YY is the IPv4 address in hex
+  if (g[0] === 0x2002) {
+    return composeV4(g[1]!, g[2]!)
+  }
+
+  // ISATAP: fe80:0:0:0:0:5efe:X:Y (or with any link-local prefix)
+  if (
+    g[0] >= 0xfe80 && g[0] <= 0xfebf &&
+    g[1] === 0 && g[2] === 0 && g[3] === 0 &&
+    g[4] === 0 && g[5] === 0x5efe
+  ) {
+    return composeV4(g[6]!, g[7]!)
+  }
+
+  return null
+}
+
+/**
+ * Combine two 16-bit groups into a dotted-decimal IPv4 string.
+ */
+function composeV4(hi: number, lo: number): string {
+  return `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`
 }
 
 /**
@@ -138,6 +190,11 @@ function expandIPv6Groups(addr: string): number[] | null {
     const lastColon = addr.lastIndexOf(':')
     const v4 = addr.slice(lastColon + 1)
     addr = addr.slice(0, lastColon)
+    // Handle the case where the remaining address is just a single colon
+    // (e.g. ::10.0.0.1 -> lastColon is the second colon, leaving ':')
+    if (addr === ':') {
+      addr = '::'
+    }
     const octets = v4.split('.').map(Number)
     if (
       octets.length !== 4 ||
@@ -176,31 +233,6 @@ function expandIPv6Groups(addr: string): number[] | null {
   }
   nums.push(...tailHextets)
   return nums.length === 8 ? nums : null
-}
-
-/**
- * Extract the embedded IPv4 address from an IPv4-mapped IPv6 address
- * (0:0:0:0:0:ffff:X:Y) in any valid representation — compressed, expanded,
- * hex groups, or trailing dotted-decimal. Returns null if the address is
- * not an IPv4-mapped IPv6 address.
- */
-function extractMappedIPv4(addr: string): string | null {
-  const g = expandIPv6Groups(addr)
-  if (!g) return null
-  // IPv4-mapped: first 80 bits zero, next 16 bits ffff, last 32 bits = IPv4
-  if (
-    g[0] === 0 &&
-    g[1] === 0 &&
-    g[2] === 0 &&
-    g[3] === 0 &&
-    g[4] === 0 &&
-    g[5] === 0xffff
-  ) {
-    const hi = g[6]!
-    const lo = g[7]!
-    return `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`
-  }
-  return null
 }
 
 /**
