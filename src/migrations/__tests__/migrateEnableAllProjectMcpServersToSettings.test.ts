@@ -48,6 +48,11 @@ beforeEach(() => {
         }
       }
     },
+    deleteSettingsField: (source: string, field: string) => {
+      if (settingsStore[source]) {
+        delete settingsStore[source][field]
+      }
+    },
   }))
 
   mock.module(join(import.meta.dir, '../../utils/log.js'), () => ({

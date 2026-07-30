@@ -537,6 +537,61 @@ export function updateSettingsForSource(
 }
 
 /**
+ * Delete a specific field from a settings file for a given source.
+ * This provides an explicit API for field deletion, avoiding reliance on
+ * undefined values which is an implementation detail of updateSettingsForSource.
+ *
+ * @param source The settings source to delete from
+ * @param field The field name to delete
+ * @returns An object with an error property if deletion failed
+ */
+export function deleteSettingsField(
+  source: EditableSettingSource,
+  field: string,
+): { error: Error | null } {
+  if (
+    (source as unknown) === 'policySettings' ||
+    (source as unknown) === 'flagSettings'
+  ) {
+    return { error: null }
+  }
+
+  const filePath = getSettingsFilePathForSource(source)
+  if (!filePath) {
+    return { error: null }
+  }
+
+  try {
+    getFsImplementation().mkdirSync(dirname(filePath))
+
+    // Get existing settings
+    let existingSettings = getSettingsForSourceUncached(source)
+
+    // If file doesn't exist, nothing to delete
+    if (!existingSettings) {
+      return { error: null }
+    }
+
+    // Delete the field from the settings object
+    delete (existingSettings as Record<string, unknown>)[field]
+
+    // Write the updated settings back to the file
+    writeFileSyncAndFlush_DEPRECATED(filePath, jsonStringify(existingSettings))
+
+    // Reset the cache to ensure subsequent reads get the updated data
+    resetSettingsCache()
+
+    return { error: null }
+  } catch (e) {
+    const error = new Error(
+      `Failed to delete field ${field} from settings source ${source}: ${e}`,
+    )
+    logError(error)
+    return { error }
+  }
+}
+
+/**
  * Custom merge function for arrays - concatenate and deduplicate
  */
 function mergeArrays<T>(targetArray: T[], sourceArray: T[]): T[] {

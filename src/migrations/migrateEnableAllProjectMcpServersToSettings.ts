@@ -7,6 +7,7 @@ import {
 } from '../utils/config.js'
 import { logError } from '../utils/log.js'
 import {
+  deleteSettingsField,
   getSettingsForSource,
   updateSettingsForSource,
 } from '../utils/settings/settings.js'
@@ -187,26 +188,22 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
     let rollbackFailed = false
 
-    // Build the rollback updates for settings by restoring the original full settings object.
+    // Attempt rollback of settings by restoring the original full settings object.
     // We pass the original settings values for the fields that were migrated.
-    // If a field didn't exist before migration, we pass undefined which signals
-    // updateSettingsForSource to delete that key from the settings file.
-    const rollbackUpdates: Record<string, unknown> = {}
-    for (const field of migratedFields) {
-      if (field in originalSettings) {
-        rollbackUpdates[field] = originalSettings[field]
-      } else {
-        // Field didn't exist before migration — set to undefined to delete it.
-        // The updateSettingsForSource function handles undefined keys by deleting them
-        // from the file (see settings.ts: updateSettingsForSource).
-        rollbackUpdates[field] = undefined as unknown as undefined
-      }
-    }
-
-    // Attempt rollback of settings
+    // For fields that didn't exist before migration, we use deleteSettingsField
+    // to explicitly remove them from the settings file.
     try {
       // Only revert the specific fields that were migrated, not the entire settings object.
       // This preserves any concurrent changes to other keys made by other processes.
+      const rollbackUpdates: Record<string, unknown> = {}
+      for (const field of migratedFields) {
+        if (field in originalSettings) {
+          rollbackUpdates[field] = originalSettings[field]
+        } else {
+          // Field didn't exist before migration — explicitly delete it.
+          deleteSettingsField('localSettings', field)
+        }
+      }
       updateSettingsForSource('localSettings', rollbackUpdates)
     } catch (rollbackError) {
       logError('Rollback of settings failed', rollbackError)
