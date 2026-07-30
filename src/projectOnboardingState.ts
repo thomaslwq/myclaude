@@ -12,15 +12,32 @@ import { getFsImplementation } from './utils/fsOperations.js'
  * without relying on mtime (which may not update reliably on FUSE mounts,
  * network filesystems, or containers with coarse timestamp resolution).
  *
- * The fingerprint is a sorted, newline-joined list of the immediate children
- * (filenames only). This reliably detects file additions, removals, and
- * renames. It does NOT detect content changes within existing files
- * (those are covered by the CLAUDE.md mtime check).
+ * The fingerprint is a sorted, newline-joined list of all files and
+ * subdirectories recursively. This reliably detects file additions,
+ * removals, and renames at any depth. It does NOT detect content
+ * changes within existing files (those are covered by the CLAUDE.md
+ * mtime check).
  */
 function getDirectoryFingerprint(dirPath: string): string {
   const fs = getFsImplementation()
   const entries = fs.readdirStringSync(dirPath)
-  return entries.sort().join('\n')
+  const sortedEntries = entries.sort()
+  
+  // Recursively include subdirectories in the fingerprint
+  const fingerprintParts: string[] = []
+  for (const entry of sortedEntries) {
+    const fullPath = join(dirPath, entry)
+    const stat = fs.statSync(fullPath)
+    if (stat.isDirectory()) {
+      // Include the directory name and recurse into it
+      fingerprintParts.push(entry + '/')
+      fingerprintParts.push(getDirectoryFingerprint(fullPath))
+    } else {
+      fingerprintParts.push(entry)
+    }
+  }
+  
+  return fingerprintParts.join('\n')
 }
 
 export type Step = {
