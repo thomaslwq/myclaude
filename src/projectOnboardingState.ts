@@ -26,8 +26,8 @@ export type Step = {
 // time-based fallback ensures the cache is refreshed quickly even on filesystems
 // where mtime may not change reliably.
 let cachedSteps: Step[] | null = null
-let cachedClaudeMdMtime: number | null = null
-let cachedDirMtime: number | null = null
+let cachedClaudeMdMtime: number = -1
+let cachedDirMtime: number = -1
 
 /**
  * Timestamp (ms) when the cache was last populated. Used as a fallback
@@ -47,8 +47,8 @@ const CACHE_MAX_AGE_MS = 30_000
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
-  cachedClaudeMdMtime = null
-  cachedDirMtime = null
+  cachedClaudeMdMtime = -1
+  cachedDirMtime = -1
   cachedAt = null
 }
 
