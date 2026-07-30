@@ -88,7 +88,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // Merge enabledMcpjsonServers if it exists in project config
     if (hasEnabledServers) {
       // Preserve empty arrays to maintain semantic meaning (explicit list of zero servers)
-      // vs undefined which means "use defaults"
+      // vs undefined which means 'use defaults'
       if (Array.isArray(projectConfig.enabledMcpjsonServers) && projectConfig.enabledMcpjsonServers.length > 0) {
         // Merge the servers, preserving order and avoiding duplicates
         // First occurrence wins: existing items keep their position, new items are appended
@@ -159,10 +159,9 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       updates.disabledMcpjsonServers = existingDisabledServers
     }
 
-    // Apply updates to settings
-    updateSettingsForSource('localSettings', updates)
-
-    // Remove migrated fields from project config
+    // Remove migrated fields from project config FIRST to avoid a window where
+    // both settings and project config carry the same data (duplicate state).
+    // If this step fails, the rollback will restore both.
     saveCurrentProjectConfig((config: Record<string, any>) => {
       const updated = { ...config }
       for (const field of migratedFields) {
@@ -170,6 +169,10 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       }
       return updated
     })
+
+    // Apply updates to settings AFTER project config fields are removed.
+    // This ensures we never have both sources holding the same fields simultaneously.
+    updateSettingsForSource('localSettings', updates)
 
     // Mark migration as completed in global config
     saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
@@ -184,15 +187,19 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
     let rollbackFailed = false
 
-    // Build the rollback updates for settings
+    // Build the rollback updates for settings by restoring the original full settings object.
+    // We pass the original settings values for the fields that were migrated.
+    // If a field didn't exist before migration, we pass undefined which signals
+    // updateSettingsForSource to delete that key from the settings file.
     const rollbackUpdates: Record<string, unknown> = {}
     for (const field of migratedFields) {
       if (field in originalSettings) {
         rollbackUpdates[field] = originalSettings[field]
       } else {
-        // Field didn't exist before migration — set to undefined to delete it
-        // updateSettingsForSource handles undefined keys by deleting them from the file
-        rollbackUpdates[field] = undefined
+        // Field didn't exist before migration — set to undefined to delete it.
+        // The updateSettingsForSource function handles undefined keys by deleting them
+        // from the file (see settings.ts: updateSettingsForSource).
+        rollbackUpdates[field] = undefined as unknown as undefined
       }
     }
 
@@ -222,12 +229,22 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     }
 
     if (rollbackFailed) {
+      // Log a clear warning for administrators about the inconsistent state
+      logError(
+        'MIGRATION WARNING: Rollback was incomplete. The system may be in an inconsistent ' +
+        'state with duplicate or conflicting MCP server configuration. Manual intervention ' +
+        'may be required to restore consistency between project config and settings.',
+        new Error(
+          'Migration failed and rollback was incomplete. The system may be in an inconsistent state. ' +
+          'Original error: ' + (error instanceof Error ? error.message : String(error))
+        )
+      )
       throw new Error(
         'Migration failed and rollback was incomplete. The system may be in an inconsistent state. ' +
         'Original error: ' + (error instanceof Error ? error.message : String(error))
       )
+    } else {
+      logError('Rollback completed successfully: original MCP server settings restored', error)
     }
-
-    logError('Rollback completed successfully: original MCP server settings restored', error)
   }
 }
