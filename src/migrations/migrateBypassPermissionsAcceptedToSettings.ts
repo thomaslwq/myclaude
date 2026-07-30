@@ -46,5 +46,6 @@ export function migrateBypassPermissionsAcceptedToSettings(): void {
     logError(
       new Error(`Failed to migrate bypass permissions accepted: ${error}`),
     )
+    throw error
   }
 }

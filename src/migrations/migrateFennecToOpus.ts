@@ -69,5 +69,6 @@ export function migrateFennecToOpus(): void {
     }
   } catch (error) {
     logError(new Error(`Failed to migrate fennec to opus: ${error}`))
+    throw error
   }
 }

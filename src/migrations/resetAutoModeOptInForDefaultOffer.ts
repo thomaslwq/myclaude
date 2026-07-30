@@ -67,6 +67,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
       return { ...c, hasResetAutoModeOptInForDefaultOffer: true }
     })
   } catch (error) {
-    logError(new Error(`Failed to reset auto mode opt-in: ${error}`))
+    logError(new Error(`Failed to reset auto mode opt-in for default offer: ${error}`))
+    throw error
   }
 }
