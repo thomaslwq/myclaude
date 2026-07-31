@@ -38,7 +38,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
     // Check if skipAutoPermissionPrompt is set in ANY source
     const sourcesToCheck: EditableSettingSource[] = ['userSettings', 'localSettings', 'projectSettings']
     const hasSkipInAnySource = sourcesToCheck.some(
-      source => getSettingsForSource(source)?.skipAutoPermissionPrompt !== undefined,
+      source => getSettingsForSource(source)?.skipAutoPermissionPrompt === true,
     )
 
     // Check the effective defaultMode from merged settings (highest-priority wins)
@@ -53,7 +53,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
       // Clear skipAutoPermissionPrompt from all editable sources where it's set
       for (const source of sourcesToCheck) {
         const settings = getSettingsForSource(source)
-        if (settings?.skipAutoPermissionPrompt !== undefined) {
+        if (settings?.skipAutoPermissionPrompt === true) {
           updateSettingsForSource(source, {
             skipAutoPermissionPrompt: undefined,
           })
