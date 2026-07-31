@@ -141,7 +141,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   try {
     updateSettingsForSource('localSettings', updates)
   } catch (error) {
-    logError('Failed to migrate MCP server settings to local config', error)
+    logError(new Error(`Failed to migrate MCP server settings to local config: ${error}`))
     throw error
   }
 
