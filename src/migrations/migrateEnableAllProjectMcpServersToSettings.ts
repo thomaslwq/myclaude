@@ -52,6 +52,8 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   // Save original state for rollback in case of failure
   const originalSettings = getSettingsForSource('localSettings') || {}
   const originalProjectConfig = { ...projectConfig }
+  // Capture file content hash for concurrent change detection
+  const originalSettingsHash = JSON.stringify(originalSettings)
 
   // Track which fields we are migrating (for rollback)
   const migratedFields: Array<
@@ -173,6 +175,17 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
     // Apply updates to settings AFTER project config fields are removed.
     // This ensures we never have both sources holding the same fields simultaneously.
+    // Check for concurrent changes before writing
+    const currentSettings = getSettingsForSource('localSettings') || {}
+    const currentSettingsHash = JSON.stringify(currentSettings)
+    if (currentSettingsHash !== originalSettingsHash) {
+      logError(
+        'MIGRATION WARNING: Settings file was modified concurrently during migration. ' +
+        'The migration will overwrite concurrent changes, potentially causing data loss. ' +
+        'Original settings hash: ' + originalSettingsHash +
+        ', Current settings hash: ' + currentSettingsHash
+      )
+    }
     updateSettingsForSource('localSettings', updates)
 
     // Mark migration as completed in global config
@@ -193,6 +206,18 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // For fields that didn't exist before migration, we use deleteSettingsField
     // to explicitly remove them from the settings file.
     try {
+      // Check for concurrent changes to the settings file
+      const currentSettings = getSettingsForSource('localSettings') || {}
+      const currentSettingsHash = JSON.stringify(currentSettings)
+      if (currentSettingsHash !== originalSettingsHash) {
+        logError(
+          'MIGRATION WARNING: Settings file was modified concurrently. ' +
+          'The rollback will overwrite concurrent changes, potentially causing data loss. ' +
+          'Original settings hash: ' + originalSettingsHash +
+          ', Current settings hash: ' + currentSettingsHash
+        )
+      }
+
       // Only revert the specific fields that were migrated, not the entire settings object.
       // This preserves any concurrent changes to other keys made by other processes.
       const rollbackUpdates: Record<string, unknown> = {}
