@@ -31,9 +31,6 @@ export function getDirectoryFingerprint(dirPath: string): string {
   
   const sortedEntries = entries.sort()
   
-  // Track visited directories to detect symlink cycles
-  const visited = new Set<string>()
-  
   // Recursively include subdirectories in the fingerprint
   const fingerprintParts: string[] = []
   for (const entry of sortedEntries) {
@@ -54,12 +51,6 @@ export function getDirectoryFingerprint(dirPath: string): string {
         if (entry === 'node_modules' || entry === '.git' || entry === 'dist' || entry === 'build' || entry === '.next' || entry === 'out' || entry === 'coverage') {
           continue
         }
-        
-        // Check for cycles (shouldn't happen with lstat, but just in case)
-        if (visited.has(fullPath)) {
-          continue
-        }
-        visited.add(fullPath)
         
         // Include the directory name and recurse into it
         fingerprintParts.push(entry + '/')
@@ -91,13 +82,17 @@ export type Step = {
 // the user. The cache is cleared when the user explicitly runs /init.
 //
 // To handle the case where the user manually creates CLAUDE.md or changes workspace
-// contents (e.g., by cloning a repo), we track the mtime of both CLAUDE.md and the
-// workspace directory. If either mtime changes, the cache is invalidated. A short
-// time-based fallback ensures the cache is refreshed quickly even on filesystems
-// where mtime may not change reliably.
+// contents (e.g., by cloning a repo), we use a two-tier invalidation strategy:
+// 1. Lightweight mtime check on the root directory (fast, single stat, no recursion)
+// 2. Only if the root mtime has changed, recompute the expensive fingerprint
+//
+// This avoids the synchronous recursive directory walk on every prompt submit,
+// which was blocking the event loop for large workspaces.
+
 let cachedSteps: Step[] | null = null
 let cachedClaudeMdMtime: number = -1
 let cachedDirFingerprint: string = ''
+let cachedRootMtime: number = -1
 
 /**
  * Timestamp (ms) when the cache was last populated. Used as a fallback
@@ -120,14 +115,16 @@ export function clearCachedSteps(): void {
   cachedSteps = null
   cachedClaudeMdMtime = -1
   cachedDirFingerprint = ''
+  cachedRootMtime = -1
   cachedAt = null
 }
 
 /**
  * Check if the cached steps are still valid.
  *
- * Primary: compare CLAUDE.md mtime and directory mtime. If either has changed,
- * the cache is stale.
+ * Primary: compare CLAUDE.md mtime and root directory mtime. If either has changed,
+ * the cache is stale. The root directory mtime check is a lightweight single statSync
+ * call that avoids the expensive recursive directory walk (getDirectoryFingerprint).
  * Fallback: if the cache is older than CACHE_MAX_AGE_MS, re-read the actual
  * file/directory state. This handles filesystems where mtime may not change
  * reliably (e.g., ext4, FUSE, network mounts).
@@ -150,15 +147,18 @@ function isCacheValid(): boolean {
     return false
   }
 
-  // Check the directory fingerprint to detect content changes (files added/removed)
-  // that don't modify CLAUDE.md itself. This is more reliable than mtime,
-  // which may not update on FUSE mounts, network filesystems, or containers
-  // with coarse timestamp resolution.
+  // Lightweight root mtime check: if the root directory's mtime hasn't changed,
+  // the workspace contents are likely unchanged. This is a single statSync call
+  // instead of a full recursive directory walk, which was blocking the event loop.
+  // The mtime of a directory changes when files are added, removed, or renamed
+  // inside it on most filesystems.
   try {
-    const currentFingerprint = getDirectoryFingerprint(cwd)
-    if (currentFingerprint !== cachedDirFingerprint) return false
+    const currentRootMtime = Math.floor(fs.statSync(cwd).mtimeMs)
+    if (currentRootMtime !== cachedRootMtime) {
+      return false
+    }
   } catch {
-    // If we can't read the directory, invalidate to be safe
+    // If we can't stat the root, invalidate to be safe
     return false
   }
 
@@ -188,6 +188,11 @@ export function getSteps(): Step[] {
     cachedClaudeMdMtime = hasClaudeMd ? getFileModificationTime(claudeMdPath) : -1
   } catch {
     cachedClaudeMdMtime = -1
+  }
+  try {
+    cachedRootMtime = Math.floor(fs.statSync(cwd).mtimeMs)
+  } catch {
+    cachedRootMtime = -1
   }
   try {
     cachedDirFingerprint = getDirectoryFingerprint(cwd)
