@@ -44,7 +44,8 @@ export function migrateReplBridgeEnabledToRemoteControlAtStartup(): void {
         replBridgeEnabled: undefined as unknown as undefined,
       }
     }
-    const { 'replBridgeEnabled': _, ...next } = prev
+    const next = { ...prev }
+    delete next.replBridgeEnabled
     return next
   })
 }
