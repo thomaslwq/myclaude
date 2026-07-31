@@ -29,6 +29,11 @@ function getDirectoryFingerprint(dirPath: string): string {
     const fullPath = join(dirPath, entry)
     const stat = fs.statSync(fullPath)
     if (stat.isDirectory()) {
+      // Skip common ignored directories to avoid performance issues
+      // (node_modules, .git, dist, build, etc.)
+      if (entry === 'node_modules' || entry === '.git' || entry === 'dist' || entry === 'build' || entry === '.next' || entry === 'out' || entry === 'coverage') {
+        continue
+      }
       // Include the directory name and recurse into it
       fingerprintParts.push(entry + '/')
       fingerprintParts.push(getDirectoryFingerprint(fullPath))
