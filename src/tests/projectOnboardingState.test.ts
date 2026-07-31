@@ -35,9 +35,11 @@ function createMockFs(customBehaviors: Record<string, any>) {
     linkSync: () => {},
     symlinkSync: () => {},
     readlinkSync: () => '',
-    readdirStringSync: (path: string): string[] => {
+    readdirSync: (path: string) => {
       if (customBehaviors[path]?.readdirError) throw customBehaviors[path].readdirError;
-      if (customBehaviors[path]?.readdirResult) return customBehaviors[path].readdirResult;
+      if (customBehaviors[path]?.readdirResult) {
+        return customBehaviors[path].readdirResult.map((name: string) => ({ name } as any));
+      }
       return [];
     },
   };

@@ -23,7 +23,7 @@ export function getDirectoryFingerprint(dirPath: string): string {
   
   let entries: string[]
   try {
-    entries = fs.readdirStringSync(dirPath)
+    entries = fs.readdirSync(dirPath).map((dirent) => dirent.name)
   } catch {
     // If we can't read the directory (permission error, etc.), return empty fingerprint
     return ''
@@ -159,6 +159,15 @@ function isCacheValid(): boolean {
     }
   } catch {
     // If we can't stat the root, invalidate to be safe
+    return false
+  }
+
+  // Fingerprint check: compare the cached directory fingerprint with the current one.
+  // This reliably detects file additions, removals, and renames at any depth,
+  // even when mtime doesn't change (e.g., on FUSE mounts, network filesystems,
+  // or containers with coarse timestamp resolution).
+  const currentDirFingerprint = getDirectoryFingerprint(cwd)
+  if (currentDirFingerprint !== cachedDirFingerprint) {
     return false
   }
 
