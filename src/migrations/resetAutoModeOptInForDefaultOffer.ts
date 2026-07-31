@@ -37,7 +37,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
   try {
     // Check if skipAutoPermissionPrompt is set in ANY source
     const sourcesToCheck: EditableSettingSource[] = ['userSettings', 'localSettings', 'projectSettings']
-    const hasSkipInAnySource = sourcesToCheck.some(
+    const hasSkipInEditableSources = sourcesToCheck.some(
       source => getSettingsForSource(source)?.skipAutoPermissionPrompt === true,
     )
 
@@ -46,7 +46,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
     const effectiveDefaultMode = effectiveSettings?.permissions?.defaultMode
 
     if (
-      hasSkipInAnySource &&
+      hasSkipInEditableSources &&
       effectiveDefaultMode != null &&
       effectiveDefaultMode !== 'auto'
     ) {
@@ -60,6 +60,20 @@ export function resetAutoModeOptInForDefaultOffer(): void {
         }
       }
       logEvent('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
+    }
+
+    // Check if skipAutoPermissionPrompt is still set after migration
+    // (e.g., in policySettings or flagSettings which are read-only)
+    const allSources = ['userSettings', 'localSettings', 'projectSettings', 'flagSettings', 'policySettings']
+    const hasSkipInNonEditableSources = allSources.some(
+      source => getSettingsForSource(source)?.skipAutoPermissionPrompt === true,
+    )
+
+    if (hasSkipInNonEditableSources) {
+      logError(new Error(
+        'Migration incomplete: skipAutoPermissionPrompt is still set in non-editable sources (policySettings or flagSettings). '
+        + 'The permission prompt will not be re-surfaced. Please check your managed settings configuration.'
+      ))
     }
 
     saveGlobalConfig(c => {

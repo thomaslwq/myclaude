@@ -138,4 +138,90 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(() => resetAutoModeOptInForDefaultOffer()).toThrow('Failed to get initial settings')
     expect(mockLogError).toHaveBeenCalled()
   })
+
+  it('should log warning when skipAutoPermissionPrompt is set in policySettings (non-editable source)', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'policySettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'ask' },
+      }
+      if (source === 'userSettings') return {}
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      if (source === 'flagSettings') return null
+      return null
+    })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    // Should NOT update any editable source since none have the flag set
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+    // Should log a warning about non-editable sources
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('skipAutoPermissionPrompt is still set in non-editable sources'),
+      }),
+    )
+    // Should still save the config as migrated
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+    // Should NOT log the event (since hasSkipInEditableSources is false)
+    expect(mockLogEvent).not.toHaveBeenCalled()
+  })
+
+  it('should log warning when skipAutoPermissionPrompt is set in flagSettings (non-editable source)', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'flagSettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'ask' },
+      }
+      if (source === 'userSettings') return {}
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      if (source === 'policySettings') return null
+      return null
+    })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('skipAutoPermissionPrompt is still set in non-editable sources'),
+      }),
+    )
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+  })
+
+  it('should also log warning when skipAutoPermissionPrompt is set in both editable and non-editable sources', () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'ask' },
+      }
+      if (source === 'policySettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'ask' },
+      }
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      if (source === 'flagSettings') return null
+      return null
+    })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    // Should clear the editable source
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { skipAutoPermissionPrompt: undefined },
+    )
+    // Should log warning about non-editable sources still having the flag
+    expect(mockLogError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('skipAutoPermissionPrompt is still set in non-editable sources'),
+      }),
+    )
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+    expect(mockLogEvent).toHaveBeenCalled()
+  })
 })
