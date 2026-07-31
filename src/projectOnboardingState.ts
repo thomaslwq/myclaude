@@ -48,7 +48,22 @@ export function getDirectoryFingerprint(dirPath: string): string {
       if (lstat.isDirectory()) {
         // Skip common ignored directories to avoid performance issues
         // (node_modules, .git, dist, build, etc.)
-        if (entry === 'node_modules' || entry === '.git' || entry === 'dist' || entry === 'build' || entry === '.next' || entry === 'out' || entry === 'coverage') {
+        if (
+          entry === 'node_modules' ||
+          entry === '.git' ||
+          entry === 'dist' ||
+          entry === 'build' ||
+          entry === '.next' ||
+          entry === 'out' ||
+          entry === 'coverage' ||
+          entry === 'target' ||
+          entry === 'vendor' ||
+          entry === '__pycache__' ||
+          entry === '.cache' ||
+          entry === '.mypy_cache' ||
+          entry === '.svn' ||
+          entry === '.hg'
+        ) {
           continue
         }
         

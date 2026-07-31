@@ -136,3 +136,80 @@ test('should skip symlinks', () => {
     setFsImplementation(originalFs);
   }
 });
+
+test('should skip common ignored directories', () => {
+  originalFs = getFsImplementation();
+
+  const mockFs = createMockFs({
+    '/test-root': {
+      readdirResult: [
+        'node_modules',
+        '.git',
+        'dist',
+        'build',
+        '.next',
+        'out',
+        'coverage',
+        'target',
+        'vendor',
+        '__pycache__',
+        '.cache',
+        '.mypy_cache',
+        '.svn',
+        '.hg',
+        'normal-file.txt',
+      ],
+    },
+    '/test-root/target': {
+      readdirResult: ['subdir', 'file.txt'],
+    },
+    '/test-root/vendor': {
+      readdirResult: ['lib', 'file.txt'],
+    },
+    '/test-root/__pycache__': {
+      readdirResult: ['__init__.pyc', 'module.pyc'],
+    },
+    '/test-root/.cache': {
+      readdirResult: ['cache-file.txt'],
+    },
+    '/test-root/.mypy_cache': {
+      readdirResult: ['__pycache__'],
+    },
+    '/test-root/.svn': {
+      readdirResult: ['entries'],
+    },
+    '/test-root/.hg': {
+      readdirResult: ['store'],
+    },
+    '/test-root/normal-file.txt': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
+    },
+  });
+
+  setFsImplementation(mockFs as any);
+
+  try {
+    const fingerprint = getDirectoryFingerprint('/test-root');
+    expect(fingerprint).toBeDefined();
+    // Should not contain any of the skipped directories
+    expect(fingerprint).not.toContain('node_modules/');
+    expect(fingerprint).not.toContain('.git/');
+    expect(fingerprint).not.toContain('dist/');
+    expect(fingerprint).not.toContain('build/');
+    expect(fingerprint).not.toContain('.next/');
+    expect(fingerprint).not.toContain('out/');
+    expect(fingerprint).not.toContain('coverage/');
+    expect(fingerprint).not.toContain('target/');
+    expect(fingerprint).not.toContain('vendor/');
+    expect(fingerprint).not.toContain('__pycache__/');
+    expect(fingerprint).not.toContain('.cache/');
+    expect(fingerprint).not.toContain('.mypy_cache/');
+    expect(fingerprint).not.toContain('.svn/');
+    expect(fingerprint).not.toContain('.hg/');
+    // Should contain the normal file
+    expect(fingerprint).toContain('normal-file.txt');
+  } finally {
+    setFsImplementation(originalFs);
+  }
+});
