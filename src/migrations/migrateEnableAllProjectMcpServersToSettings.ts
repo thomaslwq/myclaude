@@ -73,10 +73,8 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     const existingSettings = originalSettings
 
     // Migrate enableAllProjectMcpServers if it exists
-    // Always migrate the project config value to settings, preferring the project-level value
     if (hasEnableAll) {
-      updates.enableAllProjectMcpServers =
-        projectConfig.enableAllProjectMcpServers
+      updates.enableAllProjectMcpServers = projectConfig.enableAllProjectMcpServers
       migratedFields.push('enableAllProjectMcpServers')
     }
 
@@ -124,43 +122,25 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     // Resolve overlapping servers: if a server appears in both enabled and disabled lists,
     // remove it from the disabled list since the enabled list takes precedence.
     // This prevents ambiguous configuration where the same server is both enabled and disabled.
-    const enabledSet = new Set(existingEnabledServers)
-    const overlappingServers = existingDisabledServers.filter(server =>
-      enabledSet.has(server)
+    const overlappingServers = existingEnabledServers.filter((server: string) =>
+      existingDisabledServers.includes(server)
     )
-    for (const server of overlappingServers) {
-      const index = existingDisabledServers.indexOf(server)
-      if (index !== -1) {
-        existingDisabledServers.splice(index, 1)
-      }
-    }
 
-    // Log warning if overlapping servers were found
     if (overlappingServers.length > 0) {
       logEvent('tengu_migrate_mcp_server_overlap_in_both_lists', {
         overlappingServers: overlappingServers.join(','),
+        resolvedBy: 'removing_from_disabled_list',
       })
-    }
 
-    // Determine which settings fields to include based on:
-    // - Settings already had it (preserve existing data even if empty), OR
-    // - The project config has an array to migrate (including empty arrays to preserve semantics)
-    const existingHadEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
-    const existingHadDisabledServers = Array.isArray(existingSettings.disabledMcpjsonServers)
-
-    const hasEnabledServersArray =
-      hasEnabledServers &&
-      Array.isArray(projectConfig.enabledMcpjsonServers)
-    const hasDisabledServersArray =
-      hasDisabledServers &&
-      Array.isArray(projectConfig.disabledMcpjsonServers)
-
-    if (existingHadEnabledServers || hasEnabledServersArray) {
-      updates.enabledMcpjsonServers = existingEnabledServers
-    }
-    if (existingHadDisabledServers || hasDisabledServersArray) {
+      // Remove overlapping servers from the disabled list
+      updates.disabledMcpjsonServers = existingDisabledServers.filter(
+        (server: string) => !overlappingServers.includes(server)
+      )
+    } else {
       updates.disabledMcpjsonServers = existingDisabledServers
     }
+
+    updates.enabledMcpjsonServers = existingEnabledServers
 
     // Remove migrated fields from project config FIRST to avoid a window where
     // both settings and project config carry the same data (duplicate state).
@@ -181,9 +161,14 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     if (currentSettingsHash !== originalSettingsHash) {
       logError(
         'MIGRATION WARNING: Settings file was modified concurrently during migration. ' +
-        'The migration will overwrite concurrent changes, potentially causing data loss. ' +
+        'The migration will abort to prevent data loss. ' +
         'Original settings hash: ' + originalSettingsHash +
         ', Current settings hash: ' + currentSettingsHash
+      )
+      // Abort the migration instead of overwriting
+      throw new Error(
+        'Migration aborted due to concurrent changes to settings file. ' +
+        'Please ensure no other processes are modifying the settings file and try again.'
       )
     }
     updateSettingsForSource('localSettings', updates)
@@ -212,9 +197,14 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
       if (currentSettingsHash !== originalSettingsHash) {
         logError(
           'MIGRATION WARNING: Settings file was modified concurrently. ' +
-          'The rollback will overwrite concurrent changes, potentially causing data loss. ' +
+          'The rollback will abort to prevent data loss. ' +
           'Original settings hash: ' + originalSettingsHash +
           ', Current settings hash: ' + currentSettingsHash
+        )
+        // Abort the rollback instead of overwriting
+        throw new Error(
+          'Rollback aborted due to concurrent changes to settings file. ' +
+          'Please ensure no other processes are modifying the settings file.'
         )
       }
 
@@ -230,43 +220,31 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
         }
       }
       updateSettingsForSource('localSettings', rollbackUpdates)
+
+      // Restore original project config fields if they were removed
+      saveCurrentProjectConfig((config: Record<string, any>) => {
+        const updated = { ...config }
+        for (const field of migratedFields) {
+          if (field in originalProjectConfig) {
+            updated[field] = originalProjectConfig[field]
+          }
+        }
+        return updated
+      })
     } catch (rollbackError) {
       logError('Rollback of settings failed', rollbackError)
       rollbackFailed = true
     }
 
-    // Attempt rollback of project config
-    try {
-      // Restore the original project config fields that were migrated
-      saveCurrentProjectConfig((config: Record<string, any>) => {
-        const updated = { ...config }
-        for (const field of migratedFields) {
-          updated[field] = originalProjectConfig[field]
-        }
-        return updated
-      })
-    } catch (rollbackError) {
-      logError('Rollback of project config failed', rollbackError)
-      rollbackFailed = true
-    }
-
     if (rollbackFailed) {
-      // Log a clear warning for administrators about the inconsistent state
       logError(
-        'MIGRATION WARNING: Rollback was incomplete. The system may be in an inconsistent ' +
-        'state with duplicate or conflicting MCP server configuration. Manual intervention ' +
-        'may be required to restore consistency between project config and settings.',
-        new Error(
-          'Migration failed and rollback was incomplete. The system may be in an inconsistent state. ' +
-          'Original error: ' + (error instanceof Error ? error.message : String(error))
-        )
+        'Migration failed and rollback was incomplete. ' +
+        'The settings file may be in an inconsistent state. ' +
+        'Please check the settings file manually.'
       )
-      throw new Error(
-        'Migration failed and rollback was incomplete. The system may be in an inconsistent state. ' +
-        'Original error: ' + (error instanceof Error ? error.message : String(error))
-      )
-    } else {
-      logError('Rollback completed successfully: original MCP server settings restored', error)
+      // Do NOT mark migration as completed when rollback fails, so the user can retry
+      // or manually fix the state. The migration flag will not be set.
+      throw error
     }
   }
 }
