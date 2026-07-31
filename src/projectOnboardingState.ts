@@ -18,27 +18,59 @@ import { getFsImplementation } from './utils/fsOperations.js'
  * changes within existing files (those are covered by the CLAUDE.md
  * mtime check).
  */
-function getDirectoryFingerprint(dirPath: string): string {
+export function getDirectoryFingerprint(dirPath: string): string {
   const fs = getFsImplementation()
-  const entries = fs.readdirStringSync(dirPath)
+  
+  let entries: string[]
+  try {
+    entries = fs.readdirStringSync(dirPath)
+  } catch {
+    // If we can't read the directory (permission error, etc.), return empty fingerprint
+    return ''
+  }
+  
   const sortedEntries = entries.sort()
+  
+  // Track visited directories to detect symlink cycles
+  const visited = new Set<string>()
   
   // Recursively include subdirectories in the fingerprint
   const fingerprintParts: string[] = []
   for (const entry of sortedEntries) {
     const fullPath = join(dirPath, entry)
-    const stat = fs.statSync(fullPath)
-    if (stat.isDirectory()) {
-      // Skip common ignored directories to avoid performance issues
-      // (node_modules, .git, dist, build, etc.)
-      if (entry === 'node_modules' || entry === '.git' || entry === 'dist' || entry === 'build' || entry === '.next' || entry === 'out' || entry === 'coverage') {
+    
+    try {
+      // Use lstatSync to detect symlinks without following them
+      const lstat = fs.lstatSync(fullPath)
+      
+      // Skip symbolic links to prevent infinite recursion and permission issues
+      if (lstat.isSymbolicLink()) {
         continue
       }
-      // Include the directory name and recurse into it
-      fingerprintParts.push(entry + '/')
-      fingerprintParts.push(getDirectoryFingerprint(fullPath))
-    } else {
-      fingerprintParts.push(entry)
+      
+      if (lstat.isDirectory()) {
+        // Skip common ignored directories to avoid performance issues
+        // (node_modules, .git, dist, build, etc.)
+        if (entry === 'node_modules' || entry === '.git' || entry === 'dist' || entry === 'build' || entry === '.next' || entry === 'out' || entry === 'coverage') {
+          continue
+        }
+        
+        // Check for cycles (shouldn't happen with lstat, but just in case)
+        if (visited.has(fullPath)) {
+          continue
+        }
+        visited.add(fullPath)
+        
+        // Include the directory name and recurse into it
+        fingerprintParts.push(entry + '/')
+        fingerprintParts.push(getDirectoryFingerprint(fullPath))
+      } else {
+        fingerprintParts.push(entry)
+      }
+    } catch {
+      // Skip entries that can't be accessed (permission errors, etc.)
+      // This prevents the entire fingerprint computation from failing
+      continue
     }
   }
   
