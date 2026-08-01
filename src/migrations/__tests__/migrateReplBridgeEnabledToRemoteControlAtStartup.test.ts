@@ -212,6 +212,28 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     expect(phase2Result).toBeDefined()
   })
 
+  it('should NOT set remoteControlAtStartup to false when old key is missing in phase 2', () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(2)
+
+    // Phase 1: no old key, so skip
+    const phase1Result = calls[0]({
+      remoteControlAtStartup: undefined,
+    })
+    expect(phase1Result).toBeDefined()
+
+    // Phase 2: no old key, so skip - should NOT modify remoteControlAtStartup
+    const phase2Result = calls[1]({
+      remoteControlAtStartup: true, // User had a preference set
+    })
+    expect(phase2Result.remoteControlAtStartup).toBe(true) // Should remain true, not become false
+  })
+
   it('should handle crash recovery — phase 1 done, phase 2 re-runs', () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {

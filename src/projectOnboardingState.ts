@@ -18,12 +18,15 @@ import { getFsImplementation } from './utils/fsOperations.js'
  * changes within existing files (those are covered by the CLAUDE.md
  * mtime check).
  */
-export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<string>, rootRealPath?: string): string {
+export function getDirectoryFingerprint(dirPath: string, recursionStack?: string[], rootRealPath?: string): string {
   const fs = getFsImplementation()
   
-  // Track resolved real paths to detect symlink cycles
-  if (!visitedRealPaths) {
-    visitedRealPaths = new Set<string>()
+  // Track resolved real paths in the current recursion chain to detect symlink cycles
+  // Using a stack instead of a global set allows the same directory to be visited
+  // via multiple paths (e.g., directly and via a symlink) while still detecting
+  // genuine cycles (e.g., a symlink pointing to an ancestor).
+  if (!recursionStack) {
+    recursionStack = []
   }
   
   // Get the real path of the current directory to detect cycles
@@ -36,11 +39,12 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
     currentRealPath = dirPath
   }
   
-  // If we've already visited this real path, we're in a cycle - skip it
-  if (visitedRealPaths.has(currentRealPath)) {
+  // If we've already visited this real path in the current recursion chain,
+  // we're in a cycle - skip it to prevent infinite recursion
+  if (recursionStack.includes(currentRealPath)) {
     return ''
   }
-  visitedRealPaths.add(currentRealPath)
+  recursionStack.push(currentRealPath)
   
   // Store the root real path on first call to enforce symlink boundary
   if (rootRealPath === undefined) {
@@ -53,7 +57,7 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
   } catch (err) {
     // If we can't read the directory (permission error, etc.), return empty fingerprint
     console.warn(`[getDirectoryFingerprint] Failed to read directory '${dirPath}': ${err}`)
-    visitedRealPaths.delete(currentRealPath)
+    recursionStack.pop()
     return ''
   }
   
@@ -73,35 +77,42 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
           // Follow symbolic links to directories so their contents are tracked
           // This ensures changes in symlinked directories (e.g., shared folders, linked packages)
           // are reflected in the fingerprint and don't cause stale cache.
-          // Security: only follow symlinks whose target is within the root directory
-          // to prevent symlink traversal attacks (reading arbitrary directories).
+          // Security: read the symlink target atomically using readlinkSync to avoid
+          // TOCTOU race conditions. Between lstatSync and statSync/realpathSync, an
+          // attacker could replace the symlink with one pointing outside the root.
+          // By reading the link target immediately, we eliminate the race window.
           try {
-            const stat = fs.statSync(fullPath)
-            if (stat.isDirectory()) {
-              // Resolve the target's real path to check if it's inside the root
-              let targetRealPath: string
-              try {
-                targetRealPath = fs.realpathSync(fullPath)
-              } catch (err) {
-                console.warn(`[getDirectoryFingerprint] Failed to resolve target real path for symlink '${fullPath}': ${err}`)
-                targetRealPath = fullPath
-              }
-              // Only recurse into the symlink target if it's within the root directory
-              if (targetRealPath.startsWith(rootRealPath + '/') || targetRealPath === rootRealPath) {
+            // Atomically read the symlink target (single system call, no race)
+            const linkTarget = fs.readlinkSync(fullPath)
+            // Resolve the target relative to the symlink's parent directory
+            const resolvedTarget = resolve(dirPath, linkTarget)
+            // Check if the resolved target is inside the root directory
+            let targetRealPath: string
+            try {
+              targetRealPath = fs.realpathSync(resolvedTarget)
+            } catch (err) {
+              console.warn(`[getDirectoryFingerprint] Failed to resolve target real path for symlink '${fullPath}': ${err}`)
+              targetRealPath = resolvedTarget
+            }
+            // Only recurse into the symlink target if it's within the root directory
+            if (targetRealPath.startsWith(rootRealPath + '/') || targetRealPath === rootRealPath) {
+              // Check if the target is a directory
+              const stat = fs.statSync(resolvedTarget)
+              if (stat.isDirectory()) {
                 fingerprintParts.push(entry + '/')
-                fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths, rootRealPath))
+                fingerprintParts.push(getDirectoryFingerprint(resolvedTarget, recursionStack, rootRealPath))
               } else {
-                // Symlink points outside the root - include the entry name with trailing slash
-                // to maintain consistency with symlinked directories inside the root
-                fingerprintParts.push(entry + '/')
+                // Symlink to a file: include the entry name
+                fingerprintParts.push(entry)
               }
             } else {
-              // Symlink to a file: include the entry name
-              fingerprintParts.push(entry)
+              // Symlink points outside the root - include the entry name with trailing slash
+              // to maintain consistency with symlinked directories inside the root
+              fingerprintParts.push(entry + '/')
             }
           } catch (err) {
-            // If we can't stat the target (broken symlink, permission error, etc.), skip it
-            console.warn(`[getDirectoryFingerprint] Failed to stat symlink target '${fullPath}': ${err}`)
+            // If we can't read the link target (broken symlink, permission error, etc.), skip it
+            console.warn(`[getDirectoryFingerprint] Failed to process symlink '${fullPath}': ${err}`)
             continue
           }
         } else if (lstat.isDirectory()) {
@@ -128,7 +139,7 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
           
           // Include the directory name and recurse into it
           fingerprintParts.push(entry + '/')
-          fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths))
+          fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath))
         } else {
           fingerprintParts.push(entry)
         }
@@ -141,7 +152,7 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
     }
   } finally {
     // Ensure cleanup happens even if an exception is thrown
-    visitedRealPaths.delete(currentRealPath)
+    recursionStack.pop()
   }
   
   return fingerprintParts.join('\n')
