@@ -30,8 +30,9 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
   let currentRealPath: string
   try {
     currentRealPath = fs.realpathSync(dirPath)
-  } catch {
+  } catch (err) {
     // If we can't resolve the real path, use the original path
+    console.warn(`[getDirectoryFingerprint] Failed to resolve real path for '${dirPath}', using original path: ${err}`)
     currentRealPath = dirPath
   }
   
@@ -49,8 +50,9 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
   let entries: string[]
   try {
     entries = fs.readdirSync(dirPath).map((dirent) => dirent.name)
-  } catch {
+  } catch (err) {
     // If we can't read the directory (permission error, etc.), return empty fingerprint
+    console.warn(`[getDirectoryFingerprint] Failed to read directory '${dirPath}': ${err}`)
     visitedRealPaths.delete(currentRealPath)
     return ''
   }
@@ -79,7 +81,8 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
             let targetRealPath: string
             try {
               targetRealPath = fs.realpathSync(fullPath)
-            } catch {
+            } catch (err) {
+              console.warn(`[getDirectoryFingerprint] Failed to resolve target real path for symlink '${fullPath}': ${err}`)
               targetRealPath = fullPath
             }
             // Only recurse into the symlink target if it's within the root directory
@@ -94,8 +97,9 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
             // Symlink to a file: include the entry name
             fingerprintParts.push(entry)
           }
-        } catch {
+        } catch (err) {
           // If we can't stat the target (broken symlink, permission error, etc.), skip it
+          console.warn(`[getDirectoryFingerprint] Failed to stat symlink target '${fullPath}': ${err}`)
           continue
         }
       } else if (lstat.isDirectory()) {
@@ -126,9 +130,10 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
       } else {
         fingerprintParts.push(entry)
       }
-    } catch {
+    } catch (err) {
       // Skip entries that can't be accessed (permission errors, etc.)
       // This prevents the entire fingerprint computation from failing
+      console.warn(`[getDirectoryFingerprint] Failed to access entry '${fullPath}': ${err}`)
       continue
     }
   }
