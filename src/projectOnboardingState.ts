@@ -61,84 +61,89 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
   
   // Recursively include subdirectories in the fingerprint
   const fingerprintParts: string[] = []
-  for (const entry of sortedEntries) {
-    const fullPath = join(dirPath, entry)
-    
-    try {
-      // Use lstatSync to detect symlinks without following them
-      const lstat = fs.lstatSync(fullPath)
+  try {
+    for (const entry of sortedEntries) {
+      const fullPath = join(dirPath, entry)
       
-      if (lstat.isSymbolicLink()) {
-        // Follow symbolic links to directories so their contents are tracked
-        // This ensures changes in symlinked directories (e.g., shared folders, linked packages)
-        // are reflected in the fingerprint and don't cause stale cache.
-        // Security: only follow symlinks whose target is within the root directory
-        // to prevent symlink traversal attacks (reading arbitrary directories).
-        try {
-          const stat = fs.statSync(fullPath)
-          if (stat.isDirectory()) {
-            // Resolve the target's real path to check if it's inside the root
-            let targetRealPath: string
-            try {
-              targetRealPath = fs.realpathSync(fullPath)
-            } catch (err) {
-              console.warn(`[getDirectoryFingerprint] Failed to resolve target real path for symlink '${fullPath}': ${err}`)
-              targetRealPath = fullPath
-            }
-            // Only recurse into the symlink target if it's within the root directory
-            if (targetRealPath.startsWith(rootRealPath + '/') || targetRealPath === rootRealPath) {
-              fingerprintParts.push(entry + '/')
-              fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths, rootRealPath))
+      try {
+        // Use lstatSync to detect symlinks without following them
+        const lstat = fs.lstatSync(fullPath)
+        
+        if (lstat.isSymbolicLink()) {
+          // Follow symbolic links to directories so their contents are tracked
+          // This ensures changes in symlinked directories (e.g., shared folders, linked packages)
+          // are reflected in the fingerprint and don't cause stale cache.
+          // Security: only follow symlinks whose target is within the root directory
+          // to prevent symlink traversal attacks (reading arbitrary directories).
+          try {
+            const stat = fs.statSync(fullPath)
+            if (stat.isDirectory()) {
+              // Resolve the target's real path to check if it's inside the root
+              let targetRealPath: string
+              try {
+                targetRealPath = fs.realpathSync(fullPath)
+              } catch (err) {
+                console.warn(`[getDirectoryFingerprint] Failed to resolve target real path for symlink '${fullPath}': ${err}`)
+                targetRealPath = fullPath
+              }
+              // Only recurse into the symlink target if it's within the root directory
+              if (targetRealPath.startsWith(rootRealPath + '/') || targetRealPath === rootRealPath) {
+                fingerprintParts.push(entry + '/')
+                fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths, rootRealPath))
+              } else {
+                // Symlink points outside the root - include the entry name with trailing slash
+                // to maintain consistency with symlinked directories inside the root
+                fingerprintParts.push(entry + '/')
+              }
             } else {
-              // Symlink points outside the root - include the entry name but don't recurse
+              // Symlink to a file: include the entry name
               fingerprintParts.push(entry)
             }
-          } else {
-            // Symlink to a file: include the entry name
-            fingerprintParts.push(entry)
+          } catch (err) {
+            // If we can't stat the target (broken symlink, permission error, etc.), skip it
+            console.warn(`[getDirectoryFingerprint] Failed to stat symlink target '${fullPath}': ${err}`)
+            continue
           }
-        } catch (err) {
-          // If we can't stat the target (broken symlink, permission error, etc.), skip it
-          console.warn(`[getDirectoryFingerprint] Failed to stat symlink target '${fullPath}': ${err}`)
-          continue
+        } else if (lstat.isDirectory()) {
+          // Skip common ignored directories to avoid performance issues
+          // (node_modules, .git, dist, build, etc.)
+          if (
+            entry === 'node_modules' ||
+            entry === '.git' ||
+            entry === 'dist' ||
+            entry === 'build' ||
+            entry === '.next' ||
+            entry === 'out' ||
+            entry === 'coverage' ||
+            entry === 'target' ||
+            entry === 'vendor' ||
+            entry === '__pycache__' ||
+            entry === '.cache' ||
+            entry === '.mypy_cache' ||
+            entry === '.svn' ||
+            entry === '.hg'
+          ) {
+            continue
+          }
+          
+          // Include the directory name and recurse into it
+          fingerprintParts.push(entry + '/')
+          fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths))
+        } else {
+          fingerprintParts.push(entry)
         }
-      } else if (lstat.isDirectory()) {
-        // Skip common ignored directories to avoid performance issues
-        // (node_modules, .git, dist, build, etc.)
-        if (
-          entry === 'node_modules' ||
-          entry === '.git' ||
-          entry === 'dist' ||
-          entry === 'build' ||
-          entry === '.next' ||
-          entry === 'out' ||
-          entry === 'coverage' ||
-          entry === 'target' ||
-          entry === 'vendor' ||
-          entry === '__pycache__' ||
-          entry === '.cache' ||
-          entry === '.mypy_cache' ||
-          entry === '.svn' ||
-          entry === '.hg'
-        ) {
-          continue
-        }
-        
-        // Include the directory name and recurse into it
-        fingerprintParts.push(entry + '/')
-        fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths))
-      } else {
-        fingerprintParts.push(entry)
+      } catch (err) {
+        // Skip entries that can't be accessed (permission errors, etc.)
+        // This prevents the entire fingerprint computation from failing
+        console.warn(`[getDirectoryFingerprint] Failed to access entry '${fullPath}': ${err}`)
+        continue
       }
-    } catch (err) {
-      // Skip entries that can't be accessed (permission errors, etc.)
-      // This prevents the entire fingerprint computation from failing
-      console.warn(`[getDirectoryFingerprint] Failed to access entry '${fullPath}': ${err}`)
-      continue
     }
+  } finally {
+    // Ensure cleanup happens even if an exception is thrown
+    visitedRealPaths.delete(currentRealPath)
   }
   
-  visitedRealPaths.delete(currentRealPath)
   return fingerprintParts.join('\n')
 }
 
