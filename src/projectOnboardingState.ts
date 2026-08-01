@@ -172,8 +172,9 @@ function isCacheValid(): boolean {
   // matches, we skip the expensive fingerprint computation entirely.
   let rootMtimeChanged = false
   try {
-    const currentRootMtime = Math.floor(fs.statSync(cwd).mtimeMs)
-    rootMtimeChanged = currentRootMtime !== cachedRootMtime
+    const currentRootMtime = fs.statSync(cwd).mtimeMs
+    // Compare with tolerance to handle sub-millisecond precision
+    rootMtimeChanged = Math.abs(currentRootMtime - cachedRootMtime) > 0.5
   } catch {
     // If we can't stat the root, invalidate to be safe
     return false
@@ -220,7 +221,7 @@ export function getSteps(): Step[] {
     cachedClaudeMdMtime = -1
   }
   try {
-    cachedRootMtime = Math.floor(fs.statSync(cwd).mtimeMs)
+    cachedRootMtime = fs.statSync(cwd).mtimeMs
   } catch {
     cachedRootMtime = -1
   }

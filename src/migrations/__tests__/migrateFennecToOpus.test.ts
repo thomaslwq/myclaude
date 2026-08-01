@@ -94,27 +94,29 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate fennec-latest[1M] to opus[1M]', () => {
+  it('should not preserve uppercase suffix [1M] (invalid context-length suffix)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1M]' })
 
     migrateFennecToOpus()
 
+    // [1M] is not a valid context-length suffix (uppercase is invalid), so suffix should be dropped
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'userSettings',
-      { model: 'opus[1M]' },
+      { model: 'opus' },
     )
   })
 
-  it('should migrate fennec-latest[100K] to opus[100K]', () => {
+  it('should not preserve uppercase suffix [100K] (invalid context-length suffix)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[100K]' })
 
     migrateFennecToOpus()
 
+    // [100K] is not a valid context-length suffix (uppercase is invalid), so suffix should be dropped
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'userSettings',
-      { model: 'opus[100K]' },
+      { model: 'opus' },
     )
   })
 
@@ -178,15 +180,16 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate fennec-fast-latest[1M] to opus[1M] without fastMode', () => {
+  it('should not preserve uppercase suffix [1M] in fennec-fast-latest (invalid context-length suffix)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1M]' })
 
     migrateFennecToOpus()
 
+    // [1M] is not a valid context-length suffix (uppercase is invalid), so suffix should be dropped
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'userSettings',
-      { model: 'opus[1M]' },
+      { model: 'opus' },
     )
   })
 

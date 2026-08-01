@@ -43,7 +43,7 @@ export function migrateFennecToOpus(): void {
         // Preserve any suffix (e.g., [1m], [100k], [200k]) from the original model name
         // Use a regex that matches valid context-length suffix patterns at the end of the string
         // No whitespace allowed inside brackets to avoid false positives on custom model names
-        const suffix = model.match(/\[\d+[km]\]$/i)?.[0] ?? ''
+        const suffix = model.match(/\[\d+[km]\]$/)?.[0] ?? ''
         updateSettingsForSource(source, {
           model: `opus${suffix}`,
         })
@@ -54,7 +54,7 @@ export function migrateFennecToOpus(): void {
         // Preserve any suffix (e.g., [1m], [100k], [200k]) from the original model name
         // Use a regex that matches valid context-length suffix patterns at the end of the string
         // No whitespace allowed inside brackets to avoid false positives on custom model names
-        const suffix = model.match(/\[\d+[km]\]$/i)?.[0] ?? ''
+        const suffix = model.match(/\[\d+[km]\]$/)?.[0] ?? ''
         // Preserve the existing fastMode setting if it exists, otherwise omit it
         // to avoid overwriting the implicit default behavior
         const existingFastMode = settings?.fastMode
