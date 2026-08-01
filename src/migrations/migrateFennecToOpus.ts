@@ -6,6 +6,14 @@ import {
 } from '../utils/settings/settings.js'
 
 /**
+ * Extract the context-length suffix from a model name (e.g., [1m], [100k], [200k]).
+ * Returns the suffix (including brackets) if found, otherwise an empty string.
+ */
+function extractSuffix(model: string): string {
+  return model.match(/\[\d+[km]\]$/)?.[0] ?? ''
+}
+
+/**
  * Migrate users on removed fennec model aliases to their new Opus 4.6 aliases.
  * - fennec-latest → opus
  * - fennec-latest[1m] → opus[1m]
@@ -40,10 +48,7 @@ export function migrateFennecToOpus(): void {
       }
 
       if (model.startsWith('fennec-latest')) {
-        // Preserve any suffix (e.g., [1m], [100k], [200k]) from the original model name
-        // Use a regex that matches valid context-length suffix patterns at the end of the string
-        // No whitespace allowed inside brackets to avoid false positives on custom model names
-        const suffix = model.match(/\[\d+[km]\]$/)?.[0] ?? ''
+        const suffix = extractSuffix(model)
         updateSettingsForSource(source, {
           model: `opus${suffix}`,
         })
@@ -51,10 +56,7 @@ export function migrateFennecToOpus(): void {
         model.startsWith('fennec-fast-latest') ||
         model.startsWith('opus-4-5-fast')
       ) {
-        // Preserve any suffix (e.g., [1m], [100k], [200k]) from the original model name
-        // Use a regex that matches valid context-length suffix patterns at the end of the string
-        // No whitespace allowed inside brackets to avoid false positives on custom model names
-        const suffix = model.match(/\[\d+[km]\]$/)?.[0] ?? ''
+        const suffix = extractSuffix(model)
         // Preserve the existing fastMode setting if it exists, otherwise omit it
         // to avoid overwriting the implicit default behavior
         const existingFastMode = settings?.fastMode

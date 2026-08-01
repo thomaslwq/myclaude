@@ -18,7 +18,7 @@ import { getFsImplementation } from './utils/fsOperations.js'
  * changes within existing files (those are covered by the CLAUDE.md
  * mtime check).
  */
-export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<string>): string {
+export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<string>, rootRealPath?: string): string {
   const fs = getFsImplementation()
   
   // Track resolved real paths to detect symlink cycles
@@ -40,6 +40,11 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
     return ''
   }
   visitedRealPaths.add(currentRealPath)
+  
+  // Store the root real path on first call to enforce symlink boundary
+  if (rootRealPath === undefined) {
+    rootRealPath = currentRealPath
+  }
   
   let entries: string[]
   try {
@@ -65,12 +70,26 @@ export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<
         // Follow symbolic links to directories so their contents are tracked
         // This ensures changes in symlinked directories (e.g., shared folders, linked packages)
         // are reflected in the fingerprint and don't cause stale cache.
+        // Security: only follow symlinks whose target is within the root directory
+        // to prevent symlink traversal attacks (reading arbitrary directories).
         try {
           const stat = fs.statSync(fullPath)
           if (stat.isDirectory()) {
-            // Recurse into the symlink target directory, passing the visited set
-            fingerprintParts.push(entry + '/')
-            fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths))
+            // Resolve the target's real path to check if it's inside the root
+            let targetRealPath: string
+            try {
+              targetRealPath = fs.realpathSync(fullPath)
+            } catch {
+              targetRealPath = fullPath
+            }
+            // Only recurse into the symlink target if it's within the root directory
+            if (targetRealPath.startsWith(rootRealPath + '/') || targetRealPath === rootRealPath) {
+              fingerprintParts.push(entry + '/')
+              fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths, rootRealPath))
+            } else {
+              // Symlink points outside the root - include the entry name but don't recurse
+              fingerprintParts.push(entry)
+            }
           } else {
             // Symlink to a file: include the entry name
             fingerprintParts.push(entry)

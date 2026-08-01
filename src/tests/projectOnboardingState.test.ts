@@ -197,6 +197,61 @@ test('should detect changes in symlinked directories', () => {
   }
 });
 
+test('should NOT follow symlinks pointing outside the root directory (symlink traversal protection)', () => {
+  originalFs = getFsImplementation();
+
+  // Create a symlink pointing outside the project root: /project/evil_link -> /etc
+  // In real fs, readdirSync on a symlink to a directory returns the target's contents
+  const mockFs = createMockFs({
+    '/project': {
+      readdirResult: ['evil_link', 'file.txt'],
+      realpathResult: '/project',
+    },
+    '/project/evil_link': {
+      // readdir on a symlink to a dir returns the target's contents in real fs
+      readdirResult: ['passwd', 'shadow', 'ssh'],
+      statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
+      realpathResult: '/etc',
+    },
+    '/project/file.txt': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
+    },
+    '/etc': {
+      readdirResult: ['passwd', 'shadow', 'ssh'],
+      realpathResult: '/etc',
+    },
+    '/etc/passwd': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
+    },
+    '/etc/shadow': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
+    },
+    '/etc/ssh': {
+      readdirResult: [],
+      statResult: { isDirectory: () => true, isSymbolicLink: () => false } as any,
+    },
+  });
+
+  setFsImplementation(mockFs as any);
+
+  try {
+    const fingerprint = getDirectoryFingerprint('/project');
+    // Should include the symlink entry name
+    expect(fingerprint).toContain('evil_link');
+    // Should include the normal file
+    expect(fingerprint).toContain('file.txt');
+    // Should NOT include contents of /etc (the symlink target)
+    expect(fingerprint).not.toContain('passwd');
+    expect(fingerprint).not.toContain('shadow');
+    expect(fingerprint).not.toContain('ssh');
+  } finally {
+    setFsImplementation(originalFs);
+  }
+});
+
 test('should include symlinked files as entries', () => {
   originalFs = getFsImplementation();
 
