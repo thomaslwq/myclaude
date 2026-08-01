@@ -124,6 +124,48 @@ test('should handle symlink cycles when realpathSync fails', () => {
   }
 });
 
+test('should skip symlink to node_modules directory inside root', () => {
+  originalFs = getFsImplementation();
+
+  // Create a scenario: /root has a symlink 'node_modules' -> /root/node_modules (or an external dir)
+  // The symlink target is 'node_modules' - should be skipped
+  const mockFs = createMockFs({
+    '/root': {
+      readdirResult: ['node_modules', 'src'],
+      realpathResult: '/root',
+    },
+    '/root/node_modules': {
+      readdirResult: ['lodash', 'express'],
+      statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
+      realpathResult: '/root/node_modules',
+      readlinkResult: '/real/node_modules',
+    },
+    '/real/node_modules': {
+      readdirResult: ['lodash', 'express'],
+      statResult: { isDirectory: () => true, isSymbolicLink: () => false } as any,
+      realpathResult: '/real/node_modules',
+    },
+    '/root/src': {
+      readdirResult: [],
+      statResult: { isDirectory: () => true, isSymbolicLink: () => false } as any,
+    },
+  });
+
+  setFsImplementation(mockFs as any);
+
+  const fingerprint = getDirectoryFingerprint('/root');
+  
+  // The fingerprint should NOT contain 'lodash' or 'express' from node_modules
+  expect(fingerprint).not.toContain('lodash');
+  expect(fingerprint).not.toContain('express');
+  // It should contain 'src/' since it's a regular directory
+  expect(fingerprint).toContain('src/');
+  // It should contain 'node_modules/' since symlinks are tracked but contents skipped
+  expect(fingerprint).toContain('node_modules/');
+
+  setFsImplementation(originalFs);
+});
+
 test('should handle symlink cycles when both realpathSync and lstatSync fail', () => {
   originalFs = getFsImplementation();
 

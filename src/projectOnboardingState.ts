@@ -113,6 +113,32 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
               // Check if the target is a directory
               const stat = fs.statSync(resolvedTarget)
               if (stat.isDirectory()) {
+                // Skip common ignored directories to avoid performance issues
+                // (node_modules, .git, dist, build, etc.)
+                const targetBasename = basename(resolvedTarget)
+                if (
+                  targetBasename === 'node_modules' ||
+                  targetBasename === '.git' ||
+                  targetBasename === 'dist' ||
+                  targetBasename === 'build' ||
+                  targetBasename === '.next' ||
+                  targetBasename === 'out' ||
+                  targetBasename === 'coverage' ||
+                  targetBasename === 'target' ||
+                  targetBasename === 'vendor' ||
+                  targetBasename === '__pycache__' ||
+                  targetBasename === '.cache' ||
+                  targetBasename === '.mypy_cache' ||
+                  targetBasename === '.svn' ||
+                  targetBasename === '.hg' ||
+                  targetBasename === 'venv' ||
+                  targetBasename === '.venv' ||
+                  targetBasename === 'env'
+                ) {
+                  // Skip this directory to avoid performance issues
+                  fingerprintParts.push(entry + '/')
+                  continue
+                }
                 fingerprintParts.push(entry + '/')
                 fingerprintParts.push(getDirectoryFingerprint(resolvedTarget, recursionStack, rootRealPath))
               } else {
