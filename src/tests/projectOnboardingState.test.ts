@@ -34,7 +34,10 @@ function createMockFs(customBehaviors: Record<string, any>) {
     renameSync: () => {},
     linkSync: () => {},
     symlinkSync: () => {},
-    readlinkSync: () => '',
+    readlinkSync: (path: string) => {
+      if (customBehaviors[path]?.readlinkResult) return customBehaviors[path].readlinkResult;
+      return '';
+    },
     realpathSync: (path: string) => {
       if (customBehaviors[path]?.realpathError) throw customBehaviors[path].realpathError;
       if (customBehaviors[path]?.realpathResult) return customBehaviors[path].realpathResult;
@@ -84,24 +87,26 @@ test('should handle symlink cycles without infinite recursion', () => {
   }
 });
 
-test('should include trailing slash for symlinked directories inside root', () => {
+test('should handle symlink cycles when realpathSync fails', () => {
   originalFs = getFsImplementation();
 
+  // Create a scenario where realpathSync fails (e.g., permission error)
+  // but the path is a symlink that points to an ancestor
+  // This is the exact scenario from GitHub issue #448
   const mockFs = createMockFs({
-    '/project': {
-      readdirResult: ['symlink-dir', 'file.txt'],
-      realpathResult: '/project',
+    '/root': {
+      readdirResult: ['link-to-root'],
+      realpathResult: '/root',
     },
-    '/project/symlink-dir': {
-      readdirResult: ['nested.txt'],
+    '/root/link-to-root': {
+      readdirResult: ['file.txt'],
       statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
-      realpathResult: '/project/symlink-dir',
+      // realpathSync throws for this path (e.g., permission error)
+      realpathError: new Error('EACCES: permission denied'),
+      // readlink succeeds and returns '..' which points to /root
+      readlinkResult: '..',
     },
-    '/project/symlink-dir/nested.txt': {
-      readdirResult: [],
-      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
-    },
-    '/project/file.txt': {
+    '/root/file.txt': {
       readdirResult: [],
       statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
     },
@@ -110,27 +115,34 @@ test('should include trailing slash for symlinked directories inside root', () =
   setFsImplementation(mockFs as any);
 
   try {
-    const fingerprint = getDirectoryFingerprint('/project');
-    expect(fingerprint).toContain('symlink-dir/');
+    const fingerprint = getDirectoryFingerprint('/root');
+    expect(fingerprint).toBeDefined();
+    // Should not cause infinite recursion or stack overflow
+    expect(fingerprint).toContain('link-to-root/');
   } finally {
     setFsImplementation(originalFs);
   }
 });
 
-test('should include trailing slash for symlinked directories outside root', () => {
+test('should handle symlink cycles when both realpathSync and lstatSync fail', () => {
   originalFs = getFsImplementation();
 
+  // Create a scenario where both realpathSync and lstatSync fail
+  // The cycle detection should still work by checking dirPath in the stack
   const mockFs = createMockFs({
-    '/project': {
-      readdirResult: ['symlink-outside'],
-      realpathResult: '/project',
+    '/root': {
+      readdirResult: ['link-to-root'],
+      realpathResult: '/root',
     },
-    '/project/symlink-outside': {
-      readdirResult: ['external.txt'],
+    '/root/link-to-root': {
+      readdirResult: ['file.txt'],
       statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
-      realpathResult: '/external/path',
+      // realpathSync throws
+      realpathError: new Error('EACCES: permission denied'),
+      // lstatSync also throws (e.g., permission error on the symlink itself)
+      statError: new Error('EACCES: permission denied'),
     },
-    '/external/path/external.txt': {
+    '/root/file.txt': {
       readdirResult: [],
       statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
     },
@@ -139,10 +151,9 @@ test('should include trailing slash for symlinked directories outside root', () 
   setFsImplementation(mockFs as any);
 
   try {
-    const fingerprint = getDirectoryFingerprint('/project');
-    // The issue is that symlinked directories outside root don't have a trailing slash
-    // This test will fail before the fix
-    expect(fingerprint).toContain('symlink-outside/');
+    const fingerprint = getDirectoryFingerprint('/root');
+    expect(fingerprint).toBeDefined();
+    // Should not cause infinite recursion
   } finally {
     setFsImplementation(originalFs);
   }

@@ -34,14 +34,28 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
   try {
     currentRealPath = fs.realpathSync(dirPath)
   } catch (err) {
-    // If we can't resolve the real path, use the original path
+    // If we can't resolve the real path, try to resolve the symlink manually
+    // to detect cycles even when realpathSync fails (e.g., permission errors)
     console.warn(`[getDirectoryFingerprint] Failed to resolve real path for '${dirPath}', using original path: ${err}`)
-    currentRealPath = dirPath
+    try {
+      const lstat = fs.lstatSync(dirPath)
+      if (lstat.isSymbolicLink()) {
+        const linkTarget = fs.readlinkSync(dirPath)
+        const resolvedTarget = resolve(dirPath, linkTarget)
+        currentRealPath = resolvedTarget
+      } else {
+        currentRealPath = dirPath
+      }
+    } catch {
+      currentRealPath = dirPath
+    }
   }
   
   // If we've already visited this real path in the current recursion chain,
   // we're in a cycle - skip it to prevent infinite recursion
-  if (recursionStack.includes(currentRealPath)) {
+  // Also check the original dirPath in case realpathSync failed and the
+  // resolved path doesn't match what's in the stack (e.g., symlink cycle)
+  if (recursionStack.includes(currentRealPath) || recursionStack.includes(dirPath)) {
     return ''
   }
   recursionStack.push(currentRealPath)
