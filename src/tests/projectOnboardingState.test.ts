@@ -35,6 +35,11 @@ function createMockFs(customBehaviors: Record<string, any>) {
     linkSync: () => {},
     symlinkSync: () => {},
     readlinkSync: () => '',
+    realpathSync: (path: string) => {
+      if (customBehaviors[path]?.realpathError) throw customBehaviors[path].realpathError;
+      if (customBehaviors[path]?.realpathResult) return customBehaviors[path].realpathResult;
+      return path;
+    },
     readdirSync: (path: string) => {
       if (customBehaviors[path]?.readdirError) throw customBehaviors[path].readdirError;
       if (customBehaviors[path]?.readdirResult) {
@@ -55,10 +60,12 @@ test('should handle symlink cycles without infinite recursion', () => {
   const mockFs = createMockFs({
     '/cycle-root': {
       readdirResult: ['link', 'file.txt'],
+      realpathResult: '/cycle-root',
     },
     '/cycle-root/link': {
       readdirResult: ['cycle-root'],
       statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
+      realpathResult: '/cycle-root',
     },
     '/cycle-root/file.txt': {
       readdirResult: [],
@@ -72,8 +79,10 @@ test('should handle symlink cycles without infinite recursion', () => {
     const fingerprint = getDirectoryFingerprint('/cycle-root');
     expect(fingerprint).toBeDefined();
     expect(fingerprint).toContain('file.txt');
-    // Should not contain 'link' since it's a symlink
-    expect(fingerprint).not.toContain('link');
+    // Should contain 'link/' since it's a symlink to a directory and we now follow it
+    expect(fingerprint).toContain('link/');
+    // Should not contain 'link/cycle-root' since cycle is detected
+    expect(fingerprint).not.toContain('link/cycle-root');
   } finally {
     setFsImplementation(originalFs);
   }
@@ -83,14 +92,11 @@ test('should handle permission errors gracefully', () => {
   originalFs = getFsImplementation();
 
   const mockFs = createMockFs({
-    '/error-root': {
-      readdirResult: ['protected-dir', 'file.txt'],
+    '/test-dir': {
+      readdirResult: ['file.txt'],
+      realpathResult: '/test-dir',
     },
-    '/error-root/protected-dir': {
-      readdirResult: [],
-      statError: new Error('EACCES: permission denied'),
-    },
-    '/error-root/file.txt': {
+    '/test-dir/file.txt': {
       readdirResult: [],
       statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
     },
@@ -99,27 +105,41 @@ test('should handle permission errors gracefully', () => {
   setFsImplementation(mockFs as any);
 
   try {
-    const fingerprint = getDirectoryFingerprint('/error-root');
-    expect(fingerprint).toBeDefined();
+    const fingerprint = getDirectoryFingerprint('/test-dir');
     expect(fingerprint).toContain('file.txt');
-    // Should not throw despite the permission error
   } finally {
     setFsImplementation(originalFs);
   }
 });
 
-test('should skip symlinks', () => {
+test('should include contents of symlinked directories', () => {
   originalFs = getFsImplementation();
 
+  // Create a symlink to a directory: /project/shared -> /project/shared-target
   const mockFs = createMockFs({
-    '/symlink-root': {
-      readdirResult: ['symlink-dir', 'normal-file.txt'],
+    '/project': {
+      readdirResult: ['shared', 'file.txt'],
+      realpathResult: '/project',
     },
-    '/symlink-root/symlink-dir': {
-      readdirResult: [],
+    '/project/shared': {
+      readdirResult: ['subdir', 'other.txt'],
       statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
+      realpathResult: '/project/shared',
     },
-    '/symlink-root/normal-file.txt': {
+    '/project/shared/subdir': {
+      readdirResult: ['nested.txt'],
+      statResult: { isDirectory: () => true, isSymbolicLink: () => false } as any,
+      realpathResult: '/project/shared/subdir',
+    },
+    '/project/shared/subdir/nested.txt': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
+    },
+    '/project/shared/other.txt': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
+    },
+    '/project/file.txt': {
       readdirResult: [],
       statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
     },
@@ -128,60 +148,36 @@ test('should skip symlinks', () => {
   setFsImplementation(mockFs as any);
 
   try {
-    const fingerprint = getDirectoryFingerprint('/symlink-root');
-    expect(fingerprint).toBeDefined();
-    expect(fingerprint).toContain('normal-file.txt');
-    expect(fingerprint).not.toContain('symlink-dir');
+    const fingerprint = getDirectoryFingerprint('/project');
+    expect(fingerprint).toContain('file.txt');
+    expect(fingerprint).toContain('shared/');
+    expect(fingerprint).toContain('other.txt');
+    expect(fingerprint).toContain('subdir/');
+    expect(fingerprint).toContain('nested.txt');
   } finally {
     setFsImplementation(originalFs);
   }
 });
 
-test('should skip common ignored directories', () => {
+test('should detect changes in symlinked directories', () => {
   originalFs = getFsImplementation();
 
+  // Create a symlink to a directory: /project/shared -> /project/shared-target
   const mockFs = createMockFs({
-    '/test-root': {
-      readdirResult: [
-        'node_modules',
-        '.git',
-        'dist',
-        'build',
-        '.next',
-        'out',
-        'coverage',
-        'target',
-        'vendor',
-        '__pycache__',
-        '.cache',
-        '.mypy_cache',
-        '.svn',
-        '.hg',
-        'normal-file.txt',
-      ],
+    '/project': {
+      readdirResult: ['shared', 'file.txt'],
+      realpathResult: '/project',
     },
-    '/test-root/target': {
-      readdirResult: ['subdir', 'file.txt'],
+    '/project/shared': {
+      readdirResult: ['other.txt'], // Changed from ['subdir', 'other.txt']
+      statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
+      realpathResult: '/project/shared',
     },
-    '/test-root/vendor': {
-      readdirResult: ['lib', 'file.txt'],
+    '/project/shared/other.txt': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
     },
-    '/test-root/__pycache__': {
-      readdirResult: ['__init__.pyc', 'module.pyc'],
-    },
-    '/test-root/.cache': {
-      readdirResult: ['cache-file.txt'],
-    },
-    '/test-root/.mypy_cache': {
-      readdirResult: ['__pycache__'],
-    },
-    '/test-root/.svn': {
-      readdirResult: ['entries'],
-    },
-    '/test-root/.hg': {
-      readdirResult: ['store'],
-    },
-    '/test-root/normal-file.txt': {
+    '/project/file.txt': {
       readdirResult: [],
       statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
     },
@@ -190,25 +186,49 @@ test('should skip common ignored directories', () => {
   setFsImplementation(mockFs as any);
 
   try {
-    const fingerprint = getDirectoryFingerprint('/test-root');
-    expect(fingerprint).toBeDefined();
-    // Should not contain any of the skipped directories
-    expect(fingerprint).not.toContain('node_modules/');
-    expect(fingerprint).not.toContain('.git/');
-    expect(fingerprint).not.toContain('dist/');
-    expect(fingerprint).not.toContain('build/');
-    expect(fingerprint).not.toContain('.next/');
-    expect(fingerprint).not.toContain('out/');
-    expect(fingerprint).not.toContain('coverage/');
-    expect(fingerprint).not.toContain('target/');
-    expect(fingerprint).not.toContain('vendor/');
-    expect(fingerprint).not.toContain('__pycache__/');
-    expect(fingerprint).not.toContain('.cache/');
-    expect(fingerprint).not.toContain('.mypy_cache/');
-    expect(fingerprint).not.toContain('.svn/');
-    expect(fingerprint).not.toContain('.hg/');
-    // Should contain the normal file
-    expect(fingerprint).toContain('normal-file.txt');
+    const fingerprint = getDirectoryFingerprint('/project');
+    expect(fingerprint).toContain('file.txt');
+    expect(fingerprint).toContain('shared/');
+    expect(fingerprint).toContain('other.txt');
+    // Should NOT contain subdir since it was removed
+    expect(fingerprint).not.toContain('subdir/');
+  } finally {
+    setFsImplementation(originalFs);
+  }
+});
+
+test('should include symlinked files as entries', () => {
+  originalFs = getFsImplementation();
+
+  // Create a symlink to a file: /project/shared/link -> /project/shared/target.txt
+  const mockFs = createMockFs({
+    '/project': {
+      readdirResult: ['shared', 'file.txt'],
+      realpathResult: '/project',
+    },
+    '/project/shared': {
+      readdirResult: ['link'],
+      statResult: { isDirectory: () => true, isSymbolicLink: () => false } as any,
+      realpathResult: '/project/shared',
+    },
+    '/project/shared/link': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => true } as any,
+    },
+    '/project/file.txt': {
+      readdirResult: [],
+      statResult: { isDirectory: () => false, isSymbolicLink: () => false } as any,
+    },
+  });
+
+  setFsImplementation(mockFs as any);
+
+  try {
+    const fingerprint = getDirectoryFingerprint('/project');
+    expect(fingerprint).toContain('file.txt');
+    expect(fingerprint).toContain('shared/');
+    // Should contain 'link' since it's a symlink to a file, now included
+    expect(fingerprint).toContain('link');
   } finally {
     setFsImplementation(originalFs);
   }

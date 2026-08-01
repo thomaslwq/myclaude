@@ -1,4 +1,4 @@
-import { join } from 'path'
+import { join, resolve, basename } from 'path'
 import {
   getCurrentProjectConfig,
   saveCurrentProjectConfig,
@@ -18,14 +18,35 @@ import { getFsImplementation } from './utils/fsOperations.js'
  * changes within existing files (those are covered by the CLAUDE.md
  * mtime check).
  */
-export function getDirectoryFingerprint(dirPath: string): string {
+export function getDirectoryFingerprint(dirPath: string, visitedRealPaths?: Set<string>): string {
   const fs = getFsImplementation()
+  
+  // Track resolved real paths to detect symlink cycles
+  if (!visitedRealPaths) {
+    visitedRealPaths = new Set<string>()
+  }
+  
+  // Get the real path of the current directory to detect cycles
+  let currentRealPath: string
+  try {
+    currentRealPath = fs.realpathSync(dirPath)
+  } catch {
+    // If we can't resolve the real path, use the original path
+    currentRealPath = dirPath
+  }
+  
+  // If we've already visited this real path, we're in a cycle - skip it
+  if (visitedRealPaths.has(currentRealPath)) {
+    return ''
+  }
+  visitedRealPaths.add(currentRealPath)
   
   let entries: string[]
   try {
     entries = fs.readdirSync(dirPath).map((dirent) => dirent.name)
   } catch {
     // If we can't read the directory (permission error, etc.), return empty fingerprint
+    visitedRealPaths.delete(currentRealPath)
     return ''
   }
   
@@ -40,12 +61,25 @@ export function getDirectoryFingerprint(dirPath: string): string {
       // Use lstatSync to detect symlinks without following them
       const lstat = fs.lstatSync(fullPath)
       
-      // Skip symbolic links to prevent infinite recursion and permission issues
       if (lstat.isSymbolicLink()) {
-        continue
-      }
-      
-      if (lstat.isDirectory()) {
+        // Follow symbolic links to directories so their contents are tracked
+        // This ensures changes in symlinked directories (e.g., shared folders, linked packages)
+        // are reflected in the fingerprint and don't cause stale cache.
+        try {
+          const stat = fs.statSync(fullPath)
+          if (stat.isDirectory()) {
+            // Recurse into the symlink target directory, passing the visited set
+            fingerprintParts.push(entry + '/')
+            fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths))
+          } else {
+            // Symlink to a file: include the entry name
+            fingerprintParts.push(entry)
+          }
+        } catch {
+          // If we can't stat the target (broken symlink, permission error, etc.), skip it
+          continue
+        }
+      } else if (lstat.isDirectory()) {
         // Skip common ignored directories to avoid performance issues
         // (node_modules, .git, dist, build, etc.)
         if (
@@ -69,7 +103,7 @@ export function getDirectoryFingerprint(dirPath: string): string {
         
         // Include the directory name and recurse into it
         fingerprintParts.push(entry + '/')
-        fingerprintParts.push(getDirectoryFingerprint(fullPath))
+        fingerprintParts.push(getDirectoryFingerprint(fullPath, visitedRealPaths))
       } else {
         fingerprintParts.push(entry)
       }
@@ -80,6 +114,7 @@ export function getDirectoryFingerprint(dirPath: string): string {
     }
   }
   
+  visitedRealPaths.delete(currentRealPath)
   return fingerprintParts.join('\n')
 }
 
