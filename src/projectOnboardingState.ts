@@ -132,7 +132,10 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
             entry === '.cache' ||
             entry === '.mypy_cache' ||
             entry === '.svn' ||
-            entry === '.hg'
+            entry === '.hg' ||
+            entry === 'venv' ||
+            entry === '.venv' ||
+            entry === 'env'
           ) {
             continue
           }
