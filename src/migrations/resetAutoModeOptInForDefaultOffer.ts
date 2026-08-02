@@ -70,10 +70,9 @@ export function resetAutoModeOptInForDefaultOffer(): void {
     )
 
     if (hasSkipInNonEditableSources) {
-      logError(new Error(
-        'Migration incomplete: skipAutoPermissionPrompt is still set in non-editable sources (policySettings or flagSettings). '
+      console.warn('Migration note: skipAutoPermissionPrompt is still set in non-editable sources (policySettings or flagSettings). '
         + 'The permission prompt will not be re-surfaced. Please check your managed settings configuration.'
-      ))
+      )
     }
 
     saveGlobalConfig(c => {
