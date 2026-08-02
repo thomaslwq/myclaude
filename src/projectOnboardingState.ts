@@ -38,15 +38,14 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
     // to detect cycles even when realpathSync fails (e.g., permission errors)
     console.warn(`[getDirectoryFingerprint] Failed to resolve real path for '${dirPath}', using original path: ${err}`)
     try {
-      const lstat = fs.lstatSync(dirPath)
-      if (lstat.isSymbolicLink()) {
-        const linkTarget = fs.readlinkSync(dirPath)
-        const resolvedTarget = resolve(dirPath, linkTarget)
-        currentRealPath = resolvedTarget
-      } else {
-        currentRealPath = dirPath
-      }
+      // Use readlinkSync directly without prior lstatSync check to avoid TOCTOU race condition.
+      // readlinkSync is a single system call that atomically reads the symlink target.
+      // If the path is not a symlink, it will throw an error which we catch.
+      const linkTarget = fs.readlinkSync(dirPath)
+      const resolvedTarget = resolve(dirPath, linkTarget)
+      currentRealPath = resolvedTarget
     } catch {
+      // If readlinkSync fails (not a symlink, permission error, etc.), use the original path
       currentRealPath = dirPath
     }
   }
