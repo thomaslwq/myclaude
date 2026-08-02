@@ -1,4 +1,4 @@
-import { join, resolve, basename } from 'path'
+import { join, resolve, basename, sep as pathSep } from 'path'
 import {
   getCurrentProjectConfig,
   saveCurrentProjectConfig,
@@ -117,7 +117,7 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
               targetRealPath = resolvedTarget
             }
             // Only recurse into the symlink target if it's within the root directory
-            if (targetRealPath.startsWith(rootRealPath + '/') || targetRealPath === rootRealPath) {
+            if (targetRealPath === rootRealPath || targetRealPath.startsWith(rootRealPath + pathSep)) {
               // Check if the target is a directory
               const stat = fs.statSync(resolvedTarget)
               if (stat.isDirectory()) {
