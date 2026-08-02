@@ -18,7 +18,7 @@ import { getFsImplementation } from './utils/fsOperations.js'
  * changes within existing files (those are covered by the CLAUDE.md
  * mtime check).
  */
-export function getDirectoryFingerprint(dirPath: string, recursionStack?: string[], rootRealPath?: string): string {
+export function getDirectoryFingerprint(dirPath: string, recursionStack?: string[], rootRealPath?: string, maxDepth: number = 100): string {
   const fs = getFsImplementation()
   
   // Track resolved real paths in the current recursion chain to detect symlink cycles
@@ -60,6 +60,14 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
   }
   recursionStack.push(currentRealPath)
   
+  // Check depth limit to prevent stack overflow from deeply nested directories
+  // The recursionStack length is used as depth proxy since each push corresponds to one level
+  if (recursionStack.length > maxDepth) {
+    console.warn(`[getDirectoryFingerprint] Maximum recursion depth (${maxDepth}) exceeded for '${dirPath}'`)
+    recursionStack.pop()
+    return ''
+  }
+
   // Store the root real path on first call to enforce symlink boundary
   if (rootRealPath === undefined) {
     rootRealPath = currentRealPath
@@ -140,7 +148,7 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
                   continue
                 }
                 fingerprintParts.push(entry + '/')
-                fingerprintParts.push(getDirectoryFingerprint(resolvedTarget, recursionStack, rootRealPath))
+                fingerprintParts.push(getDirectoryFingerprint(resolvedTarget, recursionStack, rootRealPath, maxDepth))
               } else {
                 // Symlink to a file: include the entry name
                 fingerprintParts.push(entry)
@@ -182,7 +190,7 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
           
           // Include the directory name and recurse into it
           fingerprintParts.push(entry + '/')
-          fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath))
+          fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath, maxDepth))
         } else {
           fingerprintParts.push(entry)
         }
