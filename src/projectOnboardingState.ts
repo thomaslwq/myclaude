@@ -116,7 +116,13 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
               targetRealPath = resolvedTarget
             }
             // Only recurse into the symlink target if it's within the root directory
-            if (targetRealPath === rootRealPath || targetRealPath.startsWith(rootRealPath + pathSep)) {
+            // Use lowercased comparisons to handle case-insensitive filesystems
+            // (e.g., macOS APFS, Windows NTFS). On these filesystems, paths that
+            // differ only in case resolve to the same location, so a case-sensitive
+            // startsWith() check could be bypassed.
+            const targetLower = targetRealPath.toLowerCase()
+            const rootLower = rootRealPath.toLowerCase()
+            if (targetLower === rootLower || targetLower.startsWith(rootLower + pathSep)) {
               // Check if the target is a directory
               const stat = fs.statSync(resolvedTarget)
               if (stat.isDirectory()) {

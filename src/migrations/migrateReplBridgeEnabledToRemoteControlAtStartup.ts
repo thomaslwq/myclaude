@@ -22,8 +22,11 @@ export function migrateReplBridgeEnabledToRemoteControlAtStartup(): void {
     if (oldValue === undefined) return prev
     if (prev.remoteControlAtStartup !== undefined) return prev
     // Use explicit string check to avoid Boolean('false') === true bug
+    // Also handle other truthy strings like '1', 'yes', 'enabled' etc.
     const newValue =
-      typeof oldValue === 'string' ? oldValue === 'true' : Boolean(oldValue)
+      typeof oldValue === 'string'
+        ? !['false', '0', 'no', ''].includes(oldValue.toLowerCase().trim())
+        : Boolean(oldValue)
     return { ...prev, remoteControlAtStartup: newValue }
   })
 
@@ -37,7 +40,9 @@ export function migrateReplBridgeEnabledToRemoteControlAtStartup(): void {
     // phase 1, but be safe), migrate it first before removing the old key.
     if (prev.remoteControlAtStartup === undefined) {
       const newValue =
-        typeof oldValue === 'string' ? oldValue === 'true' : Boolean(oldValue)
+        typeof oldValue === 'string'
+          ? !['false', '0', 'no', ''].includes(oldValue.toLowerCase().trim())
+          : Boolean(oldValue)
       return {
         ...prev,
         remoteControlAtStartup: newValue,

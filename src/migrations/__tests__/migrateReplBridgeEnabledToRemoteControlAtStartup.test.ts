@@ -88,7 +88,7 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     expect(phase2Result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle string "false" correctly (this is the bug fix)', () => {
+  it('should handle string "1" as truthy', () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
       calls.push(cb)
@@ -99,20 +99,20 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
 
     const phase1Result = calls[0]({
       remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'false',
+      replBridgeEnabled: '1',
     })
-    expect(phase1Result.remoteControlAtStartup).toBe(false)
-    expect(phase1Result.replBridgeEnabled).toBe('false')
+    expect(phase1Result.remoteControlAtStartup).toBe(true)
+    expect(phase1Result.replBridgeEnabled).toBe('1')
 
     const phase2Result = calls[1]({
-      remoteControlAtStartup: false,
-      replBridgeEnabled: 'false',
+      remoteControlAtStartup: true,
+      replBridgeEnabled: '1',
     })
-    expect(phase2Result.remoteControlAtStartup).toBe(false)
+    expect(phase2Result.remoteControlAtStartup).toBe(true)
     expect(phase2Result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle empty string as false', () => {
+  it('should handle string "yes" as truthy', () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
       calls.push(cb)
@@ -123,41 +123,89 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
 
     const phase1Result = calls[0]({
       remoteControlAtStartup: undefined,
-      replBridgeEnabled: '',
+      replBridgeEnabled: 'yes',
+    })
+    expect(phase1Result.remoteControlAtStartup).toBe(true)
+    expect(phase1Result.replBridgeEnabled).toBe('yes')
+
+    const phase2Result = calls[1]({
+      remoteControlAtStartup: true,
+      replBridgeEnabled: 'yes',
+    })
+    expect(phase2Result.remoteControlAtStartup).toBe(true)
+    expect(phase2Result.replBridgeEnabled).toBeUndefined()
+  })
+
+  it('should handle string "enabled" as truthy', () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(2)
+
+    const phase1Result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'enabled',
+    })
+    expect(phase1Result.remoteControlAtStartup).toBe(true)
+    expect(phase1Result.replBridgeEnabled).toBe('enabled')
+
+    const phase2Result = calls[1]({
+      remoteControlAtStartup: true,
+      replBridgeEnabled: 'enabled',
+    })
+    expect(phase2Result.remoteControlAtStartup).toBe(true)
+    expect(phase2Result.replBridgeEnabled).toBeUndefined()
+  })
+
+  it('should handle string "0" as falsy', () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(2)
+
+    const phase1Result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: '0',
     })
     expect(phase1Result.remoteControlAtStartup).toBe(false)
-    expect(phase1Result.replBridgeEnabled).toBe('')
+    expect(phase1Result.replBridgeEnabled).toBe('0')
 
     const phase2Result = calls[1]({
       remoteControlAtStartup: false,
-      replBridgeEnabled: '',
+      replBridgeEnabled: '0',
     })
     expect(phase2Result.remoteControlAtStartup).toBe(false)
     expect(phase2Result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should be idempotent — skip if old key already migrated', () => {
+  it('should handle string "no" as falsy', () => {
+    const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
-      const prev = {
-        remoteControlAtStartup: true,
-      }
-      const result = cb(prev)
-      expect(result).toBe(prev) // same reference = no changes
+      calls.push(cb)
     })
     migrateReplBridgeEnabledToRemoteControlAtStartup()
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(2)
-  })
 
-  it('should be idempotent — skip if new key already set (with old key missing)', () => {
-    mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
-      const prev = {
-        remoteControlAtStartup: true,
-      }
-      const result = cb(prev)
-      expect(result).toBe(prev)
-    })
-    migrateReplBridgeEnabledToRemoteControlAtStartup()
     expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(2)
+
+    const phase1Result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'no',
+    })
+    expect(phase1Result.remoteControlAtStartup).toBe(false)
+    expect(phase1Result.replBridgeEnabled).toBe('no')
+
+    const phase2Result = calls[1]({
+      remoteControlAtStartup: false,
+      replBridgeEnabled: 'no',
+    })
+    expect(phase2Result.remoteControlAtStartup).toBe(false)
+    expect(phase2Result.replBridgeEnabled).toBeUndefined()
   })
 
   it('should add new key and remove old key in two-phase write', () => {
