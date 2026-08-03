@@ -36,7 +36,9 @@ function createMockFs(customBehaviors: Record<string, any>) {
     symlinkSync: () => {},
     readlinkSync: (path: string) => {
       if (customBehaviors[path]?.readlinkResult) return customBehaviors[path].readlinkResult;
-      return '';
+      if (customBehaviors[path]?.readlinkError) throw customBehaviors[path].readlinkError;
+      // readlinkSync throws EINVAL when the path is not a symlink
+      throw new Error('EINVAL: not a symlink');
     },
     realpathSync: (path: string) => {
       if (customBehaviors[path]?.realpathError) throw customBehaviors[path].realpathError;

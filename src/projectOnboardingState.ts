@@ -91,113 +91,106 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
       const fullPath = join(dirPath, entry)
       
       try {
-        // Use lstatSync to detect symlinks without following them
-        const lstat = fs.lstatSync(fullPath)
-        
-        if (lstat.isSymbolicLink()) {
-          // Follow symbolic links to directories so their contents are tracked
-          // This ensures changes in symlinked directories (e.g., shared folders, linked packages)
-          // are reflected in the fingerprint and don't cause stale cache.
-          // Security: read the symlink target atomically using readlinkSync to avoid
-          // TOCTOU race conditions. Between lstatSync and statSync/realpathSync, an
-          // attacker could replace the symlink with one pointing outside the root.
-          // By reading the link target immediately, we eliminate the race window.
+        // Try to read the symlink target atomically using readlinkSync.
+        // readlinkSync is a single system call: if the path is a symlink,
+        // it returns the target. If not, it throws an error (EINVAL).
+        // This eliminates the TOCTOU race window entirely since we don't
+        // first check with lstatSync — we only make one call.
+        try {
+          const linkTarget = fs.readlinkSync(fullPath)
+          // Symlink — resolve and process it
+          const resolvedTarget = resolve(dirPath, linkTarget)
+          // Check if the resolved target is inside the root directory
+          let targetRealPath: string
           try {
-            // Atomically read the symlink target (single system call, no race)
-            const linkTarget = fs.readlinkSync(fullPath)
-            // Resolve the target relative to the symlink's parent directory
-            const resolvedTarget = resolve(dirPath, linkTarget)
-            // Check if the resolved target is inside the root directory
-            let targetRealPath: string
-            try {
-              targetRealPath = fs.realpathSync(resolvedTarget)
-            } catch (err) {
-              console.warn(`[getDirectoryFingerprint] Failed to resolve target real path for symlink '${fullPath}': ${err}`)
-              targetRealPath = resolvedTarget
-            }
-            // Only recurse into the symlink target if it's within the root directory
-            // Use lowercased comparisons to handle case-insensitive filesystems
-            // (e.g., macOS APFS, Windows NTFS). On these filesystems, paths that
-            // differ only in case resolve to the same location, so a case-sensitive
-            // startsWith() check could be bypassed.
-            const targetLower = targetRealPath.toLowerCase()
-            const rootLower = rootRealPath.toLowerCase()
-            if (targetLower === rootLower || targetLower.startsWith(rootLower + pathSep)) {
-              // Check if the target is a directory
-              const stat = fs.statSync(resolvedTarget)
-              if (stat.isDirectory()) {
-                // Skip common ignored directories to avoid performance issues
-                // (node_modules, .git, dist, build, etc.)
-                const targetBasename = basename(resolvedTarget)
-                if (
-                  targetBasename === 'node_modules' ||
-                  targetBasename === '.git' ||
-                  targetBasename === 'dist' ||
-                  targetBasename === 'build' ||
-                  targetBasename === '.next' ||
-                  targetBasename === 'out' ||
-                  targetBasename === 'coverage' ||
-                  targetBasename === 'target' ||
-                  targetBasename === 'vendor' ||
-                  targetBasename === '__pycache__' ||
-                  targetBasename === '.cache' ||
-                  targetBasename === '.mypy_cache' ||
-                  targetBasename === '.svn' ||
-                  targetBasename === '.hg' ||
-                  targetBasename === 'venv' ||
-                  targetBasename === '.venv' ||
-                  targetBasename === 'env'
-                ) {
-                  // Skip this directory to avoid performance issues
-                  fingerprintParts.push(entry + '/')
-                  continue
-                }
-                fingerprintParts.push(entry + '/')
-                fingerprintParts.push(getDirectoryFingerprint(resolvedTarget, recursionStack, rootRealPath, maxDepth))
-              } else {
-                // Symlink to a file: include the entry name
-                fingerprintParts.push(entry)
-              }
-            } else {
-              // Symlink points outside the root - include the entry name with trailing slash
-              // to maintain consistency with symlinked directories inside the root
-              fingerprintParts.push(entry + '/')
-            }
+            targetRealPath = fs.realpathSync(resolvedTarget)
           } catch (err) {
-            // If we can't read the link target (broken symlink, permission error, etc.), skip it
-            console.warn(`[getDirectoryFingerprint] Failed to process symlink '${fullPath}': ${err}`)
-            continue
+            console.warn(`[getDirectoryFingerprint] Failed to resolve target real path for symlink '${fullPath}': ${err}`)
+            targetRealPath = resolvedTarget
           }
-        } else if (lstat.isDirectory()) {
-          // Skip common ignored directories to avoid performance issues
-          // (node_modules, .git, dist, build, etc.)
-          if (
-            entry === 'node_modules' ||
-            entry === '.git' ||
-            entry === 'dist' ||
-            entry === 'build' ||
-            entry === '.next' ||
-            entry === 'out' ||
-            entry === 'coverage' ||
-            entry === 'target' ||
-            entry === 'vendor' ||
-            entry === '__pycache__' ||
-            entry === '.cache' ||
-            entry === '.mypy_cache' ||
-            entry === '.svn' ||
-            entry === '.hg' ||
-            entry === 'venv' ||
-            entry === '.venv' ||
-            entry === 'env'
-          ) {
-            continue
+          // Only recurse into the symlink target if it's within the root directory
+          // Use lowercased comparisons to handle case-insensitive filesystems
+          // (e.g., macOS APFS, Windows NTFS). On these filesystems, paths that
+          // differ only in case resolve to the same location, so a case-sensitive
+          // startsWith() check could be bypassed.
+          const targetLower = targetRealPath.toLowerCase()
+          const rootLower = rootRealPath.toLowerCase()
+          if (targetLower === rootLower || targetLower.startsWith(rootLower + pathSep)) {
+            // Check if the target is a directory
+            const stat = fs.statSync(resolvedTarget)
+            if (stat.isDirectory()) {
+              // Skip common ignored directories to avoid performance issues
+              // (node_modules, .git, dist, build, etc.)
+              const targetBasename = basename(resolvedTarget)
+              if (
+                targetBasename === 'node_modules' ||
+                targetBasename === '.git' ||
+                targetBasename === 'dist' ||
+                targetBasename === 'build' ||
+                targetBasename === '.next' ||
+                targetBasename === 'out' ||
+                targetBasename === 'coverage' ||
+                targetBasename === 'target' ||
+                targetBasename === 'vendor' ||
+                targetBasename === '__pycache__' ||
+                targetBasename === '.cache' ||
+                targetBasename === '.mypy_cache' ||
+                targetBasename === '.svn' ||
+                targetBasename === '.hg' ||
+                targetBasename === 'venv' ||
+                targetBasename === '.venv' ||
+                targetBasename === 'env'
+              ) {
+                // Skip this directory to avoid performance issues
+                fingerprintParts.push(entry + '/')
+                continue
+              }
+              fingerprintParts.push(entry + '/')
+              fingerprintParts.push(getDirectoryFingerprint(resolvedTarget, recursionStack, rootRealPath, maxDepth))
+            } else {
+              // Symlink to a file: include the entry name
+              fingerprintParts.push(entry)
+            }
+          } else {
+            // Symlink points outside the root - include the entry name with trailing slash
+            // to maintain consistency with symlinked directories inside the root
+            fingerprintParts.push(entry + '/')
           }
-          
-          // Include the directory name and recurse into it
-          fingerprintParts.push(entry + '/')
-          fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath, maxDepth))
-        } else {
-          fingerprintParts.push(entry)
+        } catch {
+          // readlinkSync failed — this is not a symlink (or permission error, etc.)
+          // Use lstatSync to determine if it's a directory or a regular file
+          const lstat = fs.lstatSync(fullPath)
+          if (lstat.isDirectory()) {
+            // Skip common ignored directories to avoid performance issues
+            // (node_modules, .git, dist, build, etc.)
+            if (
+              entry === 'node_modules' ||
+              entry === '.git' ||
+              entry === 'dist' ||
+              entry === 'build' ||
+              entry === '.next' ||
+              entry === 'out' ||
+              entry === 'coverage' ||
+              entry === 'target' ||
+              entry === 'vendor' ||
+              entry === '__pycache__' ||
+              entry === '.cache' ||
+              entry === '.mypy_cache' ||
+              entry === '.svn' ||
+              entry === '.hg' ||
+              entry === 'venv' ||
+              entry === '.venv' ||
+              entry === 'env'
+            ) {
+              continue
+            }
+            
+            // Include the directory name and recurse into it
+            fingerprintParts.push(entry + '/')
+            fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath, maxDepth))
+          } else {
+            fingerprintParts.push(entry)
+          }
         }
       } catch (err) {
         // Skip entries that can't be accessed (permission errors, etc.)
