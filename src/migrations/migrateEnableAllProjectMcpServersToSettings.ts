@@ -79,14 +79,20 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   if (hasEnabledServers) {
     // Preserve empty arrays to maintain semantic meaning (explicit list of zero servers)
     // vs undefined which means 'use defaults'
-    if (Array.isArray(projectConfig.enabledMcpjsonServers) && projectConfig.enabledMcpjsonServers.length > 0) {
-      // Merge the servers, preserving order and avoiding duplicates
-      // First occurrence wins: existing items keep their position, new items are appended
-      const seen = new Set(existingEnabledServers)
-      for (const server of projectConfig.enabledMcpjsonServers) {
-        if (!seen.has(server)) {
-          existingEnabledServers.push(server)
-          seen.add(server)
+    // Empty arrays are treated as valid values that should overwrite existing settings
+    if (Array.isArray(projectConfig.enabledMcpjsonServers)) {
+      if (projectConfig.enabledMcpjsonServers.length === 0) {
+        // Empty array means explicit intent to clear the list
+        existingEnabledServers.length = 0
+      } else {
+        // Merge the servers, preserving order and avoiding duplicates
+        // First occurrence wins: existing items keep their position, new items are appended
+        const seen = new Set(existingEnabledServers)
+        for (const server of projectConfig.enabledMcpjsonServers) {
+          if (!seen.has(server)) {
+            existingEnabledServers.push(server)
+            seen.add(server)
+          }
         }
       }
     }
@@ -94,13 +100,19 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
   // Merge disabledMcpjsonServers if it exists in project config
   if (hasDisabledServers) {
-    if (Array.isArray(projectConfig.disabledMcpjsonServers) && projectConfig.disabledMcpjsonServers.length > 0) {
-      // Merge the servers, preserving order and avoiding duplicates
-      const seen = new Set(existingDisabledServers)
-      for (const server of projectConfig.disabledMcpjsonServers) {
-        if (!seen.has(server)) {
-          existingDisabledServers.push(server)
-          seen.add(server)
+    // Empty arrays are treated as valid values that should overwrite existing settings
+    if (Array.isArray(projectConfig.disabledMcpjsonServers)) {
+      if (projectConfig.disabledMcpjsonServers.length === 0) {
+        // Empty array means explicit intent to clear the list
+        existingDisabledServers.length = 0
+      } else {
+        // Merge the servers, preserving order and avoiding duplicates
+        const seen = new Set(existingDisabledServers)
+        for (const server of projectConfig.disabledMcpjsonServers) {
+          if (!seen.has(server)) {
+            existingDisabledServers.push(server)
+            seen.add(server)
+          }
         }
       }
     }
