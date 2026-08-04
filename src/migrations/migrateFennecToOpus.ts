@@ -47,12 +47,7 @@ export function migrateFennecToOpus(): void {
         continue
       }
 
-      if (model.startsWith('fennec-latest')) {
-        const suffix = extractSuffix(model)
-        updateSettingsForSource(source, {
-          model: `opus${suffix}`,
-        })
-      } else if (
+      if (
         model.startsWith('fennec-fast-latest') ||
         model.startsWith('opus-4-5-fast')
       ) {
@@ -67,6 +62,11 @@ export function migrateFennecToOpus(): void {
           update.fastMode = existingFastMode
         }
         updateSettingsForSource(source, update)
+      } else if (model.startsWith('fennec-latest')) {
+        const suffix = extractSuffix(model)
+        updateSettingsForSource(source, {
+          model: `opus${suffix}`,
+        })
       }
     }
   } catch (error) {
