@@ -241,11 +241,14 @@ let cachedAt: number | null = null
 /**
  * Maximum age of the cache in milliseconds before forcing a re-check.
  * This is a fallback for filesystems where mtime may not change reliably.
- * 5 minutes is plenty of time for normal filesystems where fingerprint
- * and mtime checks are reliable, while still being short enough to
- * recover from edge cases on unreliable filesystems.
+ * 1 minute is a reasonable balance: long enough to avoid frequent
+ * re-computation on normal filesystems where fingerprint and mtime
+ * checks are reliable, while being short enough to detect changes
+ * on unreliable filesystems (FUSE mounts, network filesystems,
+ * containers with coarse timestamp resolution) without requiring
+ * the user to manually run /init.
  */
-const CACHE_MAX_AGE_MS = 300_000
+const CACHE_MAX_AGE_MS = 60_000
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
