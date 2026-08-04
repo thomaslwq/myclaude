@@ -290,8 +290,8 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
 
     migrateEnableAllProjectMcpServersToSettings()
 
-    // Empty array means 'explicitly set to empty list' - should overwrite existing settings
-    expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual([])
+    // Empty array is treated as no-op - existing settings should be preserved
+    expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existing1'])
     expect(globalConfigStore.hasCompletedMcpServerMigration).toBe(true)
   })
 
