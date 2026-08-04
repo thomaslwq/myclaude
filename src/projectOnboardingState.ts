@@ -18,52 +18,55 @@ import { getFsImplementation } from './utils/fsOperations.js'
  * changes within existing files (those are covered by the CLAUDE.md
  * mtime check).
  */
-export function getDirectoryFingerprint(dirPath: string, recursionStack?: string[], rootRealPath?: string, maxDepth: number = 100): string {
+export function getDirectoryFingerprint(dirPath: string, recursionStack?: Set<string>, rootRealPath?: string, maxDepth: number = 100): string {
   const fs = getFsImplementation()
   
   // Track resolved real paths in the current recursion chain to detect symlink cycles
-  // Using a stack instead of a global set allows the same directory to be visited
-  // via multiple paths (e.g., directly and via a symlink) while still detecting
-  // genuine cycles (e.g., a symlink pointing to an ancestor).
+  // Using a Set instead of an array allows O(1) lookups and avoids O(n) .includes() calls.
+  // A Set is scoped to each recursion chain (passed along), so the same directory can
+  // still be visited via multiple paths while detecting genuine cycles.
   if (!recursionStack) {
-    recursionStack = []
+    recursionStack = new Set()
   }
   
   // Get the real path of the current directory to detect cycles
+  // We always resolve to an absolute path to ensure consistent comparison
+  const resolvedDirPath = resolve(dirPath)
   let currentRealPath: string
   try {
-    currentRealPath = fs.realpathSync(dirPath)
+    currentRealPath = fs.realpathSync(resolvedDirPath)
   } catch (err) {
     // If we can't resolve the real path, try to resolve the symlink manually
     // to detect cycles even when realpathSync fails (e.g., permission errors)
-    console.warn(`[getDirectoryFingerprint] Failed to resolve real path for '${dirPath}', using original path: ${err}`)
+    console.warn(`[getDirectoryFingerprint] Failed to resolve real path for '${resolvedDirPath}', using original path: ${err}`)
     try {
       // Use readlinkSync directly without prior lstatSync check to avoid TOCTOU race condition.
       // readlinkSync is a single system call that atomically reads the symlink target.
       // If the path is not a symlink, it will throw an error which we catch.
-      const linkTarget = fs.readlinkSync(dirPath)
-      const resolvedTarget = resolve(dirPath, linkTarget)
-      currentRealPath = resolvedTarget
+      const linkTarget = fs.readlinkSync(resolvedDirPath)
+      // Resolve the symlink target relative to the directory containing the symlink
+      // This produces a canonical absolute path even if the symlink target is relative
+      currentRealPath = resolve(resolvedDirPath, '..', linkTarget)
     } catch {
-      // If readlinkSync fails (not a symlink, permission error, etc.), use the original path
-      currentRealPath = dirPath
+      // If readlinkSync fails (not a symlink, permission error, etc.), use the resolved original path
+      currentRealPath = resolvedDirPath
     }
   }
   
   // If we've already visited this real path in the current recursion chain,
   // we're in a cycle - skip it to prevent infinite recursion
-  // Also check the original dirPath in case realpathSync failed and the
+  // Also check the resolved original dirPath in case realpathSync failed and the
   // resolved path doesn't match what's in the stack (e.g., symlink cycle)
-  if (recursionStack.includes(currentRealPath) || recursionStack.includes(dirPath)) {
+  if (recursionStack.has(currentRealPath) || recursionStack.has(resolvedDirPath)) {
     return ''
   }
-  recursionStack.push(currentRealPath)
+  recursionStack.add(currentRealPath)
   
   // Check depth limit to prevent stack overflow from deeply nested directories
-  // The recursionStack length is used as depth proxy since each push corresponds to one level
-  if (recursionStack.length > maxDepth) {
-    console.warn(`[getDirectoryFingerprint] Maximum recursion depth (${maxDepth}) exceeded for '${dirPath}'`)
-    recursionStack.pop()
+  // The recursionStack size is used as depth proxy since each add corresponds to one level
+  if (recursionStack.size > maxDepth) {
+    console.warn(`[getDirectoryFingerprint] Maximum recursion depth (${maxDepth}) exceeded for '${resolvedDirPath}'`)
+    recursionStack.delete(currentRealPath)
     return ''
   }
 
@@ -78,7 +81,7 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
   } catch (err) {
     // If we can't read the directory (permission error, etc.), return empty fingerprint
     console.warn(`[getDirectoryFingerprint] Failed to read directory '${dirPath}': ${err}`)
-    recursionStack.pop()
+    recursionStack.delete(currentRealPath)
     return ''
   }
   
@@ -207,7 +210,7 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
     }
   } finally {
     // Ensure cleanup happens even if an exception is thrown
-    recursionStack.pop()
+    recursionStack.delete(currentRealPath)
   }
   
   return fingerprintParts.join('\n')
