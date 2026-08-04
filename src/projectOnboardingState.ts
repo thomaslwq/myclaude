@@ -91,44 +91,16 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
       const fullPath = join(dirPath, entry)
       
       try {
-        // Use lstatSync to atomically determine the entry type.
-        // This eliminates the TOCTOU race condition that could occur if we first
-        // checked with readlinkSync (which throws if not a symlink) and then called
-        // lstatSync in the catch block.
-        const lstat = fs.lstatSync(fullPath)
-        
-        if (lstat.isDirectory()) {
-          // Skip common ignored directories to avoid performance issues
-          // (node_modules, .git, dist, build, etc.)
-          const targetBasename = basename(fullPath)
-          if (
-            targetBasename === 'node_modules' ||
-            targetBasename === '.git' ||
-            targetBasename === 'dist' ||
-            targetBasename === 'build' ||
-            targetBasename === '.next' ||
-            targetBasename === 'out' ||
-            targetBasename === 'coverage' ||
-            targetBasename === 'target' ||
-            targetBasename === 'vendor' ||
-            targetBasename === '__pycache__' ||
-            targetBasename === '.cache' ||
-            targetBasename === '.mypy_cache' ||
-            targetBasename === '.svn' ||
-            targetBasename === '.hg' ||
-            targetBasename === 'venv' ||
-            targetBasename === '.venv' ||
-            targetBasename === 'env'
-          ) {
-            // Skip this directory to avoid performance issues
-            fingerprintParts.push(entry + '/')
-            continue
-          }
-          fingerprintParts.push(entry + '/')
-          fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath, maxDepth))
-        } else if (lstat.isSymbolicLink()) {
-          // Symlink — resolve and process it
+        // Use readlinkSync directly to check if the path is a symlink.
+        // readlinkSync is a single system call that atomically reads the symlink target,
+        // eliminating the TOCTOU race condition that would exist if we first checked
+        // with lstatSync and then called readlinkSync in a separate syscall.
+        // If the path is not a symlink, readlinkSync will throw an error which we catch.
+        let isSymlink = false
+        try {
           const linkTarget = fs.readlinkSync(fullPath)
+          isSymlink = true
+          // Symlink — resolve and process it
           const resolvedTarget = resolve(dirPath, linkTarget)
           // Check if the resolved target is inside the root directory
           let targetRealPath: string
@@ -186,9 +158,45 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
             // to maintain consistency with symlinked directories inside the root
             fingerprintParts.push(entry + '/')
           }
-        } else {
-          // Regular file: include the entry name
-          fingerprintParts.push(entry)
+        } catch {
+          // If readlinkSync throws, it's not a symlink (or there's a permission error).
+          // Fall back to lstatSync to determine if it's a directory or regular file.
+          if (!isSymlink) {
+            const lstat = fs.lstatSync(fullPath)
+            if (lstat.isDirectory()) {
+              // Skip common ignored directories to avoid performance issues
+              // (node_modules, .git, dist, build, etc.)
+              const targetBasename = basename(fullPath)
+              if (
+                targetBasename === 'node_modules' ||
+                targetBasename === '.git' ||
+                targetBasename === 'dist' ||
+                targetBasename === 'build' ||
+                targetBasename === '.next' ||
+                targetBasename === 'out' ||
+                targetBasename === 'coverage' ||
+                targetBasename === 'target' ||
+                targetBasename === 'vendor' ||
+                targetBasename === '__pycache__' ||
+                targetBasename === '.cache' ||
+                targetBasename === '.mypy_cache' ||
+                targetBasename === '.svn' ||
+                targetBasename === '.hg' ||
+                targetBasename === 'venv' ||
+                targetBasename === '.venv' ||
+                targetBasename === 'env'
+              ) {
+                // Skip this directory to avoid performance issues
+                fingerprintParts.push(entry + '/')
+                continue
+              }
+              fingerprintParts.push(entry + '/')
+              fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath, maxDepth))
+            } else {
+              // Regular file: include the entry name
+              fingerprintParts.push(entry)
+            }
+          }
         }
       } catch (err) {
         // Skip entries that can't be accessed (permission errors, etc.)
