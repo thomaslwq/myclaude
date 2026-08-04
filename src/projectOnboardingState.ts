@@ -1,4 +1,4 @@
-import { join, resolve, basename, sep as pathSep } from 'path'
+import { join } from 'path'
 import {
   getCurrentProjectConfig,
   saveCurrentProjectConfig,
@@ -6,215 +6,6 @@ import {
 import { getCwd } from './utils/cwd.js'
 import { isDirEmpty, getFileModificationTime } from './utils/file.js'
 import { getFsImplementation } from './utils/fsOperations.js'
-
-/**
- * Compute a fingerprint of a directory's contents to detect changes
- * without relying on mtime (which may not update reliably on FUSE mounts,
- * network filesystems, or containers with coarse timestamp resolution).
- *
- * The fingerprint is a sorted, newline-joined list of all files and
- * subdirectories recursively. This reliably detects file additions,
- * removals, and renames at any depth. It does NOT detect content
- * changes within existing files (those are covered by the CLAUDE.md
- * mtime check).
- */
-export function getDirectoryFingerprint(dirPath: string, recursionStack?: Set<string>, rootRealPath?: string, maxDepth: number = 100): string {
-  const fs = getFsImplementation()
-  
-  // Track resolved real paths in the current recursion chain to detect symlink cycles
-  // Using a Set instead of an array allows O(1) lookups and avoids O(n) .includes() calls.
-  // A Set is scoped to each recursion chain (passed along), so the same directory can
-  // still be visited via multiple paths while detecting genuine cycles.
-  if (!recursionStack) {
-    recursionStack = new Set()
-  }
-  
-  // Get the real path of the current directory to detect cycles
-  // We always resolve to an absolute path to ensure consistent comparison
-  const resolvedDirPath = resolve(dirPath)
-  let currentRealPath: string
-  try {
-    currentRealPath = fs.realpathSync(resolvedDirPath)
-  } catch (err) {
-    // If we can't resolve the real path, try to resolve the symlink manually
-    // to detect cycles even when realpathSync fails (e.g., permission errors)
-    console.warn(`[getDirectoryFingerprint] Failed to resolve real path for '${resolvedDirPath}', using original path: ${err}`)
-    try {
-      // Use readlinkSync directly without prior lstatSync check to avoid TOCTOU race condition.
-      // readlinkSync is a single system call that atomically reads the symlink target.
-      // If the path is not a symlink, it will throw an error which we catch.
-      const linkTarget = fs.readlinkSync(resolvedDirPath)
-      // Resolve the symlink target relative to the directory containing the symlink
-      // This produces a canonical absolute path even if the symlink target is relative
-      currentRealPath = resolve(resolvedDirPath, '..', linkTarget)
-    } catch {
-      // If readlinkSync fails (not a symlink, permission error, etc.), use the resolved original path
-      currentRealPath = resolvedDirPath
-    }
-  }
-  
-  // If we've already visited this real path in the current recursion chain,
-  // we're in a cycle - skip it to prevent infinite recursion
-  // Also check the resolved original dirPath in case realpathSync failed and the
-  // resolved path doesn't match what's in the stack (e.g., symlink cycle)
-  if (recursionStack.has(currentRealPath) || recursionStack.has(resolvedDirPath)) {
-    return ''
-  }
-  recursionStack.add(currentRealPath)
-  
-  // Check depth limit to prevent stack overflow from deeply nested directories
-  // The recursionStack size is used as depth proxy since each add corresponds to one level
-  if (recursionStack.size > maxDepth) {
-    console.warn(`[getDirectoryFingerprint] Maximum recursion depth (${maxDepth}) exceeded for '${resolvedDirPath}'`)
-    recursionStack.delete(currentRealPath)
-    return ''
-  }
-
-  // Store the root real path on first call to enforce symlink boundary
-  if (rootRealPath === undefined) {
-    rootRealPath = currentRealPath
-  }
-  
-  let entries: string[]
-  try {
-    entries = fs.readdirSync(dirPath).map((dirent) => dirent.name)
-  } catch (err) {
-    // If we can't read the directory (permission error, etc.), return empty fingerprint
-    console.warn(`[getDirectoryFingerprint] Failed to read directory '${dirPath}': ${err}`)
-    recursionStack.delete(currentRealPath)
-    return ''
-  }
-  
-  const sortedEntries = entries.sort()
-  
-  // Recursively include subdirectories in the fingerprint
-  const fingerprintParts: string[] = []
-  try {
-    for (const entry of sortedEntries) {
-      const fullPath = join(dirPath, entry)
-      
-      try {
-        // Use readlinkSync directly to check if the path is a symlink.
-        // readlinkSync is a single system call that atomically reads the symlink target,
-        // eliminating the TOCTOU race condition that would exist if we first checked
-        // with lstatSync and then called readlinkSync in a separate syscall.
-        // If the path is not a symlink, readlinkSync will throw an error which we catch.
-        let isSymlink = false
-        try {
-          const linkTarget = fs.readlinkSync(fullPath)
-          isSymlink = true
-          // Symlink — resolve and process it
-          const resolvedTarget = resolve(dirPath, linkTarget)
-          // Check if the resolved target is inside the root directory
-          let targetRealPath: string
-          try {
-            targetRealPath = fs.realpathSync(resolvedTarget)
-          } catch (err) {
-            console.warn(`[getDirectoryFingerprint] Failed to resolve target real path for symlink '${fullPath}': ${err}`)
-            targetRealPath = resolvedTarget
-          }
-          // Only recurse into the symlink target if it's within the root directory
-          // Use lowercased comparisons to handle case-insensitive filesystems
-          // (e.g., macOS APFS, Windows NTFS). On these filesystems, paths that
-          // differ only in case resolve to the same location, so a case-sensitive
-          // startsWith() check could be bypassed.
-          const targetLower = targetRealPath.toLowerCase()
-          const rootLower = rootRealPath.toLowerCase()
-          if (targetLower === rootLower || targetLower.startsWith(rootLower + pathSep)) {
-            // Check if the target is a directory
-            const stat = fs.statSync(resolvedTarget)
-            if (stat.isDirectory()) {
-              // Skip common ignored directories to avoid performance issues
-              // (node_modules, .git, dist, build, etc.)
-              const targetBasename = basename(resolvedTarget)
-              if (
-                targetBasename === 'node_modules' ||
-                targetBasename === '.git' ||
-                targetBasename === 'dist' ||
-                targetBasename === 'build' ||
-                targetBasename === '.next' ||
-                targetBasename === 'out' ||
-                targetBasename === 'coverage' ||
-                targetBasename === 'target' ||
-                targetBasename === 'vendor' ||
-                targetBasename === '__pycache__' ||
-                targetBasename === '.cache' ||
-                targetBasename === '.mypy_cache' ||
-                targetBasename === '.svn' ||
-                targetBasename === '.hg' ||
-                targetBasename === 'venv' ||
-                targetBasename === '.venv' ||
-                targetBasename === 'env'
-              ) {
-                // Skip this directory to avoid performance issues
-                fingerprintParts.push(entry + '/')
-                continue
-              }
-              fingerprintParts.push(entry + '/')
-              fingerprintParts.push(getDirectoryFingerprint(resolvedTarget, recursionStack, rootRealPath, maxDepth))
-            } else {
-              // Symlink to a file: include the entry name
-              fingerprintParts.push(entry)
-            }
-          } else {
-            // Symlink points outside the root - include the entry name with trailing slash
-            // to maintain consistency with symlinked directories inside the root
-            fingerprintParts.push(entry + '/')
-          }
-        } catch {
-          // If readlinkSync throws, it's not a symlink (or there's a permission error).
-          // Fall back to lstatSync to determine if it's a directory or regular file.
-          if (!isSymlink) {
-            const lstat = fs.lstatSync(fullPath)
-            if (lstat.isDirectory()) {
-              // Skip common ignored directories to avoid performance issues
-              // (node_modules, .git, dist, build, etc.)
-              const targetBasename = basename(fullPath)
-              if (
-                targetBasename === 'node_modules' ||
-                targetBasename === '.git' ||
-                targetBasename === 'dist' ||
-                targetBasename === 'build' ||
-                targetBasename === '.next' ||
-                targetBasename === 'out' ||
-                targetBasename === 'coverage' ||
-                targetBasename === 'target' ||
-                targetBasename === 'vendor' ||
-                targetBasename === '__pycache__' ||
-                targetBasename === '.cache' ||
-                targetBasename === '.mypy_cache' ||
-                targetBasename === '.svn' ||
-                targetBasename === '.hg' ||
-                targetBasename === 'venv' ||
-                targetBasename === '.venv' ||
-                targetBasename === 'env'
-              ) {
-                // Skip this directory to avoid performance issues
-                fingerprintParts.push(entry + '/')
-                continue
-              }
-              fingerprintParts.push(entry + '/')
-              fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath, maxDepth))
-            } else {
-              // Regular file: include the entry name
-              fingerprintParts.push(entry)
-            }
-          }
-        }
-      } catch (err) {
-        // Skip entries that can't be accessed (permission errors, etc.)
-        // This prevents the entire fingerprint computation from failing
-        console.warn(`[getDirectoryFingerprint] Failed to access entry '${fullPath}': ${err}`)
-        continue
-      }
-    }
-  } finally {
-    // Ensure cleanup happens even if an exception is thrown
-    recursionStack.delete(currentRealPath)
-  }
-  
-  return fingerprintParts.join('\n')
-}
 
 export type Step = {
   key: string
@@ -230,42 +21,19 @@ export type Step = {
 // the user. The cache is cleared when the user explicitly runs /init.
 //
 // To handle the case where the user manually creates CLAUDE.md or changes workspace
-// contents (e.g., by cloning a repo), we use a two-tier invalidation strategy:
-// 1. Lightweight mtime check on the root directory (fast, single stat, no recursion)
-// 2. Only if the root mtime has changed, recompute the expensive fingerprint
-//
-// This avoids the synchronous recursive directory walk on every prompt submit,
-// which was blocking the event loop for large workspaces.
+// contents (e.g., by cloning a repo), we use a lightweight mtime check on the root
+// directory. This is a single statSync call that detects file additions/removals/renames
+// without the overhead of a recursive directory walk.
 
 let cachedSteps: Step[] | null = null
 let cachedClaudeMdMtime: number = -1
 let cachedRootMtime: number = -1
-
-/**
- * Timestamp (ms) when the cache was last populated. Used as a fallback
- * for filesystems where mtime may not change reliably (e.g., network mounts,
- * FUSE, containers with coarse timestamp resolution).
- */
-let cachedAt: number | null = null
-
-/**
- * Maximum age of the cache in milliseconds before forcing a re-check.
- * This is a fallback for filesystems where mtime may not change reliably.
- * 1 minute is a reasonable balance: long enough to avoid frequent
- * re-computation on normal filesystems where fingerprint and mtime
- * checks are reliable, while being short enough to detect changes
- * on unreliable filesystems (FUSE mounts, network filesystems,
- * containers with coarse timestamp resolution) without requiring
- * the user to manually run /init.
- */
-const CACHE_MAX_AGE_MS = 60_000
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
   cachedClaudeMdMtime = -1
   cachedRootMtime = -1
-  cachedAt = null
 }
 
 /**
@@ -273,10 +41,8 @@ export function clearCachedSteps(): void {
  *
  * Primary: compare CLAUDE.md mtime and root directory mtime. If either has changed,
  * the cache is stale. The root directory mtime check is a lightweight single statSync
- * call that avoids the expensive recursive directory walk (getDirectoryFingerprint).
- * Fallback: if the cache is older than CACHE_MAX_AGE_MS, re-read the actual
- * file/directory state. This handles filesystems where mtime may not change
- * reliably (e.g., ext4, FUSE, network mounts).
+ * call that detects file additions/removals/renames without the overhead of a
+ * recursive directory walk.
  */
 function isCacheValid(): boolean {
   if (!cachedSteps) return false
@@ -311,13 +77,6 @@ function isCacheValid(): boolean {
     return false
   }
 
-  // Fallback: if the cache is older than the max age, force a re-check
-  // to handle filesystems where mtime may not change reliably
-  // (e.g., ext4, FUSE, network mounts).
-  if (cachedAt !== null && Date.now() - cachedAt > CACHE_MAX_AGE_MS) {
-    return false
-  }
-
   return true
 }
 
@@ -343,7 +102,6 @@ export function getSteps(): Step[] {
   } catch {
     cachedRootMtime = -1
   }
-  cachedAt = Date.now()
 
   cachedSteps = [
     {
@@ -391,18 +149,9 @@ export function shouldShowProjectOnboarding(): boolean {
   // hits the filesystem — this runs during first render.
   if (
     projectConfig.hasCompletedProjectOnboarding ||
-    projectConfig.projectOnboardingSeenCount >= 4 ||
-    process.env.IS_DEMO
+    projectConfig.hasDismissedProjectOnboarding
   ) {
     return false
   }
-
   return !isProjectOnboardingComplete()
-}
-
-export function incrementProjectOnboardingSeenCount(): void {
-  saveCurrentProjectConfig(current => ({
-    ...current,
-    projectOnboardingSeenCount: current.projectOnboardingSeenCount + 1,
-  }))
 }
