@@ -60,6 +60,21 @@ export function resetAutoModeOptInForDefaultOffer(): void {
         }
       }
       logEvent('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
+
+      // Check if skipAutoPermissionPrompt is still set in ANY editable source
+      // If it is, the migration was interrupted and we should not mark it as complete.
+      // This allows the migration to be re-run until all sources are cleared.
+      const hasSkipAfterClear = sourcesToCheck.some(
+        source => getSettingsForSource(source)?.skipAutoPermissionPrompt === true,
+      )
+
+      if (!hasSkipAfterClear) {
+        // Only mark migration as complete if all sources were successfully cleared
+        saveGlobalConfig(c => {
+          if (c.hasResetAutoModeOptInForDefaultOffer) return c
+          return { ...c, hasResetAutoModeOptInForDefaultOffer: true }
+        })
+      }
     }
 
     // Check if skipAutoPermissionPrompt is still set after migration
