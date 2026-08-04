@@ -718,6 +718,43 @@ Summary: ${result.summary}`;
 
       runCmd(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`, { ignoreError: true });
 
+      // ── Performance Regression Gate ──
+      // Run the performance test suite. If it fails, the commit is rejected
+      // and the issue is marked as failed — changes that degrade performance
+      // must not be pushed or published.
+      log.step('Running performance regression tests...');
+      const perfResult = runCmd('bun run test:perf', { timeout: 120000, ignoreError: true });
+      if (perfResult.exitCode !== 0) {
+        log.error(`❌ Performance regression test FAILED for issue #${number}`);
+        log.error(`  Output: ${perfResult.stdout.slice(0, 1000)}`);
+        log.error(`  Stderr: ${perfResult.stderr.slice(0, 500)}`);
+
+        // Revert the commit
+        runCmd('git reset --soft HEAD~1', { ignoreError: true });
+        runCmd('git checkout -- . 2>/dev/null || true', { ignoreError: true });
+        log.info('  Commit has been reverted due to performance regression.');
+
+        // Mark as failed (don't push/publish)
+        result.fixed = false;
+        totalFixed--;
+        totalFailed++;
+        anyChanges = false;
+
+        if (!CONFIG.dryRun) {
+          runCmd(
+            `gh issue comment ${number} --repo "${CONFIG.repository}" --body "🤖 **Auto-Fix Agent** attempted to fix this issue but the fix was **rejected** due to a performance regression.
+
+**Reason:** The change introduced a performance degradation that failed the performance regression test suite.
+**Model:** \`${CONFIG.llmModelName}\`"`,
+            { ignoreError: true }
+          );
+        }
+
+        continue;  // Skip push/publish for this issue, move to next
+      }
+      log.info('✅ Performance regression tests passed.');
+      // ── End Performance Regression Gate ──
+
       if (CONFIG.dryRun) {
         log.info(`[DRY RUN] Would push commit for issue #${number}`);
         log.info(`  Commit: ${runCmd('git log -1 --oneline', { ignoreError: true }).stdout}`);

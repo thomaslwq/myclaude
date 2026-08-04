@@ -1,6 +1,6 @@
 {
   "name": "@funnycode/myclaude",
-  "version": "0.1.181",
+  "version": "0.1.182",
   "private": false,
   "description": "An open-source AI coding assistant in your terminal - powered by Claude",
   "license": "MIT",
@@ -23,6 +23,7 @@
     "start": "bun run ./src/dev-entry.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
+    "test:perf": "bun test src/tests/performance-regression.test.ts",
     "build": "bun run ./scripts/build.ts",
     "prepublishOnly": "bun run build",
     "version": "bun run ./src/dev-entry.ts --version"
