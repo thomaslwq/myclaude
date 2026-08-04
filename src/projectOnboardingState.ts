@@ -236,7 +236,6 @@ export type Step = {
 
 let cachedSteps: Step[] | null = null
 let cachedClaudeMdMtime: number = -1
-let cachedDirFingerprint: string = ''
 let cachedRootMtime: number = -1
 
 /**
@@ -262,7 +261,6 @@ const CACHE_MAX_AGE_MS = 60_000
 export function clearCachedSteps(): void {
   cachedSteps = null
   cachedClaudeMdMtime = -1
-  cachedDirFingerprint = ''
   cachedRootMtime = -1
   cachedAt = null
 }
@@ -295,35 +293,19 @@ function isCacheValid(): boolean {
     return false
   }
 
-  // Lightweight root mtime check: if the root directory's mtime hasn't changed,
-  // the workspace contents are likely unchanged. This is a single statSync call
-  // instead of a full recursive directory walk, which was blocking the event loop.
-  // The mtime of a directory changes when files are added, removed, or renamed
-  // inside it on most filesystems.
-  // If the mtime has changed, we compute the fingerprint to confirm the cache is
-  // stale (since mtime may change spuriously on some filesystems). If the mtime
-  // matches, we skip the expensive fingerprint computation entirely.
-  let rootMtimeChanged = false
+  // Root mtime check: if the root directory's mtime has changed, the workspace
+  // contents likely changed (files added/removed/renamed). This is a single
+  // statSync call — cheap. We intentionally do NOT run a recursive directory
+  // fingerprint walk here: it blocks the event loop on large workspaces, and
+  // onboarding only needs root-level state (workspace emptiness, CLAUDE.md
+  // existence) which the mtime check covers.
   try {
     const currentRootMtime = fs.statSync(cwd).mtimeMs
     // Compare with tolerance to handle sub-millisecond precision
-    rootMtimeChanged = Math.abs(currentRootMtime - cachedRootMtime) > 0.5
+    if (Math.abs(currentRootMtime - cachedRootMtime) > 0.5) return false
   } catch {
     // If we can't stat the root, invalidate to be safe
     return false
-  }
-
-  if (rootMtimeChanged) {
-    // Fingerprint check: compare the cached directory fingerprint with the current one.
-    // This reliably detects file additions, removals, and renames at any depth,
-    // even when mtime doesn't change (e.g., on FUSE mounts, network filesystems,
-    // or containers with coarse timestamp resolution).
-    // Only computed when the mtime has changed, as the mtime check is a lightweight
-    // single statSync call that avoids the expensive recursive directory walk.
-    const currentDirFingerprint = getDirectoryFingerprint(cwd)
-    if (currentDirFingerprint !== cachedDirFingerprint) {
-      return false
-    }
   }
 
   // Fallback: if the cache is older than the max age, force a re-check
@@ -357,17 +339,6 @@ export function getSteps(): Step[] {
     cachedRootMtime = fs.statSync(cwd).mtimeMs
   } catch {
     cachedRootMtime = -1
-  }
-  // Only recompute the expensive directory fingerprint when refreshing an
-  // existing cache. On the very first fill there is no cached fingerprint
-  // to compare against, so the recursive directory walk would be pure
-  // waste and blocks startup on large workspaces.
-  if (cachedSteps !== null) {
-    try {
-      cachedDirFingerprint = getDirectoryFingerprint(cwd)
-    } catch {
-      cachedDirFingerprint = ''
-    }
   }
   cachedAt = Date.now()
 
