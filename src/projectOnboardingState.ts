@@ -91,14 +91,44 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
       const fullPath = join(dirPath, entry)
       
       try {
-        // Try to read the symlink target atomically using readlinkSync.
-        // readlinkSync is a single system call: if the path is a symlink,
-        // it returns the target. If not, it throws an error (EINVAL).
-        // This eliminates the TOCTOU race window entirely since we don't
-        // first check with lstatSync — we only make one call.
-        try {
-          const linkTarget = fs.readlinkSync(fullPath)
+        // Use lstatSync to atomically determine the entry type.
+        // This eliminates the TOCTOU race condition that could occur if we first
+        // checked with readlinkSync (which throws if not a symlink) and then called
+        // lstatSync in the catch block.
+        const lstat = fs.lstatSync(fullPath)
+        
+        if (lstat.isDirectory()) {
+          // Skip common ignored directories to avoid performance issues
+          // (node_modules, .git, dist, build, etc.)
+          const targetBasename = basename(fullPath)
+          if (
+            targetBasename === 'node_modules' ||
+            targetBasename === '.git' ||
+            targetBasename === 'dist' ||
+            targetBasename === 'build' ||
+            targetBasename === '.next' ||
+            targetBasename === 'out' ||
+            targetBasename === 'coverage' ||
+            targetBasename === 'target' ||
+            targetBasename === 'vendor' ||
+            targetBasename === '__pycache__' ||
+            targetBasename === '.cache' ||
+            targetBasename === '.mypy_cache' ||
+            targetBasename === '.svn' ||
+            targetBasename === '.hg' ||
+            targetBasename === 'venv' ||
+            targetBasename === '.venv' ||
+            targetBasename === 'env'
+          ) {
+            // Skip this directory to avoid performance issues
+            fingerprintParts.push(entry + '/')
+            continue
+          }
+          fingerprintParts.push(entry + '/')
+          fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath, maxDepth))
+        } else if (lstat.isSymbolicLink()) {
           // Symlink — resolve and process it
+          const linkTarget = fs.readlinkSync(fullPath)
           const resolvedTarget = resolve(dirPath, linkTarget)
           // Check if the resolved target is inside the root directory
           let targetRealPath: string
@@ -156,41 +186,9 @@ export function getDirectoryFingerprint(dirPath: string, recursionStack?: string
             // to maintain consistency with symlinked directories inside the root
             fingerprintParts.push(entry + '/')
           }
-        } catch {
-          // readlinkSync failed — this is not a symlink (or permission error, etc.)
-          // Use lstatSync to determine if it's a directory or a regular file
-          const lstat = fs.lstatSync(fullPath)
-          if (lstat.isDirectory()) {
-            // Skip common ignored directories to avoid performance issues
-            // (node_modules, .git, dist, build, etc.)
-            if (
-              entry === 'node_modules' ||
-              entry === '.git' ||
-              entry === 'dist' ||
-              entry === 'build' ||
-              entry === '.next' ||
-              entry === 'out' ||
-              entry === 'coverage' ||
-              entry === 'target' ||
-              entry === 'vendor' ||
-              entry === '__pycache__' ||
-              entry === '.cache' ||
-              entry === '.mypy_cache' ||
-              entry === '.svn' ||
-              entry === '.hg' ||
-              entry === 'venv' ||
-              entry === '.venv' ||
-              entry === 'env'
-            ) {
-              continue
-            }
-            
-            // Include the directory name and recurse into it
-            fingerprintParts.push(entry + '/')
-            fingerprintParts.push(getDirectoryFingerprint(fullPath, recursionStack, rootRealPath, maxDepth))
-          } else {
-            fingerprintParts.push(entry)
-          }
+        } else {
+          // Regular file: include the entry name
+          fingerprintParts.push(entry)
         }
       } catch (err) {
         // Skip entries that can't be accessed (permission errors, etc.)

@@ -21,6 +21,8 @@ function createMockFs(customBehaviors: Record<string, any>) {
       return { isDirectory: () => false, isSymbolicLink: () => false };
     },
     lstatSync: (path: string) => {
+      if (customBehaviors[path]?.lstatError) throw customBehaviors[path].lstatError;
+      if (customBehaviors[path]?.lstatResult) return customBehaviors[path].lstatResult;
       if (customBehaviors[path]?.statError) throw customBehaviors[path].statError;
       if (customBehaviors[path]?.statResult) return customBehaviors[path].statResult;
       return { isDirectory: () => false, isSymbolicLink: () => false };
@@ -74,7 +76,7 @@ test('should reject symlink with case-different target outside root on case-inse
       realpathResult: '/home/user/project',
     },
     '/project-root/malicious-link': {
-      statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
+      lstatResult: { isDirectory: () => false, isSymbolicLink: () => true } as any,
       readlinkResult: '/Home/User/Project/../../etc/passwd',
     },
     '/Home/User/Project/../../etc/passwd': {
@@ -115,7 +117,7 @@ test('should allow symlink within root even with different case', () => {
       realpathResult: '/home/user/project',
     },
     '/project-root/subdir-link': {
-      statResult: { isDirectory: () => true, isSymbolicLink: () => true } as any,
+      lstatResult: { isDirectory: () => false, isSymbolicLink: () => true } as any,
       readlinkResult: '/Home/User/Project/subdir',
     },
     '/Home/User/Project/subdir': {
