@@ -349,10 +349,16 @@ export function getSteps(): Step[] {
   } catch {
     cachedRootMtime = -1
   }
-  try {
-    cachedDirFingerprint = getDirectoryFingerprint(cwd)
-  } catch {
-    cachedDirFingerprint = ''
+  // Only recompute the expensive directory fingerprint when refreshing an
+  // existing cache. On the very first fill there is no cached fingerprint
+  // to compare against, so the recursive directory walk would be pure
+  // waste and blocks startup on large workspaces.
+  if (cachedSteps !== null) {
+    try {
+      cachedDirFingerprint = getDirectoryFingerprint(cwd)
+    } catch {
+      cachedDirFingerprint = ''
+    }
   }
   cachedAt = Date.now()
 
