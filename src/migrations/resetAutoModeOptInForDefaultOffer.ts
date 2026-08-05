@@ -7,6 +7,7 @@ import {
   getInitialSettings,
   updateSettingsForSource,
 } from '../utils/settings/settings.js'
+import { resetSettingsCache } from '../utils/settings/settingsCache.js'
 import {
   type EditableSettingSource,
 } from '../utils/settings/constants.js'
@@ -60,6 +61,11 @@ export function resetAutoModeOptInForDefaultOffer(): void {
         }
       }
       logEvent('tengu_migrate_reset_auto_opt_in_for_default_offer', {})
+
+      // Invalidate the settings cache to ensure we read fresh data from disk
+      // This prevents the race condition where getSettingsForSource returns
+      // stale cached data after the write operation.
+      resetSettingsCache()
 
       // Check if skipAutoPermissionPrompt is still set in ANY editable source
       // If it is, the migration was interrupted and we should not mark it as complete.
