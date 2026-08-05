@@ -213,6 +213,24 @@ describe('migrateFennecToOpus', () => {
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
+  it('should not match fennec-latest with unexpected suffix (e.g., fennec-latest-v2)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest-v2' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+  })
+
+  it('should not match fennec-fast-latest with unexpected suffix (e.g., fennec-fast-latest-2)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest-2' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+  })
+
   it('should skip sources with undefined model', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({})

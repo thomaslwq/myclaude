@@ -6,14 +6,6 @@ import {
 } from '../utils/settings/settings.js'
 
 /**
- * Extract the context-length suffix from a model name (e.g., [1m], [100k], [200k]).
- * Returns the suffix (including brackets) if found, otherwise an empty string.
- */
-function extractSuffix(model: string): string {
-  return model.match(/\[\d+[km]\]$/)?.[0] ?? ''
-}
-
-/**
  * Migrate users on removed fennec model aliases to their new Opus 4.6 aliases.
  * - fennec-latest → opus
  * - fennec-latest[1m] → opus[1m]
@@ -47,11 +39,16 @@ export function migrateFennecToOpus(): void {
         continue
       }
 
-      if (
-        model.startsWith('fennec-fast-latest') ||
-        model.startsWith('opus-4-5-fast')
-      ) {
-        const suffix = extractSuffix(model)
+      // Match known model aliases with optional context-length suffix (e.g., [1m], [1M], [100k])
+      // Only lowercase suffixes are valid and preserved; invalid suffixes are stripped.
+      const fennecFastLatestMatch = model.match(/^fennec-fast-latest(\[\d+[km]\])?$/i)
+      const opus45FastMatch = model.match(/^opus-4-5-fast(\[\d+[km]\])?$/i)
+      const fennecLatestMatch = model.match(/^fennec-latest(\[\d+[km]\])?$/i)
+
+      if (fennecFastLatestMatch || opus45FastMatch) {
+        const rawSuffix = (fennecFastLatestMatch ?? opus45FastMatch)?.[1] ?? ''
+        // Only use lowercase suffix (valid context-length suffix)
+        const suffix = rawSuffix && /^\[\d+[km]\]$/.test(rawSuffix) ? rawSuffix : ''
         // Preserve the existing fastMode setting if it exists, otherwise omit it
         // to avoid overwriting the implicit default behavior
         const existingFastMode = settings?.fastMode
@@ -62,8 +59,10 @@ export function migrateFennecToOpus(): void {
           update.fastMode = existingFastMode
         }
         updateSettingsForSource(source, update)
-      } else if (model.startsWith('fennec-latest')) {
-        const suffix = extractSuffix(model)
+      } else if (fennecLatestMatch) {
+        const rawSuffix = fennecLatestMatch[1] ?? ''
+        // Only use lowercase suffix (valid context-length suffix)
+        const suffix = rawSuffix && /^\[\d+[km]\]$/.test(rawSuffix) ? rawSuffix : ''
         updateSettingsForSource(source, {
           model: `opus${suffix}`,
         })
