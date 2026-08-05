@@ -94,7 +94,7 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should not preserve uppercase suffix [1M] (invalid context-length suffix)', () => {
+  it('should preserve uppercase suffix [1M] (valid context-length suffix)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1M]' })
 
@@ -102,7 +102,43 @@ describe('migrateFennecToOpus', () => {
 
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'userSettings',
-      { model: 'opus' },
+      { model: 'opus[1M]' },
+    )
+  })
+
+  it('should preserve uppercase suffix [2K]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[2K]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[2K]' },
+    )
+  })
+
+  it('should preserve uppercase suffix [100M]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[100M]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[100M]' },
+    )
+  })
+
+  it('should preserve uppercase suffix [500K]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[500K]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[500K]' },
     )
   })
 

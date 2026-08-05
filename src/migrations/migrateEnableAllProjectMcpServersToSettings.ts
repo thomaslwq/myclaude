@@ -122,10 +122,11 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   if (hasEnabledServers) {
     updates.enabledMcpjsonServers = existingEnabledServers
   }
-  // Always update disabled list if there are servers to resolve, even when
-  // project config has no disabledMcpjsonServers field. This handles the case
-  // where existing settings have overlapping enabled/disabled servers.
-  if (hasDisabledServers || existingSettings.disabledMcpjsonServers !== undefined) {
+  // Update disabled list if there are servers to resolve
+  // This handles cases where:
+  // 1. Project config has disabled servers (hasDisabledServers is true)
+  // 2. Existing settings have disabled servers that need conflict resolution
+  if (hasDisabledServers || (existingSettings.disabledMcpjsonServers !== undefined && finalDisabledServers.length > 0)) {
     updates.disabledMcpjsonServers = finalDisabledServers
   }
 

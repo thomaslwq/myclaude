@@ -47,8 +47,8 @@ export function migrateFennecToOpus(): void {
 
       if (fennecFastLatestMatch || opus45FastMatch) {
         const rawSuffix = (fennecFastLatestMatch ?? opus45FastMatch)?.[1] ?? ''
-        // Only use lowercase suffix (valid context-length suffix)
-        const suffix = rawSuffix && /^\[\d+[km]\]$/.test(rawSuffix) ? rawSuffix : ''
+        // Use suffix (valid context-length suffix, case-insensitive)
+        const suffix = rawSuffix && /^\[\d+[km]\]$/i.test(rawSuffix) ? rawSuffix : ''
         // Preserve the existing fastMode setting if it exists, otherwise omit it
         // to avoid overwriting the implicit default behavior
         const existingFastMode = settings?.fastMode
@@ -61,8 +61,8 @@ export function migrateFennecToOpus(): void {
         updateSettingsForSource(source, update)
       } else if (fennecLatestMatch) {
         const rawSuffix = fennecLatestMatch[1] ?? ''
-        // Only use lowercase suffix (valid context-length suffix)
-        const suffix = rawSuffix && /^\[\d+[km]\]$/.test(rawSuffix) ? rawSuffix : ''
+        // Use suffix (valid context-length suffix, case-insensitive)
+        const suffix = rawSuffix && /^\[\d+[km]\]$/i.test(rawSuffix) ? rawSuffix : ''
         updateSettingsForSource(source, {
           model: `opus${suffix}`,
         })
