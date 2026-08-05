@@ -40,7 +40,7 @@ export function migrateFennecToOpus(): void {
       }
 
       // Match known model aliases with optional context-length suffix (e.g., [1m], [1M], [100k])
-      // Only lowercase suffixes are valid and preserved; invalid suffixes are stripped.
+      // Case-insensitive matching is intentional; both lowercase and uppercase suffixes are preserved.
       const fennecFastLatestMatch = model.match(/^fennec-fast-latest(\[\d+[km]\])?$/i)
       const opus45FastMatch = model.match(/^opus-4-5-fast(\[\d+[km]\])?$/i)
       const fennecLatestMatch = model.match(/^fennec-latest(\[\d+[km]\])?$/i)
