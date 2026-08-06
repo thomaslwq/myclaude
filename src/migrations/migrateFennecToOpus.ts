@@ -41,14 +41,16 @@ export function migrateFennecToOpus(): void {
 
       // Match known model aliases with optional context-length suffix (e.g., [1m], [1M], [100k])
       // Case-insensitive matching is intentional; both lowercase and uppercase suffixes are preserved.
-      const fennecFastLatestMatch = model.match(/^fennec-fast-latest(\[\d+[km]\])?$/i)
-      const opus45FastMatch = model.match(/^opus-4-5-fast(\[\d+[km]\])?$/i)
-      const fennecLatestMatch = model.match(/^fennec-latest(\[\d+[km]\])?$/i)
+      // Use * to match zero or more suffixes to preserve all context-length specifications.
+      const fennecFastLatestMatch = model.match(/^fennec-fast-latest(\[\d+[km]\])*$/i)
+      const opus45FastMatch = model.match(/^opus-4-5-fast(\[\d+[km]\])*$/i)
+      const fennecLatestMatch = model.match(/^fennec-latest(\[\d+[km]\])*$/i)
 
       if (fennecFastLatestMatch || opus45FastMatch) {
-        const rawSuffix = (fennecFastLatestMatch ?? opus45FastMatch)?.[1] ?? ''
-        // Use suffix (valid context-length suffix, case-insensitive)
-        const suffix = rawSuffix && /^\[\d+[km]\]$/i.test(rawSuffix) ? rawSuffix : ''
+        // Extract all suffixes (e.g., [1m][200k])
+        const rawSuffixes = (fennecFastLatestMatch ?? opus45FastMatch)?.slice(1).join('') ?? ''
+        // Validate that all captured groups are valid context-length suffixes
+        const suffix = rawSuffixes && /^\[\d+[km]\]*$/i.test(rawSuffixes) ? rawSuffixes : ''
         // Preserve the existing fastMode setting if it exists, otherwise omit it
         // to avoid overwriting the implicit default behavior
         const existingFastMode = settings?.fastMode
@@ -60,9 +62,10 @@ export function migrateFennecToOpus(): void {
         }
         updateSettingsForSource(source, update)
       } else if (fennecLatestMatch) {
-        const rawSuffix = fennecLatestMatch[1] ?? ''
-        // Use suffix (valid context-length suffix, case-insensitive)
-        const suffix = rawSuffix && /^\[\d+[km]\]$/i.test(rawSuffix) ? rawSuffix : ''
+        // Extract all suffixes (e.g., [1m][200k])
+        const rawSuffixes = fennecLatestMatch.slice(1).join('') ?? ''
+        // Validate that all captured groups are valid context-length suffixes
+        const suffix = rawSuffixes && /^\[\d+[km]\]*$/i.test(rawSuffixes) ? rawSuffixes : ''
         updateSettingsForSource(source, {
           model: `opus${suffix}`,
         })
