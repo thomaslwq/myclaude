@@ -91,9 +91,9 @@ export function resetAutoModeOptInForDefaultOffer(): void {
     )
 
     if (hasSkipInNonEditableSources) {
-      console.warn('Migration note: skipAutoPermissionPrompt is still set in non-editable sources (policySettings or flagSettings). '
-        + 'The permission prompt will not be re-surfaced. Please check your managed settings configuration.'
-      )
+      logEvent('tengu_migrate_reset_auto_opt_in_for_default_offer_skipped', {
+        reason: 'skipAutoPermissionPrompt_set_in_non_editable_sources'
+      })
     }
 
     saveGlobalConfig(c => {

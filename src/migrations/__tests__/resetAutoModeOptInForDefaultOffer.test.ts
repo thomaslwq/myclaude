@@ -34,7 +34,7 @@ vi.mock('../../utils/log.js', () => ({
   logError: (...args: any[]) => mockLogError(...args),
 }))
 
-// Note: console.warn is not mocked as it's a browser/node built-in
+// Note: console.warn is not mocked as it's a browser/node built-in, but we no longer use it in this migration
 
 describe('resetAutoModeOptInForDefaultOffer', () => {
   beforeEach(() => {
@@ -159,14 +159,13 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
 
     // Should NOT update any editable source since none have the flag set
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-    // Should log a warning about non-editable sources
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('skipAutoPermissionPrompt is still set in non-editable sources'),
+    // Should log an event about non-editable sources
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      'tengu_migrate_reset_auto_opt_in_for_default_offer_skipped',
+      { reason: 'skipAutoPermissionPrompt_set_in_non_editable_sources' }
     )
     // Should still save the config as migrated
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
-    // Should NOT log the event (since hasSkipInEditableSources is false)
-    expect(mockLogEvent).not.toHaveBeenCalled()
   })
 
   it('should log warning when skipAutoPermissionPrompt is set in flagSettings (non-editable source)', () => {
@@ -185,8 +184,9 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     resetAutoModeOptInForDefaultOffer()
 
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('skipAutoPermissionPrompt is still set in non-editable sources'),
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      'tengu_migrate_reset_auto_opt_in_for_default_offer_skipped',
+      { reason: 'skipAutoPermissionPrompt_set_in_non_editable_sources' }
     )
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
@@ -215,10 +215,10 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
       { skipAutoPermissionPrompt: undefined },
     )
     // Should log warning about non-editable sources still having the flag
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('skipAutoPermissionPrompt is still set in non-editable sources'),
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      'tengu_migrate_reset_auto_opt_in_for_default_offer_skipped',
+      { reason: 'skipAutoPermissionPrompt_set_in_non_editable_sources' }
     )
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
-    expect(mockLogEvent).toHaveBeenCalled()
   })
 })
