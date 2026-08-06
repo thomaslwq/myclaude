@@ -48,9 +48,8 @@ export function migrateFennecToOpus(): void {
 
       if (fennecFastLatestMatch || opus45FastMatch) {
         // Extract all suffixes (e.g., [1m][200k])
-        const rawSuffixes = (fennecFastLatestMatch ?? opus45FastMatch)?.slice(1).join('') ?? ''
-        // Validate that all captured groups are valid context-length suffixes
-        const suffix = rawSuffixes && /^\[\d+[km]\]*$/i.test(rawSuffixes) ? rawSuffixes : ''
+        const suffixTokens = model.match(/\[\d+[km]\]/gi)
+        const suffix = suffixTokens ? suffixTokens.join('') : ''
         // Preserve the existing fastMode setting if it exists, otherwise omit it
         // to avoid overwriting the implicit default behavior
         const existingFastMode = settings?.fastMode
@@ -63,9 +62,8 @@ export function migrateFennecToOpus(): void {
         updateSettingsForSource(source, update)
       } else if (fennecLatestMatch) {
         // Extract all suffixes (e.g., [1m][200k])
-        const rawSuffixes = fennecLatestMatch.slice(1).join('') ?? ''
-        // Validate that all captured groups are valid context-length suffixes
-        const suffix = rawSuffixes && /^\[\d+[km]\]*$/i.test(rawSuffixes) ? rawSuffixes : ''
+        const suffixTokens = model.match(/\[\d+[km]\]/gi)
+        const suffix = suffixTokens ? suffixTokens.join('') : ''
         updateSettingsForSource(source, {
           model: `opus${suffix}`,
         })

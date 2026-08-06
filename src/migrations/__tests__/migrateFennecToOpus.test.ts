@@ -142,6 +142,18 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
+  it('should preserve multiple suffixes like [1m][200k]', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1m][200k]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1m][200k]' },
+    )
+  })
+
   it('should migrate fennec-fast-latest to opus with fast mode', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest' })
