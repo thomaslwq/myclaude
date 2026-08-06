@@ -17,9 +17,9 @@ import {
  * - The earlier migrateSonnet1mToSonnet45 migration (sonnet[1m] → explicit 4.5[1m])
  * - Manually selecting it via /model
  *
- * Reads userSettings specifically (not merged) so we only migrate what /model
- * wrote — project/local pins are left alone.
- * Idempotent: only writes if userSettings.model matches a Sonnet 4.5 string.
+ * Reads from all editable sources (userSettings, projectSettings, localSettings)
+ * so we migrate model aliases wherever they are set.
+ * Idempotent: only writes if a source's model matches a Sonnet 4.5 string.
  */
 export function migrateSonnet45ToSonnet46(): void {
   if (getAPIProvider() !== 'firstParty') {
