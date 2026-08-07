@@ -112,6 +112,52 @@ describe('checkDuplicateKeysInJson', () => {
     expect(warnings).toHaveLength(1)
   })
 
+  it('should correctly handle unicode escapes in keys', () => {
+    const json = `[
+      {
+        "context": "Global",
+        "bindings": {
+          "\\u0041": "action:show",
+          "\\u0042": "action:other"
+        }
+      }
+    ]`
+    const warnings = checkDuplicateKeysInJson(json)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('should not skip characters after unicode escapes', () => {
+    const json = `[
+      {
+        "context": "Global",
+        "bindings": {
+          "\\u0041X": "action:show",
+          "\\u0041Y": "action:other"
+        }
+      }
+    ]`
+    // "\u0041X" decodes to "AX", "\u0041Y" decodes to "AY"
+    // These are different keys, no duplicate should be detected
+    const warnings = checkDuplicateKeysInJson(json)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('should detect duplicates when unicode escape matches a following key', () => {
+    const json = `[
+      {
+        "context": "Global",
+        "bindings": {
+          "\\u0041X": "action:show",
+          "AX": "action:other"
+        }
+      }
+    ]`
+    // "\u0041X" decodes to "AX", which is the same as the second key
+    const warnings = checkDuplicateKeysInJson(json)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].key).toBe('AX')
+  })
+
   it('should handle empty bindings', () => {
     const json = `[
       {

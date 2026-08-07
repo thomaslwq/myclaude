@@ -299,7 +299,7 @@ export function checkDuplicateKeysInJson(
                   const hex = jsonString.slice(k + 2, k + 6)
                   const cp = parseInt(hex, 16)
                   decoded += isNaN(cp) ? jsonString.slice(k, k + 6) : String.fromCharCode(cp)
-                  k += 5
+                  k += 4
                 } else {
                   decoded += 'u'
                   k++

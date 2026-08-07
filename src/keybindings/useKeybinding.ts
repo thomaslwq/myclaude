@@ -146,7 +146,7 @@ export function useKeybindings(
         unregister()
       }
     }
-  }, [context, keybindingContext, isActive])
+  }, [context, handlers, keybindingContext, isActive])
 
   const handleInput = useCallback(
     (input: string, key: Key, event: InputEvent) => {
