@@ -85,6 +85,47 @@ describe('migrateSonnet45ToSonnet46', () => {
     )
   })
 
+  it('should migrate projectSettings', () => {
+    mockGetSettingsForSource.mockReturnValue({ model: 'claude-sonnet-4-5-20250929' })
+
+    migrateSonnet45ToSonnet46()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'projectSettings',
+      { model: 'sonnet' },
+    )
+  })
+
+  it('should migrate localSettings', () => {
+    mockGetSettingsForSource.mockReturnValue({ model: 'claude-sonnet-4-5-20250929' })
+
+    migrateSonnet45ToSonnet46()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'localSettings',
+      { model: 'sonnet' },
+    )
+  })
+
+  it('should migrate all three sources', () => {
+    mockGetSettingsForSource.mockReturnValue({ model: 'claude-sonnet-4-5-20250929' })
+
+    migrateSonnet45ToSonnet46()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'sonnet' },
+    )
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'projectSettings',
+      { model: 'sonnet' },
+    )
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'localSettings',
+      { model: 'sonnet' },
+    )
+  })
+
   it('should migrate sonnet-4-5-20250929 to sonnet', () => {
     mockGetSettingsForSource.mockReturnValue({ model: 'sonnet-4-5-20250929' })
 
