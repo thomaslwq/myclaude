@@ -28,14 +28,19 @@ vi.mock('../../utils/settings/settings.js', () => ({
 }))
 
 describe('migrateAutoUpdatesToSettings', () => {
+  const originalDisableAutoupdater = process.env.DISABLE_AUTOUPDATER
+
   beforeEach(() => {
     vi.clearAllMocks()
-    // Save original env
     process.env.DISABLE_AUTOUPDATER = ''
   })
 
   afterEach(() => {
-    delete process.env.DISABLE_AUTOUPDATER
+    if (originalDisableAutoupdater === undefined) {
+      delete process.env.DISABLE_AUTOUPDATER
+    } else {
+      process.env.DISABLE_AUTOUPDATER = originalDisableAutoupdater
+    }
   })
 
   it('should not mutate process.env.DISABLE_AUTOUPDATER', () => {
