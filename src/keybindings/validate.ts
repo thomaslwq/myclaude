@@ -260,46 +260,140 @@ export function checkDuplicateKeysInJson(
 ): KeybindingWarning[] {
   const warnings: KeybindingWarning[] = []
 
-  // Find each "bindings" block and check for duplicates within it
-  // Pattern: "bindings" : { ... }
-  const bindingsBlockPattern =
-    /"bindings"\s*:\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g
+  // Parse the JSON string manually to detect duplicate keys.
+  // We track the depth and whether we're inside a bindings object.
 
-  let blockMatch
-  while ((blockMatch = bindingsBlockPattern.exec(jsonString)) !== null) {
-    const blockContent = blockMatch[1]
-    if (!blockContent) continue
+  let i = 0
+  const len = jsonString.length
 
-    // Find the context for this block by looking backwards
-    const textBeforeBlock = jsonString.slice(0, blockMatch.index)
-    const contextMatch = textBeforeBlock.match(
-      /"context"\s*:\s*"([^"]+)"[^{]*$/,
-    )
-    const context = contextMatch?.[1] ?? 'unknown'
+  let depth = 0
+  let inBindings = false
+  let currentContext = 'unknown'
+  // Stack of keys maps for each bindings object
+  const bindingsKeyMaps: Map<string, number>[] = []
 
-    // Find all keys within this bindings block
-    const keyPattern = /"([^"]+)"\s*:/g
-    const keysByName = new Map<string, number>()
-
-    let keyMatch
-    while ((keyMatch = keyPattern.exec(blockContent)) !== null) {
-      const key = keyMatch[1]
-      if (!key) continue
-
-      const count = (keysByName.get(key) ?? 0) + 1
-      keysByName.set(key, count)
-
-      if (count === 2) {
-        // Only warn on the second occurrence
-        warnings.push({
-          type: 'duplicate',
-          severity: 'warning',
-          message: `Duplicate key "${key}" in ${context} bindings`,
-          key,
-          context,
-          suggestion: `This key appears multiple times in the same context. JSON uses the last value, earlier values are ignored.`,
-        })
+  // Parse a string starting at position pos (which must be a quote)
+  function parseString(pos: number): { str: string; nextPos: number } | null {
+    if (pos >= len || jsonString[pos] !== '"') return null
+    let end = pos + 1
+    while (end < len) {
+      if (jsonString[end] === '\\') {
+        end += 2 // skip escaped char
+      } else if (jsonString[end] === '"') {
+        // Decode the string
+        let decoded = ''
+        for (let k = pos + 1; k < end; k++) {
+          if (jsonString[k] === '\\' && k + 1 < end) {
+            const esc = jsonString[k + 1]
+            switch (esc) {
+              case '"': decoded += '"'; break
+              case '\\': decoded += '\\'; break
+              case '/': decoded += '/'; break
+              case 'b': decoded += '\b'; break
+              case 'f': decoded += '\f'; break
+              case 'n': decoded += '\n'; break
+              case 'r': decoded += '\r'; break
+              case 't': decoded += '\t'; break
+              case 'u': {
+                if (k + 5 < end) {
+                  const hex = jsonString.slice(k + 2, k + 6)
+                  const cp = parseInt(hex, 16)
+                  decoded += isNaN(cp) ? jsonString.slice(k, k + 6) : String.fromCharCode(cp)
+                  k += 5
+                } else {
+                  decoded += 'u'
+                  k++
+                }
+                break
+              }
+              default: decoded += esc; break
+            }
+            k++ // skip the backslash
+          } else {
+            decoded += jsonString[k]
+          }
+        }
+        return { str: decoded, nextPos: end + 1 }
+      } else {
+        end++
       }
+    }
+    return null
+  }
+
+  function skipWhitespace(pos: number): number {
+    while (pos < len && (jsonString[pos] === ' ' || jsonString[pos] === '\n' || jsonString[pos] === '\t' || jsonString[pos] === '\r')) {
+      pos++
+    }
+    return pos
+  }
+
+  while (i < len) {
+    const char = jsonString[i]
+
+    if (char === '{') {
+      depth++
+      if (depth === 2 && inBindings) {
+        bindingsKeyMaps.push(new Map<string, number>())
+      }
+      i++
+    } else if (char === '}') {
+      if (depth === 2 && inBindings) {
+        bindingsKeyMaps.pop()
+      }
+      depth--
+      i++
+    } else if (char === '"') {
+      const result = parseString(i)
+      if (result) {
+        const str = result.str
+        i = result.nextPos
+
+        const after = skipWhitespace(i)
+
+        if (after < len && jsonString[after] === ':') {
+          // This string is a property name
+          // Determine the context based on depth
+          if (depth === 1) {
+            if (str === 'context') {
+              // Next value after colon is the context string
+              const afterColon = skipWhitespace(after + 1)
+              const valResult = parseString(afterColon)
+              if (valResult) {
+                currentContext = valResult.str
+                i = valResult.nextPos
+              }
+            } else if (str === 'bindings') {
+              inBindings = true
+            }
+          } else if (depth === 2 && inBindings) {
+            // This is a key inside a bindings object
+            if (bindingsKeyMaps.length > 0) {
+              const keysMap = bindingsKeyMaps[bindingsKeyMaps.length - 1]
+              const count = (keysMap.get(str) ?? 0) + 1
+              keysMap.set(str, count)
+
+              if (count === 2) {
+                warnings.push({
+                  type: 'duplicate',
+                  severity: 'warning',
+                  message: `Duplicate key "${str}" in ${currentContext} bindings`,
+                  key: str,
+                  context: currentContext,
+                  suggestion: `This key appears multiple times in the same context. JSON uses the last value, earlier values are ignored.`,
+                })
+              }
+            }
+          }
+        }
+      } else {
+        i++
+      }
+    } else if (char === ']' || char === '[' || char === ',' || char === ':' || ' \n\t\r'.includes(char)) {
+      i++
+    } else {
+      // Skip other tokens (numbers, booleans, null)
+      i++
     }
   }
 
