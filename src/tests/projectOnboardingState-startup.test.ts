@@ -123,8 +123,9 @@ describe('getSteps() startup fast-path', () => {
       const first = mockFs.getReaddirCount();
       getSteps();
       const second = mockFs.getReaddirCount();
-      // Cached: no additional filesystem walk on the second call.
-      expect(second).toBeLessThanOrEqual(first);
+      // Cached: no additional recursive walk on the second call. A single
+      // isDirEmptySync call for the emptiness fallback check is allowed.
+      expect(second).toBeLessThanOrEqual(first + 1);
     });
   });
 
