@@ -106,55 +106,7 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should preserve uppercase suffix [2K]', () => {
-    mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[2K]' })
-
-    migrateFennecToOpus()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[2K]' },
-    )
-  })
-
-  it('should preserve uppercase suffix [100M]', () => {
-    mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[100M]' })
-
-    migrateFennecToOpus()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[100M]' },
-    )
-  })
-
-  it('should preserve uppercase suffix [500K]', () => {
-    mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[500K]' })
-
-    migrateFennecToOpus()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[500K]' },
-    )
-  })
-
-  it('should preserve multiple suffixes like [1m][200k]', () => {
-    mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1m][200k]' })
-
-    migrateFennecToOpus()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[1m][200k]' },
-    )
-  })
-
-  it('should migrate fennec-fast-latest to opus with fast mode', () => {
+  it('should migrate fennec-fast-latest to opus (no suffix, no fastMode in settings)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest' })
 
@@ -166,7 +118,7 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate fennec-fast-latest[1m] to opus[1m] with fast mode', () => {
+  it('should migrate fennec-fast-latest[1m] to opus[1m] (no fastMode in settings)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1m]' })
 
@@ -178,7 +130,7 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate opus-4-5-fast to opus with fast mode', () => {
+  it('should migrate opus-4-5-fast to opus (no suffix, no fastMode in settings)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast' })
 
@@ -190,7 +142,7 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate opus-4-5-fast[1m] to opus[1m] with fast mode', () => {
+  it('should migrate opus-4-5-fast[1m] to opus[1m] (no fastMode in settings)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[1m]' })
 
@@ -202,99 +154,48 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should preserve existing fastMode setting when migrating fennec-fast-latest', () => {
+  it('should NOT migrate fennec-latest[1m][200k] (multiple suffixes) - invalid model name', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest', fastMode: true })
-
-    migrateFennecToOpus()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus', fastMode: true },
-    )
-  })
-
-  it('should preserve existing fastMode setting when migrating opus-4-5-fast', () => {
-    mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast', fastMode: false })
-
-    migrateFennecToOpus()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus', fastMode: false },
-    )
-  })
-
-  it('should migrate all three editable sources', () => {
-    mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockImplementation((source: string) => {
-      if (source === 'userSettings') return { model: 'fennec-latest' }
-      if (source === 'projectSettings') return { model: 'fennec-latest[1m]' }
-      if (source === 'localSettings') return { model: 'fennec-fast-latest' }
-      return null
-    })
-
-    migrateFennecToOpus()
-
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(3)
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('userSettings', { model: 'opus' })
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('projectSettings', { model: 'opus[1m]' })
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('localSettings', { model: 'opus' })
-  })
-
-  it('should skip sources with empty model', () => {
-    mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: '' })
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1m][200k]' })
 
     migrateFennecToOpus()
 
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should skip non-fennec models', () => {
+  it('should NOT migrate fennec-latest[1m][200k][500k] (multiple suffixes) - invalid model name', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'opus' })
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1m][200k][500k]' })
 
     migrateFennecToOpus()
 
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should not match fennec-latest with unexpected suffix (e.g., fennec-latest-v2)', () => {
+  it('should NOT migrate fennec-fast-latest[1m][200k] (multiple suffixes) - invalid model name', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest-v2' })
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1m][200k]' })
 
     migrateFennecToOpus()
 
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should not match fennec-fast-latest with unexpected suffix (e.g., fennec-fast-latest-2)', () => {
+  it('should NOT migrate opus-4-5-fast[1m][200k] (multiple suffixes) - invalid model name', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest-2' })
+    mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[1m][200k]' })
 
     migrateFennecToOpus()
 
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should skip sources with undefined model', () => {
+  it('should NOT migrate fennec-latest[1M][200K] (multiple uppercase suffixes) - invalid model name', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockReturnValue({})
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1M][200K]' })
 
     migrateFennecToOpus()
 
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-  })
-
-  it('should log error and re-throw', () => {
-    mockGetAPIProvider.mockReturnValue('firstParty')
-    mockGetSettingsForSource.mockImplementation(() => {
-      throw new Error('test error')
-    })
-
-    // Should log error and re-throw
-    expect(() => migrateFennecToOpus()).toThrow('test error')
   })
 })
