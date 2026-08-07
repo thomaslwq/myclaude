@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import type { InputEvent } from '../ink/events/input-event.js'
 import { type Key, useInput } from '../ink.js'
 import { useOptionalKeybindingContext } from './KeybindingContext.js'
@@ -44,20 +44,22 @@ export function useKeybinding(
     return keybindingContext.registerHandler({ action, context, handler })
   }, [action, context, handler, keybindingContext, isActive])
 
+  // Precompute unique contexts when activeContexts or context changes
+  const uniqueContexts = useMemo<KeybindingContextName[]>(() => {
+    if (!keybindingContext) return []
+    const contextsToCheck: KeybindingContextName[] = [
+      ...keybindingContext.activeContexts,
+      context,
+      'Global',
+    ]
+    // Deduplicate while preserving order (first occurrence wins for priority)
+    return [...new Set(contextsToCheck)]
+  }, [keybindingContext?.activeContexts, context])
+
   const handleInput = useCallback(
     (input: string, key: Key, event: InputEvent) => {
       // If no keybinding context available, skip resolution
       if (!keybindingContext) return
-
-      // Build context list: registered active contexts + this context + Global
-      // More specific contexts (registered ones) take precedence over Global
-      const contextsToCheck: KeybindingContextName[] = [
-        ...keybindingContext.activeContexts,
-        context,
-        'Global',
-      ]
-      // Deduplicate while preserving order (first occurrence wins for priority)
-      const uniqueContexts = [...new Set(contextsToCheck)]
 
       const result = keybindingContext.resolve(input, key, uniqueContexts)
 
