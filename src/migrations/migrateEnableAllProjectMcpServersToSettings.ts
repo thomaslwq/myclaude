@@ -156,9 +156,9 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   logEvent('tengu_migrate_enable_all_project_mcp_servers_to_settings', {
     migration: 'enableAllProjectMcpServersToSettings',
     fieldsMigrated: [
-      hasEnableAll && 'enableAllProjectMcpServers',
-      hasEnabledServers && 'enabledMcpjsonServers',
-      hasDisabledServers && 'disabledMcpjsonServers',
+      hasEnableAll ? 'enableAllProjectMcpServers' : undefined,
+      hasEnabledServers ? 'enabledMcpjsonServers' : undefined,
+      hasDisabledServers ? 'disabledMcpjsonServers' : undefined,
     ].filter(Boolean).join(','),
   })
 }
