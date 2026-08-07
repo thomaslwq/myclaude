@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { InputEvent } from '../ink/events/input-event.js'
 import { type Key, useInput } from '../ink.js'
 import { useOptionalKeybindingContext } from './KeybindingContext.js'
@@ -126,12 +126,16 @@ export function useKeybindings(
   const { context = 'Global', isActive = true } = options
   const keybindingContext = useOptionalKeybindingContext()
 
+  // Memoize handlers to avoid re-registration on every render
+  const handlersRef = useRef(handlers)
+  handlersRef.current = handlers
+
   // Register all handlers with the context for ChordInterceptor to invoke
   useEffect(() => {
     if (!keybindingContext || !isActive) return
 
     const unregisterFns: Array<() => void> = []
-    for (const [action, handler] of Object.entries(handlers)) {
+    for (const [action, handler] of Object.entries(handlersRef.current)) {
       unregisterFns.push(
         keybindingContext.registerHandler({ action, context, handler }),
       )
@@ -142,7 +146,7 @@ export function useKeybindings(
         unregister()
       }
     }
-  }, [context, handlers, keybindingContext, isActive])
+  }, [context, keybindingContext, isActive])
 
   const handleInput = useCallback(
     (input: string, key: Key, event: InputEvent) => {
@@ -165,8 +169,8 @@ export function useKeybindings(
         case 'match':
           // Chord completed (if any) - clear pending state
           keybindingContext.setPendingChord(null)
-          if (result.action in handlers) {
-            const handler = handlers[result.action]
+          if (result.action in handlersRef.current) {
+            const handler = handlersRef.current[result.action]
             if (handler && handler() !== false) {
               event.stopImmediatePropagation()
             }
@@ -191,7 +195,7 @@ export function useKeybindings(
           break
       }
     },
-    [context, handlers, keybindingContext],
+    [context, keybindingContext],
   )
 
   useInput(handleInput, { isActive })
