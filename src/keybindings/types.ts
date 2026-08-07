@@ -7,9 +7,10 @@ export type ParsedKeystroke = {
   shift?: boolean
   meta?: boolean
 }
+export type Chord = ParsedKeystroke[]
 export type ParsedBinding = {
   action: string
-  keys: ParsedKeystroke[]
+  chord: Chord
 }
 export type KeybindingBlock = {
   context?: KeybindingContextName
