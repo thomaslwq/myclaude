@@ -21,11 +21,12 @@ export function migrateReplBridgeEnabledToRemoteControlAtStartup(): void {
     const oldValue = (prev as Record<string, unknown>)['replBridgeEnabled']
     if (oldValue === undefined) return prev
     if (prev.remoteControlAtStartup !== undefined) return prev
-    // Use explicit string check to avoid Boolean('false') === true bug
-    // Also handle other truthy strings like '1', 'yes', 'enabled' etc.
+    // Use explicit whitelist to avoid treating unknown values as true.
+    // Only specific strings are considered truthy: 'true', '1', 'yes', 'enabled'.
+    const truthyValues = ['true', '1', 'yes', 'enabled']
     const newValue =
       typeof oldValue === 'string'
-        ? !['false', '0', 'no', ''].includes(oldValue.toLowerCase().trim())
+        ? truthyValues.includes(oldValue.toLowerCase().trim())
         : Boolean(oldValue)
     const next = { ...prev, remoteControlAtStartup: newValue }
     delete next.replBridgeEnabled
