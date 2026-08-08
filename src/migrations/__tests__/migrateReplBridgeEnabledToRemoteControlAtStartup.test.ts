@@ -306,4 +306,12 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     expect(result.remoteControlAtStartup).toBe(false)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
+
+  it('should propagate error when saveGlobalConfig throws', () => {
+    mockSaveGlobalConfig.mockImplementation(() => {
+      throw new Error('Failed to save config')
+    })
+
+    expect(() => migrateReplBridgeEnabledToRemoteControlAtStartup()).toThrow('Failed to save config')
+  })
 })

@@ -96,7 +96,7 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
-  it('should throw error when updateSettingsForSource fails', () => {
+  it('should throw error when updateSettingsForSource fails and NOT mark migration as complete', () => {
     mockGetSettingsForSource.mockImplementation((source: string) => {
       if (source === 'userSettings') return {
         skipAutoPermissionPrompt: true,
@@ -112,6 +112,8 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
 
     expect(() => resetAutoModeOptInForDefaultOffer()).toThrow('Failed to update settings')
     expect(mockLogError).toHaveBeenCalled()
+    // Migration must NOT mark itself complete if the clear operation failed
+    expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
   })
 
   it('should throw error when saveGlobalConfig fails', () => {

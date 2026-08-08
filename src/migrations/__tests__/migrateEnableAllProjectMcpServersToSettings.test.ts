@@ -616,6 +616,53 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     })
   })
 
+  test('should propagate error when saveGlobalConfig fails and NOT mark migration as completed', async () => {
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock project config with fields to migrate
+    projectConfigStore = {
+      enableAllProjectMcpServers: true,
+      enabledMcpjsonServers: ['server1'],
+      otherField: 'keep-me',
+    }
+
+    // Mock settings with existing data
+    settingsStore.localSettings = {
+      otherSetting: 'some-value',
+    }
+
+    // Mock saveGlobalConfig to throw
+    mock.module(join(import.meta.dir, '../../utils/config.js'), () => ({
+      getCurrentProjectConfig: () => ({ ...projectConfigStore }),
+      saveCurrentProjectConfig: (updater: any) => {
+        if (typeof updater === 'function') {
+          projectConfigStore = updater(projectConfigStore)
+        } else {
+          projectConfigStore = { ...projectConfigStore, ...updater }
+        }
+      },
+      getGlobalConfig: () => ({ ...globalConfigStore }),
+      saveGlobalConfig: () => {
+        throw new Error('Failed to save global config')
+      },
+    }))
+
+    // Run migration - should throw
+    expect(() => migrateEnableAllProjectMcpServersToSettings()).toThrow('Failed to save global config')
+
+    // Verify that migration flag was NOT set
+    expect(globalConfigStore.hasCompletedMcpServerMigration).toBeUndefined()
+
+    // Verify that settings were updated (step 1 succeeded)
+    expect(settingsStore.localSettings.enableAllProjectMcpServers).toBe(true)
+    expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['server1'])
+
+    // Verify that project config fields were removed (step 2 succeeded before step 3 failed)
+    expect(projectConfigStore).toEqual({
+      otherField: 'keep-me',
+    })
+  })
+
   test('should be idempotent - second call does nothing', async () => {
     const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 
