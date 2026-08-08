@@ -21,37 +21,29 @@ export type Step = {
 // the user. The cache is cleared when the user explicitly runs /init.
 //
 // To handle the case where the user manually creates CLAUDE.md or changes workspace
-// contents (e.g., by cloning a repo), we use a lightweight mtime check on the root
-// directory. This is a single statSync call that detects file additions/removals/renames
-// without the overhead of a recursive directory walk.
+// contents (e.g., by cloning a repo), we check CLAUDE.md mtime and directory
+// emptiness. These are cheap, reliable checks — unlike directory mtime, which is
+// not guaranteed to update on all filesystems when files are added or removed.
 
 let cachedSteps: Step[] | null = null
 let cachedClaudeMdMtime: number = -1
-let cachedRootMtime: number = -1
 let cachedIsDirEmpty: boolean | null = null
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
   cachedClaudeMdMtime = -1
-  cachedRootMtime = -1
   cachedIsDirEmpty = null
 }
 
 /**
  * Check if the cached steps are still valid.
  *
- * Primary: compare CLAUDE.md mtime and root directory mtime. If either has changed,
- * the cache is stale. The root directory mtime check is a lightweight single statSync
- * call that detects file additions/removals/renames without the overhead of a
- * recursive directory walk.
- *
- * Fallback: compare the root directory emptiness against the cached value. The root
- * mtime may not change on filesystems with coarse mtime granularity or on network
- * mounts (e.g., cloning a repo into an already-populated root directory may not
- * bump the root mtime). Checking isDirEmpty is a single isDirEmptySync call on just
- * the root directory — not a recursive walk — so it stays cheap while catching
- * cases where the mtime didn't change.
+ * Compare CLAUDE.md mtime and root directory emptiness against the cached values.
+ * If either has changed, the cache is stale. Directory emptiness is checked with
+ * isDirEmptySync — a single call on just the root directory, not a recursive
+ * walk — so it stays cheap. This is more reliable than directory mtime, which is
+ * not guaranteed to update on all filesystems when files are added or removed.
  */
 function isCacheValid(): boolean {
   if (!cachedSteps) return false
@@ -71,23 +63,11 @@ function isCacheValid(): boolean {
     return false
   }
 
-  // Root mtime check: if the root directory's mtime has changed, the workspace
-  // contents likely changed (files added/removed/renamed). This is a single
-  // statSync call — cheap. On most local filesystems this is sufficient.
-  try {
-    const currentRootMtime = fs.statSync(cwd).mtimeMs
-    // Compare with tolerance to handle sub-millisecond precision
-    if (Math.abs(currentRootMtime - cachedRootMtime) > 0.5) return false
-  } catch {
-    // If we can't stat the root, invalidate to be safe
-    return false
-  }
-
-  // Fallback: check if the root directory emptiness changed. The root mtime can
-  // be unreliable on filesystems with coarse mtime granularity or on network
-  // mounts. This is a single isDirEmptySync call on just the root directory — not
-  // a recursive walk — so it stays cheap while catching cases where the mtime
-  // didn't change.
+  // Check if the root directory emptiness changed. This is a single
+  // isDirEmptySync call on just the root directory — not a recursive walk
+  // — so it stays cheap. This is more reliable than checking directory mtime,
+  // which is not guaranteed to update on all filesystems when files are added
+  // or removed (e.g., some Linux configurations).
   if (cachedIsDirEmpty !== null && cachedIsDirEmpty !== isDirEmptySync(cwd)) {
     return false
   }
@@ -105,17 +85,12 @@ export function getSteps(): Step[] {
   const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
   const isWorkspaceDirEmpty = isDirEmptySync(cwd)
 
-  // Track mtimes for cache invalidation
+  // Track state for cache invalidation
   const claudeMdPath = join(cwd, 'CLAUDE.md')
   try {
     cachedClaudeMdMtime = hasClaudeMd ? getFileModificationTime(claudeMdPath) : -1
   } catch {
     cachedClaudeMdMtime = -1
-  }
-  try {
-    cachedRootMtime = fs.statSync(cwd).mtimeMs
-  } catch {
-    cachedRootMtime = -1
   }
   cachedIsDirEmpty = isWorkspaceDirEmpty
 
