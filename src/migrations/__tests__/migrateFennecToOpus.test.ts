@@ -213,4 +213,76 @@ describe('migrateFennecToOpus', () => {
       { model: 'opus[1M][200K]' },
     )
   })
+
+  it('should migrate fennec-fast-latest[1M] to opus[1M] (uppercase suffix)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1M]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1M]' },
+    )
+  })
+
+  it('should migrate opus-4-5-fast[1M] to opus[1M] (uppercase suffix)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[1M]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1M]' },
+    )
+  })
+
+  it('should migrate fennec-fast-latest[100K] to opus[100K] (uppercase suffix)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[100K]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[100K]' },
+    )
+  })
+
+  it('should migrate opus-4-5-fast[100K] to opus[100K] (uppercase suffix)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[100K]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[100K]' },
+    )
+  })
+
+  it('should migrate fennec-fast-latest[1M][200K] to opus[1M][200K] (multiple uppercase suffixes)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1M][200K]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1M][200K]' },
+    )
+  })
+
+  it('should migrate opus-4-5-fast[1M][200K] to opus[1M][200K] (multiple uppercase suffixes)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[1M][200K]' })
+
+    migrateFennecToOpus()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus[1M][200K]' },
+    )
+  })
 })
