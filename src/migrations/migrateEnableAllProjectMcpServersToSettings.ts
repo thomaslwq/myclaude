@@ -29,8 +29,10 @@ import {
  *
  * Safety: Settings are written FIRST (step 1), then project config fields are removed (step 2).
  * If the process crashes after step 1, the migration is incomplete but harmless — the fields
- * exist in both places and the migration will complete on next run. No rollback mechanism is
- * needed because the operation is idempotent and safe in partial completion.
+ * exist in both places and the migration will complete on next run. If it crashes after step 2,
+ * the fields only exist in settings, which is also safe because the migration will re-run and
+ * find no fields to migrate. No rollback mechanism is needed because the operation is
+ * idempotent and safe in partial completion.
  */
 export function migrateEnableAllProjectMcpServersToSettings(): void {
   // Check if migration has already completed successfully
