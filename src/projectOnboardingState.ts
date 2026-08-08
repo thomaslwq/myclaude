@@ -4,7 +4,7 @@ import {
   saveCurrentProjectConfig,
 } from './utils/config.js'
 import { getCwd } from './utils/cwd.js'
-import { isDirEmpty, getFileModificationTime } from './utils/file.js'
+import { isDirEmptySync, getFileModificationTime } from './utils/file.js'
 import { getFsImplementation } from './utils/fsOperations.js'
 
 export type Step = {
@@ -88,7 +88,7 @@ function isCacheValid(): boolean {
   // mounts. This is a single isDirEmptySync call on just the root directory — not
   // a recursive walk — so it stays cheap while catching cases where the mtime
   // didn't change.
-  if (cachedIsDirEmpty !== null && cachedIsDirEmpty !== isDirEmpty(cwd)) {
+  if (cachedIsDirEmpty !== null && cachedIsDirEmpty !== isDirEmptySync(cwd)) {
     return false
   }
 
@@ -103,7 +103,7 @@ export function getSteps(): Step[] {
   const cwd = getCwd()
   const fs = getFsImplementation()
   const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
-  const isWorkspaceDirEmpty = isDirEmpty(cwd)
+  const isWorkspaceDirEmpty = isDirEmptySync(cwd)
 
   // Track mtimes for cache invalidation
   const claudeMdPath = join(cwd, 'CLAUDE.md')

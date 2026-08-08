@@ -332,7 +332,7 @@ export function stripLineNumberPrefix(line: string): string {
  * @param dirPath The path to the directory to check
  * @returns true if the directory is empty or does not exist, false otherwise
  */
-export function isDirEmpty(dirPath: string): boolean {
+export function isDirEmptySync(dirPath: string): boolean {
   try {
     return getFsImplementation().isDirEmptySync(dirPath)
   } catch (e) {
