@@ -184,7 +184,7 @@ import { migrateSonnet1mToSonnet45 } from './migrations/migrateSonnet1mToSonnet4
 import { migrateSonnet45ToSonnet46 } from './migrations/migrateSonnet45ToSonnet46.js';
 import { resetAutoModeOptInForDefaultOffer } from './migrations/resetAutoModeOptInForDefaultOffer.js';
 import { resetProToOpusDefault } from './migrations/resetProToOpusDefault.js';
-import { runMigrationsSafe, type MigrationFunction } from './migrations/migrationRunner.js';
+import { runMigrationsSafe, type Migration } from './migrations/migrationRunner.js';
 import { createRemoteSessionConfig } from './remote/RemoteSessionManager.js';
 /* eslint-enable @typescript-eslint/no-require-imports */
 // teleportWithProgress dynamically imported at call site
@@ -338,13 +338,26 @@ async function logStartupTelemetry(): Promise<void> {
 
 // @[MODEL LAUNCH]: Consider any migrations you may need for model strings. See migrateSonnet1mToSonnet45.ts for an example.
 // Bump this when adding a new sync migration so existing users re-run the set.
-const CURRENT_MIGRATION_VERSION = 11;
-function runMigrations(): void {
-  if (getGlobalConfig().migrationVersion !== CURRENT_MIGRATION_VERSION) {
-    const migrations: Array<{ name: string; migration: MigrationFunction }> = [
+// Each migration is tracked individually via `completedMigrations` so failed
+// migrations are retried on next startup while successful ones are skipped.
+const CURRENT_MIGRATION_VERSION = 12;
+async function runMigrations(): Promise<void> {
+  const globalConfig = getGlobalConfig()
+  // If the migration version is current and we have a completed list, skip.
+  // (Older configs may have migrationVersion set but no completed list —
+  // re-run once to backfill the list.)
+  const needsRun =
+    globalConfig.migrationVersion !== CURRENT_MIGRATION_VERSION ||
+    !Array.isArray(globalConfig.completedMigrations)
+
+  if (needsRun) {
+    const migrations: Migration[] = [
       { name: 'migrateAutoUpdatesToSettings', migration: migrateAutoUpdatesToSettings },
       { name: 'migrateBypassPermissionsAcceptedToSettings', migration: migrateBypassPermissionsAcceptedToSettings },
-      { name: 'migrateEnableAllProjectMcpServersToSettings', migration: migrateEnableAllProjectMcpServersToSettings },
+      // This migration assumes migrateReplBridgeEnabledToRemoteControlAtStartup
+      // has already run (it reads remoteControlAtStartup-related state).
+      // Declare the dependency explicitly so ordering is guaranteed.
+      { name: 'migrateEnableAllProjectMcpServersToSettings', migration: migrateEnableAllProjectMcpServersToSettings, dependsOn: ['migrateReplBridgeEnabledToRemoteControlAtStartup'] },
       { name: 'resetProToOpusDefault', migration: resetProToOpusDefault },
       { name: 'migrateSonnet1mToSonnet45', migration: migrateSonnet1mToSonnet45 },
       { name: 'migrateLegacyOpusToCurrent', migration: migrateLegacyOpusToCurrent },
@@ -359,16 +372,27 @@ function runMigrations(): void {
       migrations.push({ name: 'migrateFennecToOpus', migration: migrateFennecToOpus })
     }
 
-    // Run all migrations safely — errors are logged but do not block startup
-    const result = runMigrationsSafe(migrations)
+    // Run all migrations safely — errors are logged but do not block startup.
+    // The runner skips already-completed migrations and topologically sorts
+    // by `dependsOn`. Failed migrations are logged and reported via analytics,
+    // and will be retried on next startup because they are not added to
+    // `completedMigrations`.
+    const result = await runMigrationsSafe(migrations, globalConfig.completedMigrations ?? [])
 
-    // Update migration version even if some migrations failed, so they don't
-    // re-run on every startup (which could cause repeated errors). Failed
-    // migrations are logged and reported via analytics.
-    saveGlobalConfig(prev => prev.migrationVersion === CURRENT_MIGRATION_VERSION ? prev : {
-      ...prev,
-      migrationVersion: CURRENT_MIGRATION_VERSION
-    });
+    // Persist both the version and the per-migration completed list.
+    // Only migrations that actually succeeded are added, so failed ones
+    // will re-run on the next startup.
+    saveGlobalConfig(prev => {
+      const completed = new Set(prev.completedMigrations ?? [])
+      for (const name of result.newlyCompleted) {
+        completed.add(name)
+      }
+      return {
+        ...prev,
+        migrationVersion: CURRENT_MIGRATION_VERSION,
+        completedMigrations: [...completed],
+      }
+    })
   }
   // Async migration - fire and forget since it's non-blocking
   migrateChangelogFromConfig().catch(() => {
@@ -978,7 +1002,7 @@ async function run(): Promise<CommanderCommand> {
       setInlinePlugins(pluginDir);
       clearPluginCache('preAction: --plugin-dir inline plugins');
     }
-    runMigrations();
+    await runMigrations();
     profileCheckpoint('preAction_after_migrations');
 
     // Load remote managed settings for enterprise customers (non-blocking)

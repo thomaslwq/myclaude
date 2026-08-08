@@ -619,6 +619,10 @@ export type GlobalConfig = {
   // CURRENT_MIGRATION_VERSION, runMigrations() skips all sync migrations
   // (avoiding 11× saveGlobalConfig lock+re-read on every startup).
   migrationVersion?: number
+  // List of migration names that have completed successfully.
+  // Used by runMigrationsSafe to skip already-completed migrations
+  // and to retry failed ones on next startup.
+  completedMigrations?: string[]
 }
 
 /**
