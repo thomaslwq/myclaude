@@ -39,17 +39,14 @@ export interface Migration {
  * Runs a migration with error handling.
  * Logs errors but does not throw, allowing subsequent migrations to run.
  */
-export function runMigrationSafe(
+export async function runMigrationSafe(
   name: string,
   migration: MigrationFunction,
-): MigrationResult {
+): Promise<MigrationResult> {
   try {
     const result = migration()
     if (result instanceof Promise) {
-      // If we're called synchronously with an async function, we need to
-      // handle it differently. The caller should use runMigrationsSafe which
-      // handles async properly.
-      throw new Error('Migration returned a Promise. Use async migration runner.')
+      await result
     }
     return { success: true, migrationName: name }
   } catch (error) {
