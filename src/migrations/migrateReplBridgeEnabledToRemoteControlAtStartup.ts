@@ -23,7 +23,7 @@ export function migrateReplBridgeEnabledToRemoteControlAtStartup(): void {
     if (prev.remoteControlAtStartup !== undefined) return prev
     // Use explicit whitelist to avoid treating unknown values as true.
     // Only specific strings are considered truthy: 'true', '1', 'yes', 'enabled'.
-    const truthyValues = ['true', '1', 'yes', 'enabled']
+    const truthyValues = ['true', '1', 'yes', 'enabled', 'on']
     const newValue =
       typeof oldValue === 'string'
         ? truthyValues.includes(oldValue.toLowerCase().trim())
