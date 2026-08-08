@@ -82,6 +82,13 @@ function isCacheValid(): boolean {
     return false
   }
 
+  // Directory emptiness check: if the workspace directory became non-empty
+  // (or empty) since we cached the steps, the cache is stale.
+  const currentIsDirEmpty = isDirEmptySync(cwd)
+  if (cachedIsDirEmpty !== null && currentIsDirEmpty !== cachedIsDirEmpty) {
+    return false
+  }
+
   return true
 }
 
