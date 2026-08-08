@@ -256,7 +256,7 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     })
   })
 
-  it('should handle string "unknown" as falsy (not in whitelist)', () => {
+  it('should handle string "unknown" as truthy (not in blacklist)', () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
       calls.push(cb)
@@ -269,11 +269,11 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: 'unknown',
     })
-    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle string "maybe" as falsy (not in whitelist)', () => {
+  it('should handle string "maybe" as truthy (not in blacklist)', () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
       calls.push(cb)
@@ -286,7 +286,7 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: 'maybe',
     })
-    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
@@ -304,6 +304,40 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       replBridgeEnabled: 'disabled',
     })
     expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.replBridgeEnabled).toBeUndefined()
+  })
+
+  it('should handle string "active" as truthy (unknown but non-empty)', () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'active',
+    })
+    expect(result.remoteControlAtStartup).toBe(true)
+    expect(result.replBridgeEnabled).toBeUndefined()
+  })
+
+  it('should handle string "enable" as truthy (unknown but non-empty)', () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation((cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'enable',
+    })
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
