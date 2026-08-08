@@ -19,10 +19,9 @@ import {
  * Merge behavior:
  * - Existing settings arrays are preserved in order with new servers appended
  * - Duplicates are removed (first occurrence wins, preserving original order)
- * - The disabled list is filtered for mutual exclusivity: if a server appears in both
- *   enabled and disabled lists, it is removed from the disabled list since the enabled list
- *   takes precedence. This resolves the ambiguous configuration.
- * - A warning event is logged when a server appears in both lists, and the conflict is resolved.
+ * - If a server appears in both enabled and disabled lists, the conflict is preserved
+ *   and logged as a warning event for user review, rather than silently overriding
+ *   user intent.
  * - Other settings fields are never overwritten
  *
  * Idempotency: Uses a global config flag `hasCompletedMcpServerMigration` to ensure
@@ -100,34 +99,27 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     }
   }
 
-  // Resolve overlapping servers: if a server appears in both enabled and disabled lists,
-  // remove it from the disabled list since the enabled list takes precedence
+  // Detect overlapping servers: if a server appears in both enabled and disabled lists,
+  // preserve the conflict for user review rather than silently overriding user intent.
   const overlappingServers = existingEnabledServers.filter(server =>
     existingDisabledServers.includes(server)
   )
 
   if (overlappingServers.length > 0) {
-    logEvent('tengu_migrate_mcp_server_conflict_resolved', {
+    logEvent('tengu_migrate_mcp_server_conflict_detected', {
       overlappingServers: overlappingServers.join(','),
-      conflictResolution: 'removed_from_disabled',
+      conflictResolution: 'preserved_for_user_review',
     })
   }
 
-  // Remove overlapping servers from disabled list
-  const finalDisabledServers = existingDisabledServers.filter(
-    server => !existingEnabledServers.includes(server)
-  )
-
   // Set the merged arrays in updates
+  // The disabled list is preserved as-is (including any overlapping servers) so that
+  // an explicit user intent to disable a server is not silently overridden.
   if (hasEnabledServers) {
     updates.enabledMcpjsonServers = existingEnabledServers
   }
-  // Update disabled list if there are servers to resolve
-  // This handles cases where:
-  // 1. Project config has disabled servers (hasDisabledServers is true)
-  // 2. Existing settings have disabled servers that need conflict resolution
-  if (hasDisabledServers || (existingSettings.disabledMcpjsonServers !== undefined && finalDisabledServers.length > 0)) {
-    updates.disabledMcpjsonServers = finalDisabledServers
+  if (hasDisabledServers || existingSettings.disabledMcpjsonServers !== undefined) {
+    updates.disabledMcpjsonServers = existingDisabledServers
   }
 
   // Step 1: Write settings first (safe merge operation)
