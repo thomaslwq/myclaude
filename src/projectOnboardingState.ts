@@ -24,51 +24,41 @@ export type Step = {
 // contents (e.g., by cloning a repo), we check CLAUDE.md mtime and directory
 // emptiness. These are cheap, reliable checks — unlike directory mtime, which is
 // not guaranteed to update on all filesystems when files are added or removed.
+//
+// We also use a time-based cache (TTL) to avoid filesystem I/O on every prompt.
+// The workspace state is stable within a session, so we only need to revalidate
+// periodically (e.g., every 5 seconds). This prevents unnecessary I/O while
+// still detecting changes when they occur.
 
+const CACHE_TTL_MS = 5000 // 5 seconds
 let cachedSteps: Step[] | null = null
 let cachedClaudeMdMtime: number = -1
 let cachedIsDirEmpty: boolean | null = null
+let cachedStepsTimestamp: number = 0
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
   cachedClaudeMdMtime = -1
   cachedIsDirEmpty = null
+  cachedStepsTimestamp = 0
 }
 
 /**
  * Check if the cached steps are still valid.
  *
- * Compare CLAUDE.md mtime and root directory emptiness against the cached values.
- * If either has changed, the cache is stale. Directory emptiness is checked with
- * isDirEmptySync — a single call on just the root directory, not a recursive
- * walk — so it stays cheap. This is more reliable than directory mtime, which is
- * not guaranteed to update on all filesystems when files are added or removed.
+ * Uses a time-based cache (TTL) to avoid filesystem I/O on every prompt.
+ * The cache is considered valid if it exists and is less than CACHE_TTL_MS
+ * old. This prevents unnecessary I/O while still detecting changes when
+ * they occur (e.g., user manually creates CLAUDE.md or changes workspace
+ * contents).
  */
 function isCacheValid(): boolean {
   if (!cachedSteps) return false
 
-  const cwd = getCwd()
-  const claudeMdPath = join(cwd, 'CLAUDE.md')
-
-  // Check CLAUDE.md mtime if it exists
-  const fs = getFsImplementation()
-  try {
-    const currentClaudeMdMtime = fs.existsSync(claudeMdPath)
-      ? getFileModificationTime(claudeMdPath) ?? -1
-      : -1
-    if (currentClaudeMdMtime !== cachedClaudeMdMtime) return false
-  } catch {
-    // If we can't stat it, invalidate to be safe
-    return false
-  }
-
-  // Check if the root directory emptiness changed. This is a single
-  // isDirEmptySync call on just the root directory — not a recursive walk
-  // — so it stays cheap. This is more reliable than checking directory mtime,
-  // which is not guaranteed to update on all filesystems when files are added
-  // or removed (e.g., some Linux configurations).
-  if (cachedIsDirEmpty !== null && cachedIsDirEmpty !== isDirEmptySync(cwd)) {
+  // Check if the cache has expired (older than CACHE_TTL_MS)
+  const now = Date.now()
+  if (now - cachedStepsTimestamp > CACHE_TTL_MS) {
     return false
   }
 
@@ -93,6 +83,8 @@ export function getSteps(): Step[] {
     cachedClaudeMdMtime = -1
   }
   cachedIsDirEmpty = isWorkspaceDirEmpty
+
+  cachedStepsTimestamp = Date.now()
 
   cachedSteps = [
     {
