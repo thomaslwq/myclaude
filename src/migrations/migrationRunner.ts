@@ -65,15 +65,17 @@ export async function runMigrationSafe(
  * Topologically sort migrations based on their dependency declarations.
  * Throws if a circular dependency is detected.
  */
-function topologicalSort(migrations: Migration[]): Migration[] {
+export function topologicalSort(migrations: Migration[]): Migration[] {
   const nameToMigration = new Map<string, Migration>()
   for (const m of migrations) {
     nameToMigration.set(m.name, m)
   }
 
-  // Validate all dependencies exist
+  // Validate all dependencies exist and deduplicate them
+  const dependsOnMap = new Map<string, Set<string>>()
   for (const m of migrations) {
     if (m.dependsOn) {
+      const deps = new Set<string>()
       for (const dep of m.dependsOn) {
         if (!nameToMigration.has(dep)) {
           throw new Error(
@@ -81,7 +83,9 @@ function topologicalSort(migrations: Migration[]): Migration[] {
             `Dependency must be included in the migration list.`,
           )
         }
+        deps.add(dep)
       }
+      dependsOnMap.set(m.name, deps)
     }
   }
 
@@ -96,8 +100,9 @@ function topologicalSort(migrations: Migration[]): Migration[] {
   }
 
   for (const m of migrations) {
-    if (m.dependsOn) {
-      for (const dep of m.dependsOn) {
+    const deps = dependsOnMap.get(m.name)
+    if (deps) {
+      for (const dep of deps) {
         // dep must run before m
         adjacency.get(dep)!.push(m.name)
         inDegree.set(m.name, (inDegree.get(m.name) || 0) + 1)
@@ -129,9 +134,15 @@ function topologicalSort(migrations: Migration[]): Migration[] {
   }
 
   if (sorted.length !== migrations.length) {
+    // Find the migrations involved in the cycle
+    const unsorted = new Set(migrations.map(m => m.name))
+    for (const name of sorted) {
+      unsorted.delete(name)
+    }
+    const cycleNames = Array.from(unsorted).join(', ')
     throw new Error(
-      'Circular dependency detected in migrations. ' +
-      'Each migration must have a valid dependency chain.',
+      `Circular dependency detected in migrations: ${cycleNames}. ` +
+      `Each migration must have a valid dependency chain.`,
     )
   }
 
