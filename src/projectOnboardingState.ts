@@ -4,7 +4,7 @@ import {
   saveCurrentProjectConfig,
 } from './utils/config.js'
 import { getCwd } from './utils/cwd.js'
-import { isDirEmptySync, getFileModificationTime } from './utils/file.js'
+import { isDirEmptySync } from './utils/file.js'
 import { getFsImplementation } from './utils/fsOperations.js'
 
 export type Step = {
@@ -32,14 +32,12 @@ export type Step = {
 
 const CACHE_TTL_MS = 5000 // 5 seconds
 let cachedSteps: Step[] | null = null
-let cachedClaudeMdMtime: number = -1
 let cachedIsDirEmpty: boolean | null = null
 let cachedStepsTimestamp: number = 0
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
-  cachedClaudeMdMtime = -1
   cachedIsDirEmpty = null
   cachedStepsTimestamp = 0
 }
@@ -75,13 +73,6 @@ export function getSteps(): Step[] {
   const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
   const isWorkspaceDirEmpty = isDirEmptySync(cwd)
 
-  // Track state for cache invalidation
-  const claudeMdPath = join(cwd, 'CLAUDE.md')
-  try {
-    cachedClaudeMdMtime = hasClaudeMd ? getFileModificationTime(claudeMdPath) : -1
-  } catch {
-    cachedClaudeMdMtime = -1
-  }
   cachedIsDirEmpty = isWorkspaceDirEmpty
 
   cachedStepsTimestamp = Date.now()
