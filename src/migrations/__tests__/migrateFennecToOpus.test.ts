@@ -154,64 +154,49 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate fennec-latest[1m][200k] to opus[1m][200k] (multiple suffixes)', () => {
+  it('should reject fennec-latest[1m][200k] (multiple suffixes are invalid)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1m][200k]' })
 
     migrateFennecToOpus()
 
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[1m][200k]' },
-    )
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should migrate fennec-latest[1m][200k][500k] to opus[1m][200k][500k] (multiple suffixes)', () => {
+  it('should reject fennec-latest[1m][200k][500k] (multiple suffixes are invalid)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1m][200k][500k]' })
 
     migrateFennecToOpus()
 
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[1m][200k][500k]' },
-    )
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should migrate fennec-fast-latest[1m][200k] to opus[1m][200k] (multiple suffixes)', () => {
+  it('should reject fennec-fast-latest[1m][200k] (multiple suffixes are invalid)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1m][200k]' })
 
     migrateFennecToOpus()
 
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[1m][200k]' },
-    )
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should migrate opus-4-5-fast[1m][200k] to opus[1m][200k] (multiple suffixes)', () => {
+  it('should reject opus-4-5-fast[1m][200k] (multiple suffixes are invalid)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[1m][200k]' })
 
     migrateFennecToOpus()
 
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[1m][200k]' },
-    )
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should migrate fennec-latest[1M][200K] to opus[1M][200K] (multiple uppercase suffixes)', () => {
+  it('should reject fennec-latest[1M][200K] (multiple uppercase suffixes are invalid)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-latest[1M][200K]' })
 
     migrateFennecToOpus()
 
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[1M][200K]' },
-    )
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
   it('should migrate fennec-fast-latest[1M] to opus[1M] (uppercase suffix)', () => {
@@ -262,27 +247,21 @@ describe('migrateFennecToOpus', () => {
     )
   })
 
-  it('should migrate fennec-fast-latest[1M][200K] to opus[1M][200K] (multiple uppercase suffixes)', () => {
+  it('should reject fennec-fast-latest[1M][200K] (multiple uppercase suffixes are invalid)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'fennec-fast-latest[1M][200K]' })
 
     migrateFennecToOpus()
 
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[1M][200K]' },
-    )
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
-  it('should migrate opus-4-5-fast[1M][200K] to opus[1M][200K] (multiple uppercase suffixes)', () => {
+  it('should reject opus-4-5-fast[1M][200K] (multiple uppercase suffixes are invalid)', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockReturnValue({ model: 'opus-4-5-fast[1M][200K]' })
 
     migrateFennecToOpus()
 
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
-      'userSettings',
-      { model: 'opus[1M][200K]' },
-    )
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 })
