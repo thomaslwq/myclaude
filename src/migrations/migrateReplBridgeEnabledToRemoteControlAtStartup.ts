@@ -28,8 +28,8 @@ export function migrateReplBridgeEnabledToRemoteControlAtStartup(): void {
       typeof oldValue === 'string'
         ? truthyValues.includes(oldValue.toLowerCase().trim())
         : Boolean(oldValue)
-    const next = { ...prev, remoteControlAtStartup: newValue }
-    delete next.replBridgeEnabled
+    const { replBridgeEnabled: _unused, ...rest } = prev
+    const next = { ...rest, remoteControlAtStartup: newValue }
     return next
   })
 }
