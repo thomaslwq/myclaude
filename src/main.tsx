@@ -184,6 +184,7 @@ import { migrateSonnet1mToSonnet45 } from './migrations/migrateSonnet1mToSonnet4
 import { migrateSonnet45ToSonnet46 } from './migrations/migrateSonnet45ToSonnet46.js';
 import { resetAutoModeOptInForDefaultOffer } from './migrations/resetAutoModeOptInForDefaultOffer.js';
 import { resetProToOpusDefault } from './migrations/resetProToOpusDefault.js';
+import { runMigrationsSafe, type MigrationFunction } from './migrations/migrationRunner.js';
 import { createRemoteSessionConfig } from './remote/RemoteSessionManager.js';
 /* eslint-enable @typescript-eslint/no-require-imports */
 // teleportWithProgress dynamically imported at call site
@@ -340,21 +341,30 @@ async function logStartupTelemetry(): Promise<void> {
 const CURRENT_MIGRATION_VERSION = 11;
 function runMigrations(): void {
   if (getGlobalConfig().migrationVersion !== CURRENT_MIGRATION_VERSION) {
-    migrateAutoUpdatesToSettings();
-    migrateBypassPermissionsAcceptedToSettings();
-    migrateEnableAllProjectMcpServersToSettings();
-    resetProToOpusDefault();
-    migrateSonnet1mToSonnet45();
-    migrateLegacyOpusToCurrent();
-    migrateSonnet45ToSonnet46();
-    migrateOpusToOpus1m();
-    migrateReplBridgeEnabledToRemoteControlAtStartup();
+    const migrations: Array<{ name: string; migration: MigrationFunction }> = [
+      { name: 'migrateAutoUpdatesToSettings', migration: migrateAutoUpdatesToSettings },
+      { name: 'migrateBypassPermissionsAcceptedToSettings', migration: migrateBypassPermissionsAcceptedToSettings },
+      { name: 'migrateEnableAllProjectMcpServersToSettings', migration: migrateEnableAllProjectMcpServersToSettings },
+      { name: 'resetProToOpusDefault', migration: resetProToOpusDefault },
+      { name: 'migrateSonnet1mToSonnet45', migration: migrateSonnet1mToSonnet45 },
+      { name: 'migrateLegacyOpusToCurrent', migration: migrateLegacyOpusToCurrent },
+      { name: 'migrateSonnet45ToSonnet46', migration: migrateSonnet45ToSonnet46 },
+      { name: 'migrateOpusToOpus1m', migration: migrateOpusToOpus1m },
+      { name: 'migrateReplBridgeEnabledToRemoteControlAtStartup', migration: migrateReplBridgeEnabledToRemoteControlAtStartup },
+    ]
     if (feature('TRANSCRIPT_CLASSIFIER')) {
-      resetAutoModeOptInForDefaultOffer();
+      migrations.push({ name: 'resetAutoModeOptInForDefaultOffer', migration: resetAutoModeOptInForDefaultOffer })
     }
     if ("external" === 'ant') {
-      migrateFennecToOpus();
+      migrations.push({ name: 'migrateFennecToOpus', migration: migrateFennecToOpus })
     }
+
+    // Run all migrations safely — errors are logged but do not block startup
+    const result = runMigrationsSafe(migrations)
+
+    // Update migration version even if some migrations failed, so they don't
+    // re-run on every startup (which could cause repeated errors). Failed
+    // migrations are logged and reported via analytics.
     saveGlobalConfig(prev => prev.migrationVersion === CURRENT_MIGRATION_VERSION ? prev : {
       ...prev,
       migrationVersion: CURRENT_MIGRATION_VERSION
