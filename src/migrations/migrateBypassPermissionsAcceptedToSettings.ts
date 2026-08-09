@@ -29,7 +29,7 @@ export async function migrateBypassPermissionsAcceptedToSettings(): Promise<void
         getSettingsForSource('policySettings')?.skipDangerousModePermissionPrompt === false
 
       if (!userExplicitlyOptedOut) {
-        const result = updateSettingsForSource('userSettings', {
+        const result = await updateSettingsForSource('userSettings', {
           skipDangerousModePermissionPrompt: true,
         })
         if (result.error) {
@@ -40,7 +40,7 @@ export async function migrateBypassPermissionsAcceptedToSettings(): Promise<void
 
     logEvent('tengu_migrate_bypass_permissions_accepted', {})
 
-    saveGlobalConfig(current => {
+    await saveGlobalConfig(current => {
       if (!('bypassPermissionsModeAccepted' in current)) return current
       const { bypassPermissionsModeAccepted: _, ...updatedConfig } = current
       return updatedConfig
