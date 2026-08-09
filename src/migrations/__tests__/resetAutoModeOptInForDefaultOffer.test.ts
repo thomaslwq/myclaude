@@ -77,14 +77,15 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
   })
 
   it('should clear skipAutoPermissionPrompt from userSettings when set there and defaultMode is not auto', () => {
-    mockGetSettingsForSource.mockImplementation((source: string) => {
-      if (source === 'userSettings') return {
-        skipAutoPermissionPrompt: true,
-        permissions: { defaultMode: 'ask' },
-      }
-      if (source === 'localSettings') return {}
-      if (source === 'projectSettings') return {}
-      return null
+    // Use a mutable store so getSettingsForSource returns updated state after clearing
+    const settingsStore: Record<string, any> = {
+      userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
+      localSettings: {},
+      projectSettings: {},
+    }
+    mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
+    mockUpdateSettingsForSource.mockImplementation((source: string, updates: any) => {
+      settingsStore[source] = { ...settingsStore[source], ...updates }
     })
 
     resetAutoModeOptInForDefaultOffer()
@@ -117,16 +118,15 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
   })
 
   it('should throw error when saveGlobalConfig fails', () => {
-    mockGetSettingsForSource.mockImplementation((source: string) => {
-      if (source === 'userSettings') return {
-        skipAutoPermissionPrompt: true,
-        permissions: { defaultMode: 'ask' },
-      }
-      if (source === 'localSettings') return {}
-      if (source === 'projectSettings') return {}
-      return null
+    const settingsStore: Record<string, any> = {
+      userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
+      localSettings: {},
+      projectSettings: {},
+    }
+    mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
+    mockUpdateSettingsForSource.mockImplementation((source: string, updates: any) => {
+      settingsStore[source] = { ...settingsStore[source], ...updates }
     })
-    mockUpdateSettingsForSource.mockImplementation(() => {})
     mockSaveGlobalConfig.mockImplementation(() => {
       throw new Error('Failed to save config')
     })
@@ -142,6 +142,33 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
 
     expect(() => resetAutoModeOptInForDefaultOffer()).toThrow('Failed to get initial settings')
     expect(mockLogError).toHaveBeenCalled()
+  })
+
+  it('should NOT mark migration complete when skipAutoPermissionPrompt remains in editable sources after clear attempt', () => {
+    // userSettings and localSettings both have the flag; projectSettings does not
+    // updateSettingsForSource silently fails (no-op), so the flags remain set
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } }
+      if (source === 'localSettings') return { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } }
+      if (source === 'projectSettings') return {}
+      if (source === 'flagSettings') return null
+      if (source === 'policySettings') return null
+      return null
+    })
+    mockUpdateSettingsForSource.mockImplementation(() => {}) // silently fails to actually clear
+    let savedConfig: any = null
+    mockSaveGlobalConfig.mockImplementation((fn: any) => { savedConfig = fn({}) })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    // Should have tried to clear both editable sources
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(2)
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('userSettings', { skipAutoPermissionPrompt: undefined })
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('localSettings', { skipAutoPermissionPrompt: undefined })
+    // hasSkipAfterClear is still true (flags were not actually cleared),
+    // so the migration must NOT mark itself complete
+    expect(savedConfig?.hasResetAutoModeOptInForDefaultOffer).toBeUndefined()
+    expect(savedConfig?.hasResetAutoModeOptInForDefaultOffer).toBeFalsy()
   })
 
   it('should log warning when skipAutoPermissionPrompt is set in policySettings (non-editable source)', () => {
@@ -194,19 +221,16 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
   })
 
   it('should also log warning when skipAutoPermissionPrompt is set in both editable and non-editable sources', () => {
-    mockGetSettingsForSource.mockImplementation((source: string) => {
-      if (source === 'userSettings') return {
-        skipAutoPermissionPrompt: true,
-        permissions: { defaultMode: 'ask' },
-      }
-      if (source === 'policySettings') return {
-        skipAutoPermissionPrompt: true,
-        permissions: { defaultMode: 'ask' },
-      }
-      if (source === 'localSettings') return {}
-      if (source === 'projectSettings') return {}
-      if (source === 'flagSettings') return null
-      return null
+    const settingsStore: Record<string, any> = {
+      userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
+      localSettings: {},
+      projectSettings: {},
+      flagSettings: null,
+      policySettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
+    }
+    mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
+    mockUpdateSettingsForSource.mockImplementation((source: string, updates: any) => {
+      settingsStore[source] = { ...settingsStore[source], ...updates }
     })
 
     resetAutoModeOptInForDefaultOffer()

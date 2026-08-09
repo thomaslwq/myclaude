@@ -46,6 +46,10 @@ export function resetAutoModeOptInForDefaultOffer(): void {
     const effectiveSettings = getInitialSettings()
     const effectiveDefaultMode = effectiveSettings?.permissions?.defaultMode
 
+    // Tracks whether any editable source still has the flag after a clear attempt.
+    // Declared outside the if block so the completion check below can see it.
+    let hasSkipAfterClear = false
+
     if (
       hasSkipInEditableSources &&
       effectiveDefaultMode != null &&
@@ -70,17 +74,9 @@ export function resetAutoModeOptInForDefaultOffer(): void {
       // Check if skipAutoPermissionPrompt is still set in ANY editable source
       // If it is, the migration was interrupted and we should not mark it as complete.
       // This allows the migration to be re-run until all sources are cleared.
-      const hasSkipAfterClear = sourcesToCheck.some(
+      hasSkipAfterClear = sourcesToCheck.some(
         source => getSettingsForSource(source)?.skipAutoPermissionPrompt === true,
       )
-
-      if (!hasSkipAfterClear) {
-        // Only mark migration as complete if all sources were successfully cleared
-        saveGlobalConfig(c => {
-          if (c.hasResetAutoModeOptInForDefaultOffer) return c
-          return { ...c, hasResetAutoModeOptInForDefaultOffer: true }
-        })
-      }
     }
 
     // Check if skipAutoPermissionPrompt is still set after migration
@@ -96,10 +92,20 @@ export function resetAutoModeOptInForDefaultOffer(): void {
       })
     }
 
-    saveGlobalConfig(c => {
-      if (c.hasResetAutoModeOptInForDefaultOffer) return c
-      return { ...c, hasResetAutoModeOptInForDefaultOffer: true }
-    })
+    // Only mark the migration as complete if all editable sources were successfully
+    // cleared. If the clearing block was entered but some editable source still has
+    // skipAutoPermissionPrompt set (e.g., updateSettingsForSource silently failed),
+    // we must NOT mark it complete so the migration can be re-run.
+    const shouldMarkComplete =
+      !hasSkipInEditableSources ||
+      (effectiveDefaultMode != null && effectiveDefaultMode !== 'auto' && !hasSkipAfterClear)
+
+    if (shouldMarkComplete) {
+      saveGlobalConfig(c => {
+        if (c.hasResetAutoModeOptInForDefaultOffer) return c
+        return { ...c, hasResetAutoModeOptInForDefaultOffer: true }
+      })
+    }
   } catch (error) {
     logError(new Error(`Failed to reset auto mode opt-in for default offer: ${error}`))
     throw error
