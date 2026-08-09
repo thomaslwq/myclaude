@@ -50,12 +50,11 @@ export async function resetAutoModeOptInForDefaultOffer(): Promise<void> {
     // Declared outside the if block so the completion check below can see it.
     let hasSkipAfterClear = false
 
-    if (
-      hasSkipInEditableSources &&
-      effectiveDefaultMode != null &&
-      effectiveDefaultMode !== 'auto'
-    ) {
+    if (hasSkipInEditableSources) {
       // Clear skipAutoPermissionPrompt from all editable sources where it's set
+      // We do this regardless of defaultMode — if the flag exists, it should be cleared
+      // to resurface the dialog. For auto mode users, the flag is irrelevant but we
+      // clear it anyway for consistency.
       for (const source of sourcesToCheck) {
         const settings = getSettingsForSource(source)
         if (settings?.skipAutoPermissionPrompt === true) {
@@ -98,6 +97,7 @@ export async function resetAutoModeOptInForDefaultOffer(): Promise<void> {
     // we must NOT mark it complete so the migration can be re-run.
     const shouldMarkComplete =
       !hasSkipInEditableSources ||
+      effectiveDefaultMode === 'auto' ||
       (effectiveDefaultMode != null && effectiveDefaultMode !== 'auto' && !hasSkipAfterClear)
 
     if (shouldMarkComplete) {

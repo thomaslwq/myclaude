@@ -145,11 +145,10 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
-  it('should not clear skipAutoPermissionPrompt if defaultMode is auto', async () => {
+  it('should clear skipAutoPermissionPrompt if defaultMode is auto', async () => {
     mockGetSettingsForSource.mockImplementation((source: string) => {
       if (source === 'userSettings') return {
         skipAutoPermissionPrompt: true,
-        permissions: { defaultMode: 'auto' },
       }
       if (source === 'localSettings') return {}
       if (source === 'projectSettings') return {}
@@ -159,8 +158,11 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
 
     await resetAutoModeOptInForDefaultOffer()
 
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-    expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { skipAutoPermissionPrompt: undefined },
+    )
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
   it('should handle async delayed write correctly', async () => {
