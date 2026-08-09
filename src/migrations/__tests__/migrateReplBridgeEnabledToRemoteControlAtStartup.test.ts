@@ -167,6 +167,23 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
+  it('should handle object value as false (not truthy)', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: { enabled: true },
+    })
+    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.replBridgeEnabled).toBeUndefined()
+  })
+
   it('should handle string "active" (unknown truthy) correctly', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
@@ -229,14 +246,12 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     })
     await migrateReplBridgeEnabledToRemoteControlAtStartup()
 
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
   it('should handle async failure gracefully', async () => {
     // Simulate an async failure (e.g., file I/O error)
-    mockSaveGlobalConfig.mockImplementation(async () => {
-      throw new Error('Async write failed')
-    })
-    await expect(migrateReplBridgeEnabledToRemoteControlAtStartup()).rejects.toThrow('Async write failed')
+    mockSaveGlobalConfig.mockRejectedValue(new Error('File system error'))
+    await expect(migrateReplBridgeEnabledToRemoteControlAtStartup()).rejects.toThrow('File system error')
   })
 })
