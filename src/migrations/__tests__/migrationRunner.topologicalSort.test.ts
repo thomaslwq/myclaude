@@ -56,6 +56,15 @@ describe('topologicalSort', () => {
     expect(() => topologicalSort(migrations)).toThrow()
   })
 
+  it('should throw on duplicate migration names', () => {
+    const migrations: Migration[] = [
+      createMigration('A'),
+      createMigration('A'),
+    ]
+
+    expect(() => topologicalSort(migrations)).toThrow(/duplicate/i)
+  })
+
   it('should handle duplicate dependencies in dependsOn', () => {
     // This is the bug we're fixing
     const migrations: Migration[] = [

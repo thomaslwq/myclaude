@@ -42,6 +42,11 @@ export interface Migration {
 export function topologicalSort(migrations: Migration[]): Migration[] {
   const nameToMigration = new Map<string, Migration>()
   for (const m of migrations) {
+    if (nameToMigration.has(m.name)) {
+      throw new Error(
+        `Duplicate migration name '${m.name}'. Migration names must be unique.`,
+      )
+    }
     nameToMigration.set(m.name, m)
   }
 
