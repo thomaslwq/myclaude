@@ -58,10 +58,11 @@ describe('projectOnboardingState', () => {
 
       expect(steps1).toEqual(steps2)
       // No I/O on second call — cache is valid within TTL
-      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(1)
+      // Note: isDirEmptySync is called in isCacheValid() to check for changes
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(2)
     })
 
-    it('should keep cache valid when directory becomes non-empty within TTL (no I/O)', () => {
+    it('should invalidate cache when directory becomes non-empty within TTL', () => {
       mockIsDirEmptySync.mockReturnValue(true)
 
       // Initial call - workspace is empty
@@ -72,17 +73,19 @@ describe('projectOnboardingState', () => {
       // Simulate files being added (directory becomes non-empty)
       mockIsDirEmptySync.mockReturnValue(false)
 
-      // Fast-forward within TTL - cache should remain valid (no I/O)
+      // Fast-forward within TTL - cache should be invalidated due to emptiness change
       vi.advanceTimersByTime(1000)
 
       const steps2 = getSteps()
-      expect(steps2).toEqual(steps1) // cached steps returned
+      expect(steps2).not.toEqual(steps1) // new steps returned
+      expect(steps2[0].isEnabled).toBe(false) // workspace step now disabled
+      expect(steps2[1].isEnabled).toBe(true) // claude.md step now enabled
 
-      // Verify isDirEmptySync was NOT called again (cache valid, no I/O)
-      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(1)
+      // Verify isDirEmptySync was called again (cache invalidated, I/O occurred)
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(3)
     })
 
-    it('should keep cache valid when directory becomes empty within TTL (no I/O)', () => {
+    it('should invalidate cache when directory becomes empty within TTL', () => {
       mockIsDirEmptySync.mockReturnValue(false)
 
       // Initial call - workspace is not empty
@@ -93,14 +96,16 @@ describe('projectOnboardingState', () => {
       // Simulate files being removed (directory becomes empty)
       mockIsDirEmptySync.mockReturnValue(true)
 
-      // Fast-forward within TTL - cache should remain valid (no I/O)
+      // Fast-forward within TTL - cache should be invalidated due to emptiness change
       vi.advanceTimersByTime(1000)
 
       const steps2 = getSteps()
-      expect(steps2).toEqual(steps1) // cached steps returned
+      expect(steps2).not.toEqual(steps1) // new steps returned
+      expect(steps2[0].isEnabled).toBe(true) // workspace step now enabled
+      expect(steps2[1].isEnabled).toBe(false) // claude.md step now disabled
 
-      // Verify isDirEmptySync was NOT called again (cache valid, no I/O)
-      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(1)
+      // Verify isDirEmptySync was called again (cache invalidated, I/O occurred)
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(3)
     })
 
     it('should invalidate cache when CLAUDE.md mtime changes', () => {

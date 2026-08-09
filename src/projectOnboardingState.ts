@@ -34,12 +34,14 @@ const CACHE_TTL_MS = 5000 // 5 seconds
 let cachedSteps: Step[] | null = null
 let cachedStepsTimestamp: number = 0
 let cachedClaudeMdMtime: number | null = null
+let cachedIsWorkspaceDirEmpty: boolean | null = null
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
   cachedStepsTimestamp = 0
   cachedClaudeMdMtime = null
+  cachedIsWorkspaceDirEmpty = null
 }
 
 /**
@@ -74,6 +76,12 @@ function isCacheValid(): boolean {
     return false
   }
 
+  // Check if directory emptiness has changed (files added/removed)
+  const currentIsWorkspaceDirEmpty = isDirEmptySync(cwd)
+  if (currentIsWorkspaceDirEmpty !== cachedIsWorkspaceDirEmpty) {
+    return false
+  }
+
   return true
 }
 
@@ -88,6 +96,9 @@ export function getSteps(): Step[] {
   const isWorkspaceDirEmpty = isDirEmptySync(cwd)
 
   cachedStepsTimestamp = Date.now()
+
+  // Cache the directory emptiness so isCacheValid can detect changes.
+  cachedIsWorkspaceDirEmpty = isWorkspaceDirEmpty
 
   // Cache the CLAUDE.md mtime so isCacheValid can detect changes.
   if (hasClaudeMd) {
