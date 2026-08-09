@@ -217,9 +217,7 @@ export async function runMigrationsSafe(
     // Run the migration
     try {
       const result = migration()
-      if (result instanceof Promise) {
-        await result
-      }
+      await Promise.resolve(result)
       results.push({ success: true, migrationName: name })
       successful++
       newlyCompleted.push(name)
