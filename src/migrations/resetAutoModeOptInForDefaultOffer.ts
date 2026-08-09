@@ -97,7 +97,6 @@ export async function resetAutoModeOptInForDefaultOffer(): Promise<void> {
     // we must NOT mark it complete so the migration can be re-run.
     const shouldMarkComplete =
       !hasSkipInEditableSources ||
-      effectiveDefaultMode === 'auto' ||
       (effectiveDefaultMode != null && effectiveDefaultMode !== 'auto' && !hasSkipAfterClear)
 
     if (shouldMarkComplete) {

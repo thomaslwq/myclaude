@@ -145,7 +145,7 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
-  it('should clear skipAutoPermissionPrompt if defaultMode is auto', async () => {
+  it('should NOT mark migration as complete if defaultMode is auto and clearing fails', async () => {
     mockGetSettingsForSource.mockImplementation((source: string) => {
       if (source === 'userSettings') return {
         skipAutoPermissionPrompt: true,
@@ -155,6 +155,8 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
       return null
     })
     mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'auto' } })
+    // updateSettingsForSource silently fails to actually clear the flag
+    mockUpdateSettingsForSource.mockImplementation(async () => {})
 
     await resetAutoModeOptInForDefaultOffer()
 
@@ -162,7 +164,8 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
       'userSettings',
       { skipAutoPermissionPrompt: undefined },
     )
-    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+    // Migration must NOT mark itself complete if clearing failed
+    expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
   })
 
   it('should handle async delayed write correctly', async () => {
