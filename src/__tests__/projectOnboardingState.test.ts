@@ -57,10 +57,11 @@ describe('projectOnboardingState', () => {
       const steps2 = getSteps()
 
       expect(steps1).toEqual(steps2)
-      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(2)
+      // No I/O on second call — cache is valid within TTL
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(1)
     })
 
-    it('should invalidate cache when directory becomes non-empty within TTL', () => {
+    it('should keep cache valid when directory becomes non-empty within TTL (no I/O)', () => {
       mockIsDirEmptySync.mockReturnValue(true)
 
       // Initial call - workspace is empty
@@ -71,18 +72,17 @@ describe('projectOnboardingState', () => {
       // Simulate files being added (directory becomes non-empty)
       mockIsDirEmptySync.mockReturnValue(false)
 
-      // Fast-forward within TTL - cache should be invalidated
+      // Fast-forward within TTL - cache should remain valid (no I/O)
       vi.advanceTimersByTime(1000)
 
       const steps2 = getSteps()
-      expect(steps2[0].isEnabled).toBe(false) // workspace step should be disabled
-      expect(steps2[1].isEnabled).toBe(true) // claude.md step should be enabled
+      expect(steps2).toEqual(steps1) // cached steps returned
 
-      // Verify isDirEmptySync was called again (cache invalidated)
-      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(3)
+      // Verify isDirEmptySync was NOT called again (cache valid, no I/O)
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(1)
     })
 
-    it('should invalidate cache when directory becomes empty within TTL', () => {
+    it('should keep cache valid when directory becomes empty within TTL (no I/O)', () => {
       mockIsDirEmptySync.mockReturnValue(false)
 
       // Initial call - workspace is not empty
@@ -93,15 +93,14 @@ describe('projectOnboardingState', () => {
       // Simulate files being removed (directory becomes empty)
       mockIsDirEmptySync.mockReturnValue(true)
 
-      // Fast-forward within TTL - cache should be invalidated
+      // Fast-forward within TTL - cache should remain valid (no I/O)
       vi.advanceTimersByTime(1000)
 
       const steps2 = getSteps()
-      expect(steps2[0].isEnabled).toBe(true) // workspace step should be enabled
-      expect(steps2[1].isEnabled).toBe(false) // claude.md step should be disabled
+      expect(steps2).toEqual(steps1) // cached steps returned
 
-      // Verify isDirEmptySync was called again (cache invalidated)
-      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(3)
+      // Verify isDirEmptySync was NOT called again (cache valid, no I/O)
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(1)
     })
 
     it('should use cached steps when directory emptiness changes but TTL is exceeded', () => {

@@ -62,33 +62,6 @@ function isCacheValid(): boolean {
     return false
   }
 
-  // Cheap mtime check: if CLAUDE.md was created/modified since we cached the
-  // steps, the cache is stale even if the TTL hasn't elapsed.
-  const cwd = getCwd()
-  const fs = getFsImplementation()
-  const claudeMdPath = join(cwd, 'CLAUDE.md')
-  const claudeMdExists = fs.existsSync(claudeMdPath)
-  let claudeMdMtime: number | null = null
-  if (claudeMdExists) {
-    claudeMdMtime = fs.statSync(claudeMdPath)?.mtimeMs ?? null
-  }
-
-  // If the file went from existing to missing (or vice versa), or its mtime
-  // changed, the cache is stale.
-  if ((cachedClaudeMdMtime === null) !== !claudeMdExists) {
-    return false
-  }
-  if (cachedClaudeMdMtime !== null && claudeMdMtime !== cachedClaudeMdMtime) {
-    return false
-  }
-
-  // Directory emptiness check: if the workspace directory became non-empty
-  // (or empty) since we cached the steps, the cache is stale.
-  const currentIsDirEmpty = isDirEmptySync(cwd)
-  if (cachedIsDirEmpty !== null && currentIsDirEmpty !== cachedIsDirEmpty) {
-    return false
-  }
-
   return true
 }
 
