@@ -32,14 +32,12 @@ export type Step = {
 
 const CACHE_TTL_MS = 5000 // 5 seconds
 let cachedSteps: Step[] | null = null
-let cachedIsDirEmpty: boolean | null = null
 let cachedStepsTimestamp: number = 0
 let cachedClaudeMdMtime: number | null = null
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
   cachedSteps = null
-  cachedIsDirEmpty = null
   cachedStepsTimestamp = 0
   cachedClaudeMdMtime = null
 }
@@ -88,8 +86,6 @@ export function getSteps(): Step[] {
   const fs = getFsImplementation()
   const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
   const isWorkspaceDirEmpty = isDirEmptySync(cwd)
-
-  cachedIsDirEmpty = isWorkspaceDirEmpty
 
   cachedStepsTimestamp = Date.now()
 

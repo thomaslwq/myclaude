@@ -6,7 +6,6 @@ const mockGetGlobalConfig = vi.fn()
 const mockSaveGlobalConfig = vi.fn()
 const mockGetSettingsForSource = vi.fn()
 const mockUpdateSettingsForSource = vi.fn()
-const mockGetInitialSettings = vi.fn()
 const mockGetAutoModeEnabledState = vi.fn()
 const mockLogEvent = vi.fn()
 const mockLogError = vi.fn()
@@ -19,7 +18,6 @@ vi.mock('../../utils/config.js', () => ({
 vi.mock('../../utils/settings/settings.js', () => ({
   getSettingsForSource: (...args: any[]) => mockGetSettingsForSource(...args),
   updateSettingsForSource: (...args: any[]) => mockUpdateSettingsForSource(...args),
-  getInitialSettings: (...args: any[]) => mockGetInitialSettings(...args),
 }))
 
 vi.mock('../../utils/permissions/permissionSetup.js', () => ({
@@ -42,7 +40,6 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     mockGetAutoModeEnabledState.mockReturnValue('enabled')
     mockGetGlobalConfig.mockReturnValue({ hasResetAutoModeOptInForDefaultOffer: false })
-    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
     mockSaveGlobalConfig.mockImplementation(async (fn: any) => fn({}))
     mockUpdateSettingsForSource.mockImplementation(async () => {})
     // Default: no skipAutoPermissionPrompt set in any source
@@ -154,7 +151,6 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
       if (source === 'projectSettings') return {}
       return null
     })
-    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'auto' } })
     // updateSettingsForSource silently fails to actually clear the flag
     mockUpdateSettingsForSource.mockImplementation(async () => {})
 

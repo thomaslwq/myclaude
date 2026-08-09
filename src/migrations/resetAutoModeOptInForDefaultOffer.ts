@@ -4,7 +4,6 @@ import { logError } from '../utils/log.js'
 import { getAutoModeEnabledState } from '../utils/permissions/permissionSetup.js'
 import {
   getSettingsForSource,
-  getInitialSettings,
   updateSettingsForSource,
 } from '../utils/settings/settings.js'
 import { resetSettingsCache } from '../utils/settings/settingsCache.js'
@@ -41,10 +40,6 @@ export async function resetAutoModeOptInForDefaultOffer(): Promise<void> {
     const hasSkipInEditableSources = sourcesToCheck.some(
       source => getSettingsForSource(source)?.skipAutoPermissionPrompt === true,
     )
-
-    // Check the effective defaultMode from merged settings (highest-priority wins)
-    const effectiveSettings = getInitialSettings()
-    const effectiveDefaultMode = effectiveSettings?.permissions?.defaultMode
 
     // Tracks whether any editable source still has the flag after a clear attempt.
     // Declared outside the if block so the completion check below can see it.
