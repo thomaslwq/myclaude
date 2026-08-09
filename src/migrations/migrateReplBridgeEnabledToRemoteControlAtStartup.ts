@@ -14,10 +14,10 @@ import { saveGlobalConfig } from '../utils/config.js'
  * may be truncated but the backup mechanism in saveConfigWithLock prevents
  * data loss. On next startup, the migration will be idempotent.
  */
-export function migrateReplBridgeEnabledToRemoteControlAtStartup(): void {
+export async function migrateReplBridgeEnabledToRemoteControlAtStartup(): Promise<void> {
   // Single atomic write: add the new key and remove the old key in one operation.
   // This eliminates the race window between two separate writes.
-  saveGlobalConfig(prev => {
+  await saveGlobalConfig(prev => {
     const oldValue = (prev as Record<string, unknown>)['replBridgeEnabled']
     if (oldValue === undefined) return prev
     if (prev.remoteControlAtStartup !== undefined) return prev

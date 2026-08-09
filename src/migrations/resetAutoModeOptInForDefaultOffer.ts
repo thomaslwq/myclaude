@@ -30,7 +30,7 @@ import {
  * because it was a hardcoded `false` fallback that made the migration dead code
  * outside of Bun's compile-time macro system.
  */
-export function resetAutoModeOptInForDefaultOffer(): void {
+export async function resetAutoModeOptInForDefaultOffer(): Promise<void> {
   const config = getGlobalConfig()
   if (config.hasResetAutoModeOptInForDefaultOffer) return
   if (getAutoModeEnabledState() !== 'enabled') return
@@ -59,7 +59,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
       for (const source of sourcesToCheck) {
         const settings = getSettingsForSource(source)
         if (settings?.skipAutoPermissionPrompt === true) {
-          updateSettingsForSource(source, {
+          await updateSettingsForSource(source, {
             skipAutoPermissionPrompt: undefined,
           })
         }
@@ -101,7 +101,7 @@ export function resetAutoModeOptInForDefaultOffer(): void {
       (effectiveDefaultMode != null && effectiveDefaultMode !== 'auto' && !hasSkipAfterClear)
 
     if (shouldMarkComplete) {
-      saveGlobalConfig(c => {
+      await saveGlobalConfig(c => {
         if (c.hasResetAutoModeOptInForDefaultOffer) return c
         return { ...c, hasResetAutoModeOptInForDefaultOffer: true }
       })

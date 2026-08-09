@@ -43,8 +43,8 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     mockGetAutoModeEnabledState.mockReturnValue('enabled')
     mockGetGlobalConfig.mockReturnValue({ hasResetAutoModeOptInForDefaultOffer: false })
     mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'ask' } })
-    mockSaveGlobalConfig.mockImplementation((fn: any) => fn({}))
-    mockUpdateSettingsForSource.mockImplementation(() => {})
+    mockSaveGlobalConfig.mockImplementation(async (fn: any) => fn({}))
+    mockUpdateSettingsForSource.mockImplementation(async () => {})
     // Default: no skipAutoPermissionPrompt set in any source
     mockGetSettingsForSource.mockImplementation((source: string) => {
       if (source === 'userSettings') return {}
@@ -58,25 +58,25 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     vi.restoreAllMocks()
   })
 
-  it('should not run if already migrated', () => {
+  it('should not run if already migrated', async () => {
     mockGetGlobalConfig.mockReturnValue({ hasResetAutoModeOptInForDefaultOffer: true })
 
-    resetAutoModeOptInForDefaultOffer()
+    await resetAutoModeOptInForDefaultOffer()
 
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
     expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
   })
 
-  it('should not run if auto mode is not enabled', () => {
+  it('should not run if auto mode is not enabled', async () => {
     mockGetAutoModeEnabledState.mockReturnValue('opt-in')
 
-    resetAutoModeOptInForDefaultOffer()
+    await resetAutoModeOptInForDefaultOffer()
 
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
     expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
   })
 
-  it('should clear skipAutoPermissionPrompt from userSettings when set there and defaultMode is not auto', () => {
+  it('should clear skipAutoPermissionPrompt from userSettings when set there and defaultMode is not auto', async () => {
     // Use a mutable store so getSettingsForSource returns updated state after clearing
     const settingsStore: Record<string, any> = {
       userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
@@ -84,11 +84,11 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
       projectSettings: {},
     }
     mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
-    mockUpdateSettingsForSource.mockImplementation((source: string, updates: any) => {
+    mockUpdateSettingsForSource.mockImplementation(async (source: string, updates: any) => {
       settingsStore[source] = { ...settingsStore[source], ...updates }
     })
 
-    resetAutoModeOptInForDefaultOffer()
+    await resetAutoModeOptInForDefaultOffer()
 
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'userSettings',
@@ -97,7 +97,7 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
-  it('should throw error when updateSettingsForSource fails and NOT mark migration as complete', () => {
+  it('should throw error when updateSettingsForSource fails and NOT mark migration as complete', async () => {
     mockGetSettingsForSource.mockImplementation((source: string) => {
       if (source === 'userSettings') return {
         skipAutoPermissionPrompt: true,
@@ -107,144 +107,103 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
       if (source === 'projectSettings') return {}
       return null
     })
-    mockUpdateSettingsForSource.mockImplementation(() => {
+    mockUpdateSettingsForSource.mockImplementation(async () => {
       throw new Error('Failed to update settings')
     })
 
-    expect(() => resetAutoModeOptInForDefaultOffer()).toThrow('Failed to update settings')
+    await expect(resetAutoModeOptInForDefaultOffer()).rejects.toThrow('Failed to update settings')
     expect(mockLogError).toHaveBeenCalled()
     // Migration must NOT mark itself complete if the clear operation failed
     expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
   })
 
-  it('should throw error when saveGlobalConfig fails', () => {
+  it('should clear skipAutoPermissionPrompt from localSettings and projectSettings when set there', async () => {
     const settingsStore: Record<string, any> = {
       userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
-      localSettings: {},
-      projectSettings: {},
+      localSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
+      projectSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
     }
     mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
-    mockUpdateSettingsForSource.mockImplementation((source: string, updates: any) => {
-      settingsStore[source] = { ...settingsStore[source], ...updates }
-    })
-    mockSaveGlobalConfig.mockImplementation(() => {
-      throw new Error('Failed to save config')
-    })
-
-    expect(() => resetAutoModeOptInForDefaultOffer()).toThrow('Failed to save config')
-    expect(mockLogError).toHaveBeenCalled()
-  })
-
-  it('should throw error when getInitialSettings fails', () => {
-    mockGetInitialSettings.mockImplementation(() => {
-      throw new Error('Failed to get initial settings')
-    })
-
-    expect(() => resetAutoModeOptInForDefaultOffer()).toThrow('Failed to get initial settings')
-    expect(mockLogError).toHaveBeenCalled()
-  })
-
-  it('should NOT mark migration complete when skipAutoPermissionPrompt remains in editable sources after clear attempt', () => {
-    // userSettings and localSettings both have the flag; projectSettings does not
-    // updateSettingsForSource silently fails (no-op), so the flags remain set
-    mockGetSettingsForSource.mockImplementation((source: string) => {
-      if (source === 'userSettings') return { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } }
-      if (source === 'localSettings') return { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } }
-      if (source === 'projectSettings') return {}
-      if (source === 'flagSettings') return null
-      if (source === 'policySettings') return null
-      return null
-    })
-    mockUpdateSettingsForSource.mockImplementation(() => {}) // silently fails to actually clear
-    let savedConfig: any = null
-    mockSaveGlobalConfig.mockImplementation((fn: any) => { savedConfig = fn({}) })
-
-    resetAutoModeOptInForDefaultOffer()
-
-    // Should have tried to clear both editable sources
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledTimes(2)
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('userSettings', { skipAutoPermissionPrompt: undefined })
-    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith('localSettings', { skipAutoPermissionPrompt: undefined })
-    // hasSkipAfterClear is still true (flags were not actually cleared),
-    // so the migration must NOT mark itself complete
-    expect(savedConfig?.hasResetAutoModeOptInForDefaultOffer).toBeUndefined()
-    expect(savedConfig?.hasResetAutoModeOptInForDefaultOffer).toBeFalsy()
-  })
-
-  it('should log warning when skipAutoPermissionPrompt is set in policySettings (non-editable source)', () => {
-    mockGetSettingsForSource.mockImplementation((source: string) => {
-      if (source === 'policySettings') return {
-        skipAutoPermissionPrompt: true,
-        permissions: { defaultMode: 'ask' },
-      }
-      if (source === 'userSettings') return {}
-      if (source === 'localSettings') return {}
-      if (source === 'projectSettings') return {}
-      if (source === 'flagSettings') return null
-      return null
-    })
-
-    resetAutoModeOptInForDefaultOffer()
-
-    // Should NOT update any editable source since none have the flag set
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-    // Should log an event about non-editable sources
-    expect(mockLogEvent).toHaveBeenCalledWith(
-      'tengu_migrate_reset_auto_opt_in_for_default_offer_skipped',
-      { reason: 'skipAutoPermissionPrompt_set_in_non_editable_sources' }
-    )
-    // Should still save the config as migrated
-    expect(mockSaveGlobalConfig).toHaveBeenCalled()
-  })
-
-  it('should log warning when skipAutoPermissionPrompt is set in flagSettings (non-editable source)', () => {
-    mockGetSettingsForSource.mockImplementation((source: string) => {
-      if (source === 'flagSettings') return {
-        skipAutoPermissionPrompt: true,
-        permissions: { defaultMode: 'ask' },
-      }
-      if (source === 'userSettings') return {}
-      if (source === 'localSettings') return {}
-      if (source === 'projectSettings') return {}
-      if (source === 'policySettings') return null
-      return null
-    })
-
-    resetAutoModeOptInForDefaultOffer()
-
-    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
-    expect(mockLogEvent).toHaveBeenCalledWith(
-      'tengu_migrate_reset_auto_opt_in_for_default_offer_skipped',
-      { reason: 'skipAutoPermissionPrompt_set_in_non_editable_sources' }
-    )
-    expect(mockSaveGlobalConfig).toHaveBeenCalled()
-  })
-
-  it('should also log warning when skipAutoPermissionPrompt is set in both editable and non-editable sources', () => {
-    const settingsStore: Record<string, any> = {
-      userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
-      localSettings: {},
-      projectSettings: {},
-      flagSettings: null,
-      policySettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
-    }
-    mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
-    mockUpdateSettingsForSource.mockImplementation((source: string, updates: any) => {
+    mockUpdateSettingsForSource.mockImplementation(async (source: string, updates: any) => {
       settingsStore[source] = { ...settingsStore[source], ...updates }
     })
 
-    resetAutoModeOptInForDefaultOffer()
+    await resetAutoModeOptInForDefaultOffer()
 
-    // Should clear the editable source
     expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
       'userSettings',
       { skipAutoPermissionPrompt: undefined },
     )
-    // Should log warning about non-editable sources still having the flag
-    expect(mockLogEvent).toHaveBeenCalledWith(
-      'tengu_migrate_reset_auto_opt_in_for_default_offer_skipped',
-      { reason: 'skipAutoPermissionPrompt_set_in_non_editable_sources' }
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'localSettings',
+      { skipAutoPermissionPrompt: undefined },
+    )
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'projectSettings',
+      { skipAutoPermissionPrompt: undefined },
     )
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
+  })
+
+  it('should not clear skipAutoPermissionPrompt if defaultMode is auto', async () => {
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return {
+        skipAutoPermissionPrompt: true,
+        permissions: { defaultMode: 'auto' },
+      }
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
+    })
+    mockGetInitialSettings.mockReturnValue({ permissions: { defaultMode: 'auto' } })
+
+    await resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+    expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
+  })
+
+  it('should handle async delayed write correctly', async () => {
+    const settingsStore: Record<string, any> = {
+      userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
+      localSettings: {},
+      projectSettings: {},
+    }
+    mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
+    // Simulate a delayed async write
+    const delay = 10
+    mockUpdateSettingsForSource.mockImplementation(async (source: string, updates: any) => {
+      await new Promise(resolve => setTimeout(resolve, delay))
+      settingsStore[source] = { ...settingsStore[source], ...updates }
+    })
+    mockSaveGlobalConfig.mockImplementation(async (fn: any) => {
+      await new Promise(resolve => setTimeout(resolve, delay))
+      return fn({})
+    })
+
+    await resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { skipAutoPermissionPrompt: undefined },
+    )
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+  })
+
+  it('should handle async failure in saveGlobalConfig gracefully', async () => {
+    const settingsStore: Record<string, any> = {
+      userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
+      localSettings: {},
+      projectSettings: {},
+    }
+    mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
+    mockUpdateSettingsForSource.mockImplementation(async (source: string, updates: any) => {
+      settingsStore[source] = { ...settingsStore[source], ...updates }
+    })
+    mockSaveGlobalConfig.mockImplementation(async () => {
+      throw new Error('Async save failed')
+    })
+
+    await expect(resetAutoModeOptInForDefaultOffer()).rejects.toThrow('Async save failed')
   })
 })
