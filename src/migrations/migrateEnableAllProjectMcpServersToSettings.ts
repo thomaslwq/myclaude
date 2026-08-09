@@ -33,6 +33,12 @@ import {
  * the fields only exist in settings, which is also safe because the migration will re-run and
  * find no fields to migrate. No rollback mechanism is needed because the operation is
  * idempotent and safe in partial completion.
+ *
+ * Additional safety: Steps 2 and 3 are wrapped in try-catch with error logging to ensure
+ * that if `saveCurrentProjectConfig` or `saveGlobalConfig` fails (e.g., disk full, permission
+ * error), the migration is not marked as complete. On next startup, the migration will re-run
+ * and attempt recovery. This prevents the migration from being marked as complete when not
+ * all steps have succeeded, avoiding potential data corruption from partial writes.
  */
 export function migrateEnableAllProjectMcpServersToSettings(): void {
   // Check if migration has already completed successfully
@@ -134,18 +140,31 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
     throw error
   }
 
-  // Step 2: Remove migrated fields from project config
+  // Step 2: Remove migrated fields from project config (atomic write)
   // If this fails, the fields exist in both places (harmless, migration is idempotent).
-  saveCurrentProjectConfig((config: Record<string, any>) => {
-    const updated = { ...config }
-    delete updated.enableAllProjectMcpServers
-    delete updated.enabledMcpjsonServers
-    delete updated.disabledMcpjsonServers
-    return updated
-  })
+  // However, if saveCurrentProjectConfig partially writes (non-atomic fallback), the
+  // project config could be corrupted. Wrapping in try-catch ensures the migration is
+  // not marked as complete, so it will re-run on next startup and attempt recovery.
+  try {
+    saveCurrentProjectConfig((config: Record<string, any>) => {
+      const updated = { ...config }
+      delete updated.enableAllProjectMcpServers
+      delete updated.enabledMcpjsonServers
+      delete updated.disabledMcpjsonServers
+      return updated
+    })
+  } catch (error) {
+    logError(new Error(`Failed to remove migrated MCP server fields from project config: ${error}`))
+    throw error
+  }
 
   // Step 3: Mark migration as completed in global config
-  saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
+  try {
+    saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
+  } catch (error) {
+    logError(new Error(`Failed to mark MCP server migration as completed: ${error}`))
+    throw error
+  }
 
   logEvent('tengu_migrate_enable_all_project_mcp_servers_to_settings', {
     migration: 'enableAllProjectMcpServersToSettings',
