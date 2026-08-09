@@ -119,8 +119,10 @@ export function topologicalSort(migrations: Migration[]): Migration[] {
   }
 
   const sorted: Migration[] = []
-  while (queue.length > 0) {
-    const name = queue.shift()!
+  let queueIndex = 0
+  while (queueIndex < queue.length) {
+    const name = queue[queueIndex]!
+    queueIndex++
     const migration = nameToMigration.get(name)!
     sorted.push(migration)
 
