@@ -97,7 +97,7 @@ export async function resetAutoModeOptInForDefaultOffer(): Promise<void> {
     // we must NOT mark it complete so the migration can be re-run.
     const shouldMarkComplete =
       !hasSkipInEditableSources ||
-      (effectiveDefaultMode != null && effectiveDefaultMode !== 'auto' && !hasSkipAfterClear)
+      !hasSkipAfterClear
 
     if (shouldMarkComplete) {
       await saveGlobalConfig(c => {

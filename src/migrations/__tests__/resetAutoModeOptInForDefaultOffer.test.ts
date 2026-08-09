@@ -168,6 +168,27 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).not.toHaveBeenCalled()
   })
 
+  it('should mark migration as complete if defaultMode is auto and clearing succeeds', async () => {
+    const settingsStore: Record<string, any> = {
+      userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'auto' } },
+      localSettings: {},
+      projectSettings: {},
+    }
+    mockGetSettingsForSource.mockImplementation((source: string) => settingsStore[source] ?? null)
+    mockUpdateSettingsForSource.mockImplementation(async (source: string, updates: any) => {
+      settingsStore[source] = { ...settingsStore[source], ...updates }
+    })
+
+    await resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { skipAutoPermissionPrompt: undefined },
+    )
+    // Migration should mark itself complete when clearing succeeds, even for auto mode users
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+  })
+
   it('should handle async delayed write correctly', async () => {
     const settingsStore: Record<string, any> = {
       userSettings: { skipAutoPermissionPrompt: true, permissions: { defaultMode: 'ask' } },
