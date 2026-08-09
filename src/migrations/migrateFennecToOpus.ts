@@ -43,13 +43,13 @@ export function migrateFennecToOpus(): void {
       // Case-insensitive matching is intentional; both lowercase and uppercase suffixes are preserved.
       // Use * to match zero or more suffixes (multiple suffixes are allowed).
       // Non-capturing group: actual suffixes are extracted separately below.
-      const fennecFastLatestMatch = model.match(/^fennec-fast-latest(?:\[\d+[km]\])*$/i)
-      const opus45FastMatch = model.match(/^opus-4-5-fast(?:\[\d+[km]\])*$/i)
-      const fennecLatestMatch = model.match(/^fennec-latest(?:\[\d+[km]\])*$/i)
+      const fennecFastLatestMatch = model.match(/^fennec-fast-latest(?:\[\d+[kKmM]\])*$/i)
+      const opus45FastMatch = model.match(/^opus-4-5-fast(?:\[\d+[kKmM]\])*$/i)
+      const fennecLatestMatch = model.match(/^fennec-latest(?:\[\d+[kKmM]\])*$/i)
 
       if (fennecFastLatestMatch || opus45FastMatch) {
         // Extract all suffixes (e.g., [1m][200k])
-        const suffixTokens = model.match(/\[\d+[km]\]/gi)
+        const suffixTokens = model.match(/\[\d+[kKmM]\]/gi)
         const suffix = suffixTokens ? suffixTokens.join('') : ''
         // Preserve the existing fastMode setting if it exists, otherwise omit it
         // to avoid overwriting the implicit default behavior
@@ -63,7 +63,7 @@ export function migrateFennecToOpus(): void {
         updateSettingsForSource(source, update)
       } else if (fennecLatestMatch) {
         // Extract all suffixes (e.g., [1m][200k])
-        const suffixTokens = model.match(/\[\d+[km]\]/gi)
+        const suffixTokens = model.match(/\[\d+[kKmM]\]/gi)
         const suffix = suffixTokens ? suffixTokens.join('') : ''
         updateSettingsForSource(source, {
           model: `opus${suffix}`,
