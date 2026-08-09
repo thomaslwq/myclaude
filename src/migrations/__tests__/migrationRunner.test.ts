@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'bun:test'
-import { runMigrationSafe, runMigrationsSafe, type Migration, type MigrationFunction } from '../migrationRunner'
+import { runMigrationsSafe, type Migration, type MigrationFunction } from '../migrationRunner'
 
 // Mock dependencies
 const mockLogError = vi.fn()
@@ -16,86 +16,6 @@ vi.mock('../../services/analytics/index.js', () => ({
 beforeEach(() => {
   mockLogError.mockClear()
   mockLogEvent.mockClear()
-})
-
-describe('runMigrationSafe', () => {
-  it('should return success when migration runs without error', async () => {
-    const migration = () => {
-      // No-op migration
-    }
-
-    const result = await runMigrationSafe('testMigration', migration)
-
-    expect(result.success).toBe(true)
-    expect(result.error).toBeUndefined()
-    expect(result.migrationName).toBe('testMigration')
-    expect(mockLogError).not.toHaveBeenCalled()
-    expect(mockLogEvent).not.toHaveBeenCalled()
-  })
-
-  it('should return failure and log error when migration throws', async () => {
-    const errorMessage = 'Test error'
-    const migration = () => {
-      throw new Error(errorMessage)
-    }
-
-    const result = await runMigrationSafe('testMigration', migration)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe(errorMessage)
-    expect(result.migrationName).toBe('testMigration')
-    expect(mockLogError).toHaveBeenCalled()
-    expect(mockLogEvent).toHaveBeenCalledWith('tengu_migration_failed', {
-      migration: 'testMigration',
-      error: errorMessage,
-    })
-  })
-
-  it('should handle non-Error throws', async () => {
-    const errorMessage = 'Test error'
-    const migration = () => {
-      throw errorMessage
-    }
-
-    const result = await runMigrationSafe('testMigration', migration)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe(errorMessage)
-  })
-
-  it('should handle async migrations', async () => {
-    const runOrder: string[] = []
-    const migration = async () => {
-      runOrder.push('testMigration')
-    }
-
-    const result = await runMigrationSafe('testMigration', migration)
-
-    expect(result.success).toBe(true)
-    expect(result.error).toBeUndefined()
-    expect(result.migrationName).toBe('testMigration')
-    expect(runOrder).toEqual(['testMigration'])
-    expect(mockLogError).not.toHaveBeenCalled()
-    expect(mockLogEvent).not.toHaveBeenCalled()
-  })
-
-  it('should handle async migrations that throw', async () => {
-    const errorMessage = 'Async error'
-    const migration = async () => {
-      throw new Error(errorMessage)
-    }
-
-    const result = await runMigrationSafe('testMigration', migration)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe(errorMessage)
-    expect(result.migrationName).toBe('testMigration')
-    expect(mockLogError).toHaveBeenCalled()
-    expect(mockLogEvent).toHaveBeenCalledWith('tengu_migration_failed', {
-      migration: 'testMigration',
-      error: errorMessage,
-    })
-  })
 })
 
 describe('runMigrationsSafe', () => {

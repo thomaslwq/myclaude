@@ -36,32 +36,6 @@ export interface Migration {
 }
 
 /**
- * Runs a migration with error handling.
- * Logs errors but does not throw, allowing subsequent migrations to run.
- */
-export async function runMigrationSafe(
-  name: string,
-  migration: MigrationFunction,
-): Promise<MigrationResult> {
-  try {
-    const result = migration()
-    if (result instanceof Promise) {
-      await result
-    }
-    return { success: true, migrationName: name }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    logError(new Error(`Migration '${name}' failed: ${errorMessage}`))
-    logEvent('tengu_migration_failed', { migration: name, error: errorMessage })
-    return {
-      success: false,
-      error: errorMessage,
-      migrationName: name,
-    }
-  }
-}
-
-/**
  * Topologically sort migrations based on their dependency declarations.
  * Throws if a circular dependency is detected.
  */
