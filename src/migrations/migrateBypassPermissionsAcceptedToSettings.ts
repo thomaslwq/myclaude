@@ -12,7 +12,7 @@ import {
  * as skipDangerousModePermissionPrompt. This is a better home since settings.json
  * is the user-configurable settings file.
  */
-export function migrateBypassPermissionsAcceptedToSettings(): void {
+export async function migrateBypassPermissionsAcceptedToSettings(): Promise<void> {
   const globalConfig = getGlobalConfig()
 
   if (!globalConfig.bypassPermissionsModeAccepted) {
@@ -29,9 +29,12 @@ export function migrateBypassPermissionsAcceptedToSettings(): void {
         getSettingsForSource('policySettings')?.skipDangerousModePermissionPrompt === false
 
       if (!userExplicitlyOptedOut) {
-        updateSettingsForSource('userSettings', {
+        const result = updateSettingsForSource('userSettings', {
           skipDangerousModePermissionPrompt: true,
         })
+        if (result.error) {
+          throw result.error
+        }
       }
     }
 
