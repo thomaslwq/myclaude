@@ -19,7 +19,7 @@ import {
  *
  * Idempotent: only writes when a source contains a fennec alias.
  */
-export function migrateFennecToOpus(): void {
+export async function migrateFennecToOpus(): Promise<void> {
   try {
     if (getAPIProvider() !== 'firstParty') {
       return
@@ -60,12 +60,12 @@ export function migrateFennecToOpus(): void {
         if (existingFastMode !== undefined) {
           update.fastMode = existingFastMode
         }
-        updateSettingsForSource(source, update)
+        await updateSettingsForSource(source, update)
       } else if (fennecLatestMatch) {
         // Extract all suffixes (e.g., [1m][200k])
         const suffixTokens = model.match(/\[\d+[kKmM]\]/gi)
         const suffix = suffixTokens ? suffixTokens.join('') : ''
-        updateSettingsForSource(source, {
+        await updateSettingsForSource(source, {
           model: `opus${suffix}`,
         })
       }
