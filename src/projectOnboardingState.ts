@@ -62,6 +62,20 @@ function isCacheValid(): boolean {
     return false
   }
 
+  // Check if CLAUDE.md mtime has changed (manual creation/editing)
+  const cwd = getCwd()
+  const fs = getFsImplementation()
+  const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
+  if (hasClaudeMd) {
+    const currentMtime = fs.statSync(join(cwd, 'CLAUDE.md'))?.mtimeMs ?? null
+    if (currentMtime !== cachedClaudeMdMtime) {
+      return false
+    }
+  } else if (cachedClaudeMdMtime !== null) {
+    // CLAUDE.md was deleted
+    return false
+  }
+
   return true
 }
 

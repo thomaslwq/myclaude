@@ -103,24 +103,64 @@ describe('projectOnboardingState', () => {
       expect(mockIsDirEmptySync).toHaveBeenCalledTimes(1)
     })
 
-    it('should use cached steps when directory emptiness changes but TTL is exceeded', () => {
-      mockIsDirEmptySync.mockReturnValue(true)
-
-      // Initial call
-      const steps1 = getSteps()
-
-      // Simulate files being added
+    it('should invalidate cache when CLAUDE.md mtime changes', () => {
       mockIsDirEmptySync.mockReturnValue(false)
+      mockExistsSync.mockReturnValue(true)
 
-      // Fast-forward past TTL - cache should be invalidated by TTL, not by directory check
-      vi.advanceTimersByTime(5001)
+      const initialMtime = Date.now()
+      mockStatSync.mockReturnValue({ mtimeMs: initialMtime })
 
+      // Initial call - CLAUDE.md exists
+      const steps1 = getSteps()
+      expect(steps1[0].isEnabled).toBe(false) // workspace step disabled
+      expect(steps1[1].isEnabled).toBe(true) // claude.md step enabled
+
+      // Simulate CLAUDE.md being edited (mtime changes)
+      const newMtime = initialMtime + 1000
+      mockStatSync.mockReturnValue({ mtimeMs: newMtime })
+
+      // Cache should be invalidated due to mtime change, causing I/O
       const steps2 = getSteps()
-      expect(steps2[0].isEnabled).toBe(false) // workspace step disabled
-      expect(steps2[1].isEnabled).toBe(true) // claude.md step enabled
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(2) // I/O occurred
+    })
 
-      // Verify isDirEmptySync was called again (TTL expired)
-      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(2)
+    it('should invalidate cache when CLAUDE.md is created', () => {
+      mockIsDirEmptySync.mockReturnValue(true)
+      mockExistsSync.mockReturnValue(false) // No CLAUDE.md initially
+
+      // Initial call - no CLAUDE.md
+      const steps1 = getSteps()
+      expect(steps1[0].isEnabled).toBe(true) // workspace step enabled
+      expect(steps1[1].isEnabled).toBe(false) // claude.md step disabled
+
+      // Simulate CLAUDE.md being created
+      mockExistsSync.mockReturnValue(true)
+      const newMtime = Date.now()
+      mockStatSync.mockReturnValue({ mtimeMs: newMtime })
+
+      // Cache should be invalidated due to CLAUDE.md creation
+      const steps2 = getSteps()
+      expect(steps2).not.toEqual(steps1) // new steps returned
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(2) // I/O occurred
+    })
+
+    it('should invalidate cache when CLAUDE.md is deleted', () => {
+      mockIsDirEmptySync.mockReturnValue(false)
+      mockExistsSync.mockReturnValue(true)
+      mockStatSync.mockReturnValue({ mtimeMs: Date.now() })
+
+      // Initial call - CLAUDE.md exists
+      const steps1 = getSteps()
+      expect(steps1[0].isEnabled).toBe(false) // workspace step disabled
+      expect(steps1[1].isEnabled).toBe(true) // claude.md step enabled
+
+      // Simulate CLAUDE.md being deleted
+      mockExistsSync.mockReturnValue(false)
+
+      // Cache should be invalidated due to CLAUDE.md deletion
+      const steps2 = getSteps()
+      expect(steps2).not.toEqual(steps1) // new steps returned
+      expect(mockIsDirEmptySync).toHaveBeenCalledTimes(2) // I/O occurred
     })
   })
 })
