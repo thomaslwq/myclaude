@@ -30,7 +30,7 @@ export async function migrateReplBridgeEnabledToRemoteControlAtStartup(): Promis
         ? !falsyValues.includes(oldValue.toLowerCase().trim())
         : typeof oldValue === 'boolean'
           ? oldValue
-          : false
+          : !!oldValue
     const { replBridgeEnabled: _unused, ...rest } = prev
     const next = { ...rest, remoteControlAtStartup: newValue }
     return next

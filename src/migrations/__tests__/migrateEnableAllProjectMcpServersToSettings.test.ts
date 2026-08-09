@@ -78,7 +78,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that only enableAllProjectMcpServers was removed, and empty arrays are also cleaned up
     expect(projectConfigStore).toEqual({
@@ -106,7 +106,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       otherField: 'keep-me',
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(projectConfigStore).toEqual({
       otherField: 'keep-me',
@@ -133,7 +133,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       enabledMcpjsonServers: ['existing2', 'new1', 'existing1', 'new2'],
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existing1', 'existing2', 'new1', 'new2'])
 
@@ -153,7 +153,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       disabledMcpjsonServers: ['existing2', 'new1', 'existing1', 'new2'],
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(settingsStore.localSettings.disabledMcpjsonServers).toEqual(['existing1', 'existing2', 'new1', 'new2'])
 
@@ -178,7 +178,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that 'existingEnabled' is preserved in the disabled list (user intent is not overridden)
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existingEnabled', 'otherEnabled', 'newEnabled'])
@@ -201,7 +201,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that 'serverA' is preserved in the disabled list (user intent is not overridden)
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['serverA', 'serverB', 'serverC'])
@@ -224,7 +224,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that 'serverA' is preserved in the disabled list (user intent is not overridden)
     // 'serverC' stays in disabled list as it's not in enabled list
@@ -249,7 +249,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that 'serverA' is preserved in the disabled list (user intent is not overridden)
     // 'serverC' and 'serverE' stay in disabled list
@@ -270,7 +270,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       enabledMcpjsonServers: ['new1'],
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(settingsStore.localSettings.existingField).toBe('keep-me')
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existing1', 'new1'])
@@ -288,7 +288,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       enabledMcpjsonServers: [],
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Empty array is treated as no-op - existing settings should be preserved
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existing1'])
@@ -302,7 +302,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       disabledMcpjsonServers: ['server1', 'server2'],
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(settingsStore.localSettings.disabledMcpjsonServers).toEqual(['server1', 'server2'])
     expect(projectConfigStore).toEqual({})
@@ -316,7 +316,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       enabledMcpjsonServers: ['server1', 'server2'],
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['server1', 'server2'])
     expect(projectConfigStore).toEqual({})
@@ -331,7 +331,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       disabledMcpjsonServers: ['serverA', 'serverC'],
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['serverA', 'serverB'])
     expect(settingsStore.localSettings.disabledMcpjsonServers).toEqual(['serverA', 'serverC'])
@@ -345,7 +345,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       enableAllProjectMcpServers: true,
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(settingsStore.localSettings.enableAllProjectMcpServers).toBe(true)
     expect(projectConfigStore).toEqual({})
@@ -359,7 +359,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       enableAllProjectMcpServers: false,
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(settingsStore.localSettings.enableAllProjectMcpServers).toBe(false)
     expect(projectConfigStore).toEqual({})
@@ -373,7 +373,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       otherField: 'keep-me',
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(projectConfigStore).toEqual({ otherField: 'keep-me' })
     expect(globalConfigStore.hasCompletedMcpServerMigration).toBe(true)
@@ -388,7 +388,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       enabledMcpjsonServers: ['server1'],
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // enableAllProjectMcpServers is undefined, so it should not be migrated
     expect(settingsStore.localSettings.enableAllProjectMcpServers).toBeUndefined()
@@ -405,7 +405,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
       enabledMcpjsonServers: null,
     }
 
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // null is not undefined, so enableAllProjectMcpServers should be migrated
     expect(settingsStore.localSettings.enableAllProjectMcpServers).toBeNull()
@@ -430,7 +430,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that nothing is modified
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existing1'])
@@ -452,7 +452,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that only valid values are merged
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['existing1', 'valid1', 'valid2'])
@@ -469,7 +469,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that the overlapping server 'serverA' is preserved in the disabled list
     // (user intent is not overridden)
@@ -497,7 +497,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that only the completion event was logged
     expect(logEventMock).toHaveBeenCalledTimes(1)
@@ -536,7 +536,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }))
 
     // Run migration - should throw
-    expect(() => migrateEnableAllProjectMcpServersToSettings()).toThrow('Disk full')
+    await expect(migrateEnableAllProjectMcpServersToSettings()).rejects.toThrow('Disk full')
 
     // Verify that updateSettingsForSource was called only once
     expect(updateSettingsCallCount).toBe(1)
@@ -595,7 +595,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }))
 
     // Run migration - should throw
-    expect(() => migrateEnableAllProjectMcpServersToSettings()).toThrow('Permission denied')
+    await expect(migrateEnableAllProjectMcpServersToSettings()).rejects.toThrow('Permission denied')
 
     // Verify that saveCurrentProjectConfig was called once
     expect(saveProjectConfigCallCount).toBe(1)
@@ -648,7 +648,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }))
 
     // Run migration - should throw
-    expect(() => migrateEnableAllProjectMcpServersToSettings()).toThrow('Failed to save global config')
+    await expect(migrateEnableAllProjectMcpServersToSettings()).rejects.toThrow('Failed to save global config')
 
     // Verify that migration flag was NOT set
     expect(globalConfigStore.hasCompletedMcpServerMigration).toBeUndefined()
@@ -674,7 +674,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration first time
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     expect(globalConfigStore.hasCompletedMcpServerMigration).toBe(true)
     expect(settingsStore.localSettings.enableAllProjectMcpServers).toBe(true)
@@ -685,7 +685,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     logEventMock.mockClear()
 
     // Run migration second time - should do nothing
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify no additional changes or events
     expect(logEventMock).not.toHaveBeenCalled()
@@ -706,7 +706,7 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     }
 
     // Run migration
-    migrateEnableAllProjectMcpServersToSettings()
+    await migrateEnableAllProjectMcpServersToSettings()
 
     // Verify that disabledMcpjsonServers was NOT set in settings (since it didn't exist before)
     expect(settingsStore.localSettings.disabledMcpjsonServers).toBeUndefined()

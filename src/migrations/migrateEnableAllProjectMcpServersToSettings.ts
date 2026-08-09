@@ -40,7 +40,7 @@ import {
  * and attempt recovery. This prevents the migration from being marked as complete when not
  * all steps have succeeded, avoiding potential data corruption from partial writes.
  */
-export function migrateEnableAllProjectMcpServersToSettings(): void {
+export async function migrateEnableAllProjectMcpServersToSettings(): Promise<void> {
   // Check if migration has already completed successfully
   const globalConfig = getGlobalConfig()
   if (globalConfig.hasCompletedMcpServerMigration) {
@@ -56,7 +56,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
   if (!hasEnableAll && !hasEnabledServers && !hasDisabledServers) {
     // No fields to migrate, but mark as completed to avoid unnecessary checks
-    saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
+    await saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
     return
   }
 
@@ -134,7 +134,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   // This is done before removing project config fields so that if the write fails,
   // no data is lost — the original fields remain in project config.
   try {
-    updateSettingsForSource('localSettings', updates)
+    await updateSettingsForSource('localSettings', updates)
   } catch (error) {
     logError(new Error(`Failed to migrate MCP server settings to local config: ${error}`))
     throw error
@@ -146,7 +146,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   // project config could be corrupted. Wrapping in try-catch ensures the migration is
   // not marked as complete, so it will re-run on next startup and attempt recovery.
   try {
-    saveCurrentProjectConfig((config: Record<string, any>) => {
+    await saveCurrentProjectConfig((config: Record<string, any>) => {
       const updated = { ...config }
       delete updated.enableAllProjectMcpServers
       delete updated.enabledMcpjsonServers
@@ -160,7 +160,7 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
 
   // Step 3: Mark migration as completed in global config
   try {
-    saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
+    await saveGlobalConfig(c => ({ ...c, hasCompletedMcpServerMigration: true }))
   } catch (error) {
     logError(new Error(`Failed to mark MCP server migration as completed: ${error}`))
     throw error

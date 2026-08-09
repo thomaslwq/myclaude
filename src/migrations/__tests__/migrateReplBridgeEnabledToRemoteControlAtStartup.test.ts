@@ -167,7 +167,7 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle object value as false (not truthy)', async () => {
+  it('should handle object value as truthy', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -180,7 +180,7 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: { enabled: true },
     })
-    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
