@@ -6,6 +6,8 @@ import { getAPIProvider } from '../../utils/model/providers.js'
 const mockGetSettingsForSource = vi.fn()
 const mockUpdateSettingsForSource = vi.fn()
 const mockGetAPIProvider = vi.fn()
+const mockGetGlobalConfig = vi.fn()
+const mockSaveGlobalConfig = vi.fn()
 
 vi.mock('../../utils/settings/settings.js', () => ({
   getSettingsForSource: (...args: any[]) => mockGetSettingsForSource(...args),
@@ -16,9 +18,20 @@ vi.mock('../../utils/model/providers.js', () => ({
   getAPIProvider: (...args: any[]) => mockGetAPIProvider(...args),
 }))
 
+vi.mock('../../utils/config.js', () => ({
+  getGlobalConfig: (...args: any[]) => mockGetGlobalConfig(...args),
+  saveGlobalConfig: (...args: any[]) => mockSaveGlobalConfig(...args),
+}))
+
 describe('migrateFennecToOpus', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockGetGlobalConfig.mockReturnValue({})
+    mockSaveGlobalConfig.mockImplementation(
+      (updater: (current: Record<string, unknown>) => Record<string, unknown>) => {
+        updater({})
+      },
+    )
   })
 
   afterEach(() => {

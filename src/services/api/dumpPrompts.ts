@@ -30,8 +30,27 @@ function parseEventData(event: string): unknown | null {
   }
 }
 
-// Warn at module load if sensitive env vars are set
-if (process.env.USER_TYPE === 'ant' && process.env.DUMP_PROMPTS === '1') {
+/**
+ * Whether the dump-prompts debug feature is enabled.
+ *
+ * Requires an explicit opt-in (`DUMP_PROMPTS=1`) AND a non-production
+ * environment. The legacy Anthropic-internal gate (`USER_TYPE=ant`) is kept
+ * for backwards compatibility, but external users can opt in the same way by
+ * setting `MYCLAUDE_ALLOW_DUMP_PROMPTS=1` (issue #216). The production guard
+ * and the module-load warning below provide the safeguards called for by
+ * issue #179.
+ */
+function isDumpPromptsEnabled(): boolean {
+  if (process.env.NODE_ENV === 'production') return false
+  if (process.env.DUMP_PROMPTS !== '1') return false
+  return (
+    process.env.USER_TYPE === 'ant' ||
+    process.env.MYCLAUDE_ALLOW_DUMP_PROMPTS === '1'
+  )
+}
+
+// Warn at module load if the dump-prompts feature will be active
+if (isDumpPromptsEnabled()) {
   logForDebugging(
     'DUMP_PROMPTS is enabled. This will write full API payloads (including system prompts, user messages, and tool definitions) to the filesystem. This is intended for debugging only and should NOT be used in production.',
     { level: 'warn' },
@@ -142,7 +161,8 @@ export function clearAllDumpState(): void {
 }
 
 export function addApiRequestToCache(requestData: unknown): void {
-  if (process.env.USER_TYPE !== 'ant') return
+  // Only cache when the dump feature is explicitly enabled (issue #216)
+  if (!isDumpPromptsEnabled()) return
   
   // Extract only metadata to prevent sensitive data from being cached in memory
   // This protects user prompts and system instructions from being accessible
@@ -209,8 +229,8 @@ async function dumpRequest(
   // Disable in production to prevent accidental data leakage
   if (process.env.NODE_ENV === 'production') return
 
-  // Only parse and cache if USER_TYPE is ant (needed for caching or writing to disk)
-  if (process.env.USER_TYPE !== 'ant') return
+  // Only parse and cache when the dump feature is explicitly enabled
+  if (!isDumpPromptsEnabled()) return
 
   try {
     const req = jsonParse(body) as Record<string, unknown>
@@ -299,10 +319,10 @@ export function createDumpPromptsFetch(
     let timestamp: string | undefined
 
     if (init?.method === 'POST' && init.body) {
-      // Skip enqueue entirely in production or for non-ant users —
+      // Skip enqueue entirely in production or when the dump feature is off —
       // the dumpRequest function immediately returns in those cases,
       // so the enqueue would just create unnecessary overhead.
-      if (process.env.NODE_ENV !== 'production' && process.env.USER_TYPE === 'ant') {
+      if (isDumpPromptsEnabled()) {
         timestamp = new Date().toISOString()
         // Parsing + stringifying the request (system prompt + tool schemas = MBs)
         // takes hundreds of ms. Defer so it doesn't block the actual API call —
@@ -317,9 +337,9 @@ export function createDumpPromptsFetch(
     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
     const response = await globalThis.fetch(input, init)
 
-    // Save response async — require both USER_TYPE=ant and DUMP_PROMPTS=1
+    // Save response async — only when the dump feature is explicitly enabled
     // Also disable in production to prevent accidental data leakage
-    if (timestamp && response.ok && process.env.NODE_ENV !== 'production' && process.env.USER_TYPE === 'ant' && process.env.DUMP_PROMPTS === '1') {
+    if (timestamp && response.ok && isDumpPromptsEnabled()) {
       const cloned = response.clone()
       ;(async () => {
         try {

@@ -31,7 +31,18 @@
 
 ## 二、大型功能特性方案(后续迭代)
 
-以下 feature-request 均为独立大工程,本次仅给出方案,不实施:
+### 已实现(2026-08-10 第二轮)
+
+| Issue | 内容 | 状态 |
+|-------|------|------|
+| #501 / #57 | 自愈闭环:新增 `src/utils/selfHealing.ts` 的 `runAndVerify`(run→parse→fix→rerun,带尝试上限与防空转),CI 级循环已存在于 `.github/scripts/auto-fix.mjs` | ✅ 已实现 |
+| #56 | 持久会话记忆:项目已有 `src/memdir/` 记忆系统(loadMemoryPrompt/ensureMemoryDirExists/buildMemoryPrompt)与 `/memory` 命令 | ✅ 已核实覆盖 |
+| #316 | 联网搜索与文档抓取:`WebSearchTool`/`WebFetchTool` 已完整实现并注册于 `src/tools.ts` | ✅ 已核实覆盖 |
+| #97 | 多模型基准对比:新增 `scripts/benchmark.mjs`(同一任务跑多模型,输出延迟/token/成本对比表) | ✅ 已实现 |
+
+### 待实现(以下 feature 为独立大工程,方案如下)
+
+以下功能特性每个均需数小时至数天的独立开发,本次给出方案,待后续迭代实施:
 
 ### #501 / #57 自愈(Auto-Fix / Self-Healing) — priority-high
 - **方案**: 在 auto-fix workflow(已有 GitHub Actions 自动修复)之上,把"运行→解析错误→修复→重跑"闭环下沉到 Agent 工具层:新增 `run_and_verify` 工具包装测试/lint 命令,解析 stderr 产出结构化错误,回喂给模型生成补丁;补丁经 `git apply` 原子应用后重跑。

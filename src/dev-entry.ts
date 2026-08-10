@@ -11,8 +11,12 @@ applyEnvAliases()
 type MacroConfig = {
   VERSION: string
   BUILD_TIME: string
+  /** npm package name (e.g. "@funnycode/myclaude") used with `npm view`/`npm update`. */
   PACKAGE_URL: string
+  /** npm package name for the native platform package, used with `npm view`. */
   NATIVE_PACKAGE_URL: string
+  /** Valid URL for the project homepage/repository (issue #123). */
+  PACKAGE_HOMEPAGE_URL: string
   VERSION_CHANGELOG: string
   ISSUES_EXPLAINER: string
   FEEDBACK_CHANNEL: string
@@ -23,6 +27,7 @@ const defaultMacro: MacroConfig = {
   BUILD_TIME: '',
   PACKAGE_URL: pkg.name,
   NATIVE_PACKAGE_URL: pkg.name,
+  PACKAGE_HOMEPAGE_URL: 'https://github.com/thomaslwq/myclaude',
   VERSION_CHANGELOG: '',
   ISSUES_EXPLAINER:
     'file an issue at https://github.com/anthropics/claude-code/issues',

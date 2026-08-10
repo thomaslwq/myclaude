@@ -1,4 +1,5 @@
 import { logError } from '../utils/log.js'
+import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { getAPIProvider } from '../utils/model/providers.js'
 import {
   getSettingsForSource,
@@ -33,12 +34,20 @@ export function migrateFennecToOpus(): void {
       return
     }
 
+    // Completion guard (issue #299): once the migration has run and found
+    // nothing to migrate, skip re-reading/writing settings files on every
+    // startup to avoid unnecessary I/O.
+    if (getGlobalConfig().fennecToOpusMigrationComplete) {
+      return
+    }
+
     // Sources to check — in order of increasing precedence.
     // PolicySettings and flagSettings are excluded:
     // - policySettings is not user-writable and shouldn't be rewritten
     // - flagSettings is ephemeral (CLI --settings) and not stored back
     const sources = ['userSettings', 'projectSettings', 'localSettings'] as const
 
+    let anyMigrated = false
     for (const source of sources) {
       const settings = getSettingsForSource(source)
 
@@ -62,12 +71,28 @@ export function migrateFennecToOpus(): void {
           update.fastMode = existingFastMode
         }
         updateSettingsForSource(source, update)
+        anyMigrated = true
       } else if (model.startsWith('fennec-latest')) {
         const suffix = extractSuffix(model)
         updateSettingsForSource(source, {
           model: `opus${suffix}`,
         })
+        anyMigrated = true
       }
+    }
+
+    // Mark the migration complete so subsequent startups skip the scan.
+    saveGlobalConfig(current => ({
+      ...current,
+      fennecToOpusMigrationComplete: true,
+    }))
+
+    if (anyMigrated) {
+      logError(
+        new Error(
+          'Migrated fennec model aliases to opus (see migration log for details)',
+        ),
+      )
     }
   } catch (error) {
     logError(new Error(`Failed to migrate fennec to opus: ${error}`))
