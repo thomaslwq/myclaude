@@ -157,7 +157,14 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   // This is done before removing project config fields so that if the write fails,
   // no data is lost — the original fields remain in project config.
   try {
-    updateSettingsForSource('localSettings', updates)
+    // updateSettingsForSource returns { error } rather than throwing on
+    // write failures — check the return value so the migration isn't
+    // marked complete when the settings were not actually written
+    // (issue #583). Tolerate callers/mocks that return nothing.
+    const updateResult = updateSettingsForSource('localSettings', updates)
+    if (updateResult?.error) {
+      throw updateResult.error
+    }
   } catch (error) {
     logError(new Error(`Failed to migrate MCP server settings to local config: ${error}`))
     throw error

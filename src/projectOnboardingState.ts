@@ -325,8 +325,22 @@ export function getSteps(): Step[] {
 
   const cwd = getCwd()
   const fs = getFsImplementation()
-  const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
-  const isWorkspaceDirEmpty = isDirEmpty(cwd)
+  // Guard against TOCTOU races: the file/dir may be deleted between
+  // existsSync and subsequent stat calls (or while isDirEmpty runs).
+  // Treat any failure as cache invalidation instead of crashing the REPL
+  // (issue #581).
+  let hasClaudeMd = false
+  let isWorkspaceDirEmpty = true
+  try {
+    hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
+  } catch {
+    hasClaudeMd = false
+  }
+  try {
+    isWorkspaceDirEmpty = isDirEmpty(cwd)
+  } catch {
+    isWorkspaceDirEmpty = true
+  }
 
   // Track mtimes for cache invalidation
   const claudeMdPath = join(cwd, 'CLAUDE.md')

@@ -22,12 +22,13 @@ export function migrateBypassPermissionsAcceptedToSettings(): void {
   try {
     if (!hasSkipDangerousModePermissionPrompt()) {
       // Only migrate if the user has not explicitly opted out (set to false).
-      // Resolve the effective value across sources in priority order
-      // (userSettings > localSettings > flagSettings > policySettings) rather
-      // than checking each source independently — a lower-priority `false`
-      // must not mask a higher-priority `true` (or vice versa).
+      // Resolve the effective value across USER-CONFIGURABLE sources only
+      // (userSettings > localSettings). flagSettings and policySettings are
+      // excluded — they are not user-configurable, so an admin policy or
+      // ephemeral CLI flag setting `false` must not block the migration
+      // (issue #586).
       const effectiveSkip = (
-        ['userSettings', 'localSettings', 'flagSettings', 'policySettings'] as const
+        ['userSettings', 'localSettings'] as const
       )
         .map(source => getSettingsForSource(source)?.skipDangerousModePermissionPrompt)
         .find(value => value !== undefined)

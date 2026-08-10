@@ -51,7 +51,10 @@ export function migrateFennecToOpus(): void {
     for (const source of sources) {
       const settings = getSettingsForSource(source)
 
-      const model = (settings?.model ?? '').trim()
+      const model = settings?.model
+      // Type guard: malformed settings can carry non-string model values
+      // (e.g. a number from a corrupted file). Skip those instead of
+      // throwing a TypeError that aborts the migration (issue #582).
       if (typeof model !== 'string' || model === '') {
         continue
       }

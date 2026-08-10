@@ -47,6 +47,7 @@ beforeEach(() => {
           settingsStore[source][key] = updates[key]
         }
       }
+      return { error: null }
     },
     deleteSettingsField: (source: string, field: string) => {
       if (settingsStore[source]) {
