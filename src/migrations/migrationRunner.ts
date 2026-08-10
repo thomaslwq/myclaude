@@ -153,10 +153,17 @@ export async function runMigrationsSafe(
 }> {
   const completedSet = new Set(completedMigrationNames)
 
+  // Filter out dependencies that are already completed (e.g., removed/deprecated migrations)
+  // This prevents topologicalSort from throwing on missing dependencies that are already done
+  const filteredMigrations = migrations.map(m => ({
+    ...m,
+    dependsOn: m.dependsOn?.filter(dep => !completedSet.has(dep)),
+  }))
+
   // Topologically sort migrations
   let sortedMigrations: Migration[]
   try {
-    sortedMigrations = topologicalSort(migrations)
+    sortedMigrations = topologicalSort(filteredMigrations)
   } catch (error) {
     // If sorting fails (circular dep or missing dep), mark all migrations as failed
     const errorMessage = error instanceof Error ? error.message : String(error)

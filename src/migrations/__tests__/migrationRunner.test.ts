@@ -90,4 +90,23 @@ describe('runMigrationsSafe', () => {
     expect(runOrder).toEqual(['migration1', 'migration2'])
     expect(result.newlyCompleted).toEqual(['migration1', 'migration2'])
   })
+
+  it('should handle completed migration that was removed from the list', async () => {
+    // 'removed-migration' was completed in the past and has since been removed
+    // from the migrations list. 'migration2' still depends on it and should
+    // run successfully since the dependency is already completed.
+    const migrations: Migration[] = [
+      { name: 'migration1', migration: () => {} },
+      { name: 'migration2', migration: () => {}, dependsOn: ['removed-migration'] },
+    ]
+
+    const result = await runMigrationsSafe(migrations, ['removed-migration'])
+
+    expect(result.total).toBe(2)
+    expect(result.successful).toBe(2)
+    expect(result.failed).toBe(0)
+    expect(result.skipped).toBe(0)
+    expect(result.results[0].success).toBe(true)
+    expect(result.results[1].success).toBe(true)
+  })
 })
