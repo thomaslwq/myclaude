@@ -184,7 +184,7 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle string "active" (unknown, not in whitelist) as falsy', async () => {
+  it('should handle string "active" (unknown, not in whitelist) as truthy (preserving original Boolean() behavior)', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -197,11 +197,11 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: 'active',
     })
-    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle string "0.0" as falsy (edge case)', async () => {
+  it('should handle string "0.0" as truthy (edge case, non-empty string)', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -214,11 +214,11 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: '0.0',
     })
-    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle string "null" as falsy (edge case)', async () => {
+  it('should handle string "null" as truthy (edge case, non-empty string)', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -231,11 +231,11 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: 'null',
     })
-    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle string "undefined" as falsy (edge case)', async () => {
+  it('should handle string "undefined" as truthy (edge case, non-empty string)', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -248,11 +248,11 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: 'undefined',
     })
-    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle string "enable" as falsy (not in whitelist)', async () => {
+  it('should handle string "enable" as truthy (preserving original Boolean() behavior)', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -265,7 +265,7 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: 'enable',
     })
-    expect(result.remoteControlAtStartup).toBe(false)
+    expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
 
@@ -336,6 +336,7 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
     expect(result.remoteControlAtStartup).toBe(true)
     expect(result.replBridgeEnabled).toBeUndefined()
   })
+
 
   it('should not migrate if old key is undefined', async () => {
     const calls: ((prev: any) => any)[] = []
