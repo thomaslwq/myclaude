@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { logEvent } from '../services/analytics/index.js'
 import {
   getCurrentProjectConfig,
@@ -125,8 +126,13 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   )
 
   if (overlappingServers.length > 0) {
+    // Hash server names before logging — they may contain sensitive
+    // internal service names or project identifiers.
+    const hashedServers = overlappingServers.map(server =>
+      createHash('sha256').update(server).digest('hex').slice(0, 16),
+    )
     logEvent('tengu_migrate_mcp_server_conflict_resolved', {
-      overlappingServers: overlappingServers.join(','),
+      overlappingServers: hashedServers.join(','),
       conflictResolution: 'removed_from_disabled',
     })
   }

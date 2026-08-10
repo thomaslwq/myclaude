@@ -131,7 +131,6 @@ import {
   setThinkingClearLatched,
 } from '../../bootstrap/state.js'
 import {
-  AFK_MODE_BETA_HEADER,
   CONTEXT_1M_BETA_HEADER,
   CONTEXT_MANAGEMENT_BETA_HEADER,
   EFFORT_BETA_HEADER,
@@ -140,6 +139,7 @@ import {
   REDACT_THINKING_BETA_HEADER,
   STRUCTURED_OUTPUTS_BETA_HEADER,
   TASK_BUDGETS_BETA_HEADER,
+  getAfkModeBetaHeader,
 } from '../../constants/betas.js'
 import type { QuerySource } from '../../constants/querySource.js'
 import type { Notification } from '../../context/notifications.js'
@@ -1659,13 +1659,15 @@ async function* queryModel(
     // AFK mode beta: latched once auto mode is first activated. Still gated
     // by isAgenticQuery per-call so classifiers/compaction don't get it.
     if (feature('TRANSCRIPT_CLASSIFIER')) {
+      const afkModeBetaHeader = getAfkModeBetaHeader()
       if (
         afkHeaderLatched &&
         shouldIncludeFirstPartyOnlyBetas() &&
         isAgenticQuery &&
-        !betasParams.includes(AFK_MODE_BETA_HEADER)
+        afkModeBetaHeader &&
+        !betasParams.includes(afkModeBetaHeader)
       ) {
-        betasParams.push(AFK_MODE_BETA_HEADER)
+        betasParams.push(afkModeBetaHeader)
       }
     }
 

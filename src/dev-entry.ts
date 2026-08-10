@@ -1,6 +1,6 @@
 import pkg from '../package.json'
 import { realpathSync } from 'fs'
-import { readFile, readdir } from 'fs/promises'
+import { readFile, readdir, stat } from 'fs/promises'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -49,7 +49,6 @@ const SCAN_CACHE_TTL_MS = 60_000 // 1 minute TTL for scan cache
 
 async function getFileContent(filePath: string): Promise<string | null> {
   try {
-    const { stat } = await import('fs/promises')
     const stats = await stat(filePath).catch(() => null)
     if (!stats) return null
     const cached = fileContentCache.get(filePath)

@@ -22,6 +22,23 @@ interface SessionIngressError {
 // Module-level state
 const lastUuidMap: Map<string, UUID> = new Map()
 
+// Bound the number of cached session entries to prevent unbounded memory
+// growth in long-running daemons. Older sessions are evicted first.
+const MAX_CACHED_SESSIONS = 500
+
+function trimSessionCaches(): void {
+  for (const map of [lastUuidMap, sequentialBySession]) {
+    if (map.size <= MAX_CACHED_SESSIONS) continue
+    const excess = map.size - MAX_CACHED_SESSIONS
+    let evicted = 0
+    for (const key of map.keys()) {
+      if (evicted >= excess) break
+      map.delete(key)
+      evicted++
+    }
+  }
+}
+
 const MAX_RETRIES = 5
 const BASE_DELAY_MS = 500
 
@@ -62,6 +79,7 @@ function getOrCreateSequential(sessionId: string) {
       },
     )
     sequentialBySession.set(sessionId, wrapper)
+    trimSessionCaches()
   }
   return wrapper
 }

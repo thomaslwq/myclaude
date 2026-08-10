@@ -58,6 +58,21 @@ type DumpState = {
 // Track state per session to avoid duplicating data
 const dumpState = new Map<string, DumpState>()
 
+// Bound dump-state entries per session to prevent unbounded memory growth
+// when many sessions accumulate over the lifetime of a long-running process.
+const MAX_DUMP_STATE_SESSIONS = 200
+
+function trimDumpState(): void {
+  if (dumpState.size <= MAX_DUMP_STATE_SESSIONS) return
+  const excess = dumpState.size - MAX_DUMP_STATE_SESSIONS
+  let evicted = 0
+  for (const key of dumpState.keys()) {
+    if (evicted >= excess) break
+    dumpState.delete(key)
+    evicted++
+  }
+}
+
 // Queue to serialize dumpRequest calls per session to prevent race conditions
 const dumpRequestQueue = new Map<string, Array<() => Promise<void>>>()
 // Per-session promise to serialize queue processing (replaces fragile flag-based mechanism)
@@ -146,10 +161,16 @@ export function addApiRequestToCache(requestData: unknown): void {
 }
 
 export function getDumpPromptsPath(agentIdOrSessionId?: string): string {
+  // Sanitize the session id before embedding it in a filesystem path to
+  // prevent path traversal (e.g. ids containing '../' or absolute paths).
+  const safeId = (agentIdOrSessionId ?? getSessionId()).replace(
+    /[^a-zA-Z0-9._-]/g,
+    '_',
+  )
   return join(
     getClaudeConfigHomeDir(),
     'dump-prompts',
-    `${agentIdOrSessionId ?? getSessionId()}.jsonl`,
+    `${safeId}.jsonl`,
   )
 }
 
@@ -273,6 +294,7 @@ export function createDumpPromptsFetch(
       lastInitFingerprint: '',
     }
     dumpState.set(agentIdOrSessionId, state)
+    trimDumpState()
 
     let timestamp: string | undefined
 
