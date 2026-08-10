@@ -47,6 +47,8 @@ beforeEach(() => {
           settingsStore[source][key] = updates[key]
         }
       }
+      // Match the real implementation: returns a result object with an error field
+      return { error: undefined }
     },
     deleteSettingsField: (source: string, field: string) => {
       if (settingsStore[source]) {

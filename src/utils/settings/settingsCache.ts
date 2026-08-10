@@ -56,6 +56,7 @@ export function resetSettingsCache(): void {
   sessionSettingsCache = null
   perSourceCache.clear()
   parseFileCache.clear()
+  pluginSettingsBase = undefined
 }
 
 /**

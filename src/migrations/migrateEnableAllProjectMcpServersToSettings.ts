@@ -141,7 +141,10 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
   // This is done before removing project config fields so that if the write fails,
   // no data is lost — the original fields remain in project config.
   try {
-    await updateSettingsForSource('localSettings', updates)
+    const result = await updateSettingsForSource('localSettings', updates)
+    if (result.error) {
+      throw result.error
+    }
   } catch (error) {
     logError(new Error(`Failed to migrate MCP server settings to local config: ${error}`))
     throw error
