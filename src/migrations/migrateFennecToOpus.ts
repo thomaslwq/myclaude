@@ -51,14 +51,12 @@ export async function migrateFennecToOpus(): Promise<void> {
         // Extract all suffixes (e.g., [1m][200k])
         const suffixTokens = model.match(/\[\d+[kKmM]\]/gi)
         const suffix = suffixTokens ? suffixTokens.join('') : ''
-        // Preserve the existing fastMode setting if it exists, otherwise omit it
-        // to avoid overwriting the implicit default behavior
+        // Preserve the existing fastMode setting if it exists, otherwise set it to true
+        // because fennec-fast-latest and opus-4-5-fast are fast mode models
         const existingFastMode = settings?.fastMode
         const update: { model: string; fastMode?: boolean } = {
           model: `opus${suffix}`,
-        }
-        if (existingFastMode !== undefined) {
-          update.fastMode = existingFastMode
+          fastMode: existingFastMode !== undefined ? existingFastMode : true,
         }
         await updateSettingsForSource(source, update)
       } else if (fennecLatestMatch) {
