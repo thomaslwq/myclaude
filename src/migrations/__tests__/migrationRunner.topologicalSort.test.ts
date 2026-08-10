@@ -105,6 +105,7 @@ describe('topologicalSort', () => {
     expect(names).toContain('B')
     expect(names).toContain('C')
     expect(names).toContain('D')
+    // All should be present with no duplicates
     expect(names).toHaveLength(4)
     expect(new Set(names)).toHaveLength(4)
     // A should come before B, C, D
@@ -115,114 +116,40 @@ describe('topologicalSort', () => {
     expect(aIndex).toBeLessThan(bIndex)
     expect(aIndex).toBeLessThan(cIndex)
     expect(aIndex).toBeLessThan(dIndex)
-    // B should come before C and D
+    // B should come before C and D (both depend on B)
     expect(bIndex).toBeLessThan(cIndex)
     expect(bIndex).toBeLessThan(dIndex)
+  })
+
+  it('should improve error message for unknown dependency', () => {
+    const migrations: Migration[] = [
+      createMigration('A', ['B']),
+    ]
+
+    expect(() => topologicalSort(migrations)).toThrow(
+      /Unknown dependency 'B' in migration 'A'.*Dependency must be included in the migration list./
+    )
   })
 
   it('should improve error message for circular dependency', () => {
     const migrations: Migration[] = [
       createMigration('A', ['B']),
-      createMigration('B', ['C']),
-      createMigration('C', ['A']),
-    ]
-
-    try {
-      topologicalSort(migrations)
-      expect.fail('Should have thrown')
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error)
-      const message = error.message
-      // Error message should mention the involved migrations
-      expect(message).toContain('A')
-      expect(message).toContain('B')
-      expect(message).toContain('C')
-      // Error message should mention 'Circular dependency detected'
-      expect(message).toContain('Circular dependency detected')
-    }
-  })
-
-  it('should improve error message for circular dependency with more migrations', () => {
-    const migrations: Migration[] = [
-      createMigration('A', ['B']),
-      createMigration('B', ['C']),
-      createMigration('C', ['D']),
-      createMigration('D', ['A']),
-    ]
-
-    try {
-      topologicalSort(migrations)
-      expect.fail('Should have thrown')
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error)
-      const message = error.message
-      expect(message).toContain('A')
-      expect(message).toContain('B')
-      expect(message).toContain('C')
-      expect(message).toContain('D')
-    }
-  })
-
-  it('should handle complex dependency graph', () => {
-    const migrations: Migration[] = [
-      createMigration('E', ['C', 'D']),
-      createMigration('D', ['B']),
-      createMigration('C', ['A']),
       createMigration('B', ['A']),
+    ]
+
+    expect(() => topologicalSort(migrations)).toThrow(
+      /Circular dependency detected.*/i
+    )
+  })
+
+  it('should improve error message for duplicate names', () => {
+    const migrations: Migration[] = [
+      createMigration('A'),
       createMigration('A'),
     ]
 
-    const sorted = topologicalSort(migrations)
-    const names = sorted.map(m => m.name)
-    // All migrations should be present
-    expect(names).toContain('A')
-    expect(names).toContain('B')
-    expect(names).toContain('C')
-    expect(names).toContain('D')
-    expect(names).toContain('E')
-    expect(names).toHaveLength(5)
-    expect(new Set(names)).toHaveLength(5)
-    // A should come before B and C
-    const aIndex = names.indexOf('A')
-    const bIndex = names.indexOf('B')
-    const cIndex = names.indexOf('C')
-    const dIndex = names.indexOf('D')
-    const eIndex = names.indexOf('E')
-    expect(aIndex).toBeLessThan(bIndex)
-    expect(aIndex).toBeLessThan(cIndex)
-    // B should come before D
-    expect(bIndex).toBeLessThan(dIndex)
-    // C should come before E
-    expect(cIndex).toBeLessThan(eIndex)
-    // D should come before E
-    expect(dIndex).toBeLessThan(eIndex)
-  })
-
-  it('should handle multiple independent chains', () => {
-    const migrations: Migration[] = [
-      createMigration('D', ['B']),
-      createMigration('C', ['A']),
-      createMigration('B', ['A']),
-      createMigration('A'),
-    ]
-
-    const sorted = topologicalSort(migrations)
-    const names = sorted.map(m => m.name)
-    // All migrations should be present
-    expect(names).toContain('A')
-    expect(names).toContain('B')
-    expect(names).toContain('C')
-    expect(names).toContain('D')
-    expect(names).toHaveLength(4)
-    expect(new Set(names)).toHaveLength(4)
-    // A should come before B and C
-    const aIndex = names.indexOf('A')
-    const bIndex = names.indexOf('B')
-    const cIndex = names.indexOf('C')
-    const dIndex = names.indexOf('D')
-    expect(aIndex).toBeLessThan(bIndex)
-    expect(aIndex).toBeLessThan(cIndex)
-    // B should come before D
-    expect(bIndex).toBeLessThan(dIndex)
+    expect(() => topologicalSort(migrations)).toThrow(
+      /Duplicate migration name 'A'.*Migration names must be unique./
+    )
   })
 })

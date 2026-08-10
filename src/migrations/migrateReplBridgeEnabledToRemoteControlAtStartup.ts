@@ -1,3 +1,4 @@
+import type { GlobalConfig } from '../utils/config.js'
 import { saveGlobalConfig } from '../utils/config.js'
 
 /**
@@ -18,7 +19,13 @@ export async function migrateReplBridgeEnabledToRemoteControlAtStartup(): Promis
   // Single atomic write: add the new key and remove the old key in one operation.
   // This eliminates the race window between two separate writes.
   await saveGlobalConfig(prev => {
-    const oldValue = (prev as Record<string, unknown>)['replBridgeEnabled']
+    // `replBridgeEnabled` is a deprecated legacy key that was removed from
+    // the GlobalConfig type but may still exist in old config files.
+    type LegacyConfig = GlobalConfig & {
+      replBridgeEnabled?: unknown
+    }
+    const legacy = prev as LegacyConfig
+    const oldValue = legacy.replBridgeEnabled
     if (oldValue === undefined) return prev
     if (prev.remoteControlAtStartup !== undefined) return prev
     // Use a blacklist of known falsy values instead of a whitelist.
@@ -31,7 +38,7 @@ export async function migrateReplBridgeEnabledToRemoteControlAtStartup(): Promis
         : typeof oldValue === 'boolean'
           ? oldValue
           : !!oldValue
-    const { replBridgeEnabled: _unused, ...rest } = prev
+    const { replBridgeEnabled: _unused, ...rest } = legacy
     const next = { ...rest, remoteControlAtStartup: newValue }
     return next
   })
