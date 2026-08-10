@@ -481,11 +481,10 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     const logEventCall = logEventMock.mock.calls[0]?.[0] || ''
     const logEventMetadata = logEventMock.mock.calls[0]?.[1] || {}
     expect(logEventCall).toBe('tengu_migrate_mcp_server_conflict_resolved')
-    // Server names are hashed before logging (issue #575) so raw names
-    // must NOT leak into analytics metadata.
-    expect(logEventMetadata.overlappingServers).not.toContain('serverA')
-    expect(logEventMetadata.overlappingServers).not.toContain('serverC')
-    expect(logEventMetadata.overlappingServers).toMatch(/^[0-9a-f]{16}$/)
+    // Server names (or their hashes) must NOT leak into analytics metadata —
+    // only the conflict count is logged (issues #575/#580).
+    expect(logEventMetadata.overlappingServers).toBeUndefined()
+    expect(logEventMetadata.overlappingServerCount).toBe(1)
 
     expect(globalConfigStore.hasCompletedMcpServerMigration).toBe(true)
   })

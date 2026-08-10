@@ -126,13 +126,13 @@ export function migrateEnableAllProjectMcpServersToSettings(): void {
   )
 
   if (overlappingServers.length > 0) {
-    // Hash server names before logging — they may contain sensitive
-    // internal service names or project identifiers.
-    const hashedServers = overlappingServers.map(server =>
-      createHash('sha256').update(server).digest('hex').slice(0, 16),
-    )
+    // Do NOT log server names or their hashes — server names may be
+    // low-entropy, so even an unsalted SHA-256 can be reversed via brute
+    // force or rainbow tables (issue #580). Log only a boolean flag and
+    // the conflict count so analytics see the event without leaking
+    // internal infrastructure details.
     logEvent('tengu_migrate_mcp_server_conflict_resolved', {
-      overlappingServers: hashedServers.join(','),
+      overlappingServerCount: overlappingServers.length,
       conflictResolution: 'removed_from_disabled',
     })
   }
