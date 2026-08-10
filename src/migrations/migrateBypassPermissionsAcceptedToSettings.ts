@@ -24,6 +24,7 @@ export async function migrateBypassPermissionsAcceptedToSettings(): Promise<void
       // Only migrate if the user has not explicitly opted out (set to false)
       const userExplicitlyOptedOut =
         getSettingsForSource('userSettings')?.skipDangerousModePermissionPrompt === false ||
+        getSettingsForSource('projectSettings')?.skipDangerousModePermissionPrompt === false ||
         getSettingsForSource('localSettings')?.skipDangerousModePermissionPrompt === false ||
         getSettingsForSource('flagSettings')?.skipDangerousModePermissionPrompt === false ||
         getSettingsForSource('policySettings')?.skipDangerousModePermissionPrompt === false

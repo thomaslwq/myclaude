@@ -56,6 +56,21 @@ describe('migrateBypassPermissionsAcceptedToSettings', () => {
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
+  it('should not run if user explicitly opted out via projectSettings', async () => {
+    mockGetGlobalConfig.mockReturnValue({ bypassPermissionsModeAccepted: true })
+    mockHasSkipDangerousModePermissionPrompt.mockReturnValue(false)
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'projectSettings') {
+        return { skipDangerousModePermissionPrompt: false }
+      }
+      return {}
+    })
+
+    await migrateBypassPermissionsAcceptedToSettings()
+
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+  })
+
   it('should migrate and remove bypassPermissionsModeAccepted when update succeeds', async () => {
     mockGetGlobalConfig.mockReturnValue({
       bypassPermissionsModeAccepted: true,
