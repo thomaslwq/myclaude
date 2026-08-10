@@ -10,6 +10,7 @@ import {
   getSettingsForSource,
   updateSettingsForSource,
 } from '../utils/settings/settings.js'
+import { createHash } from 'crypto'
 
 /**
  * Migration: Move MCP server approval fields from project config to local settings
@@ -114,8 +115,14 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
   )
 
   if (overlappingServers.length > 0) {
+    // Server names may contain sensitive information (internal service names, project
+    // identifiers), so we hash them before logging to analytics to avoid leaking
+    // internal infrastructure details.
+    const hashedOverlappingServers = overlappingServers.map(server =>
+      createHash('sha256').update(server).digest('hex')
+    )
     logEvent('tengu_migrate_mcp_server_conflict_detected', {
-      overlappingServers: overlappingServers.join(','),
+      overlappingServers: hashedOverlappingServers.join(','),
       conflictResolution: 'preserved_for_user_review',
     })
   }
