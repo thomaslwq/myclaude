@@ -197,6 +197,7 @@ export async function runMigrationsSafe(
     }
 
     // Check if dependencies are satisfied
+    // Note: dependsOn may contain duplicates, but the check is idempotent (Set.has is O(1))
     let dependencyFailed = false
     let dependencyError = ''
     if (dependsOn) {
