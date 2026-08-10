@@ -66,8 +66,10 @@ import {
 import { getPlatform } from '../../utils/platform.js'
 import { SandboxManager } from '../../utils/sandbox/sandbox-adapter.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
+import { getInitialSettings } from '../../utils/settings/settings.js'
 import { windowsPathToPosixPath } from '../../utils/windowsPaths.js'
 import { BashTool } from './BashTool.js'
+import { getDestructiveCommandWarning } from './destructiveCommandWarning.js'
 import { checkCommandOperatorPermissions } from './bashCommandHelpers.js'
 import {
   bashCommandIsSafeAsync_DEPRECATED,
@@ -2618,4 +2620,43 @@ export function commandHasAnyCd(command: string): boolean {
   return splitCommand(command).some(subcmd =>
     isNormalizedCdCommand(subcmd.trim()),
   )
+}
+
+/**
+ * Applies the `commandApproval` setting (always | dangerous | never) on top of
+ * the permission engine's verdict:
+ * - "always": every auto-allowed command is upgraded to require confirmation.
+ * - "dangerous": only heuristically dangerous commands (see
+ *   getDestructiveCommandWarning) are upgraded to require confirmation.
+ * - "never" (or unset): permission engine verdict is used unchanged.
+ * Deny verdicts are never downgraded — safety rules always win.
+ */
+export async function applyCommandApprovalPolicy(
+  command: string,
+  result: PermissionResult,
+): Promise<PermissionResult> {
+  if (result.behavior !== 'allow') {
+    return result
+  }
+  const approvalMode = getInitialSettings().commandApproval
+  if (approvalMode === 'never') {
+    return result
+  }
+  const isDangerous = getDestructiveCommandWarning(command) !== null
+  if (approvalMode === 'always' || (approvalMode === 'dangerous' && isDangerous)) {
+    const decisionReason: PermissionDecisionReason = {
+      type: 'other',
+      reason:
+        approvalMode === 'always'
+          ? 'commandApproval=always requires confirmation before running commands'
+          : 'commandApproval=dangerous requires confirmation for heuristically dangerous commands',
+    }
+    return {
+      behavior: 'ask',
+      message: createPermissionRequestMessage(BashTool.name, decisionReason),
+      updatedInput: result.updatedInput,
+      decisionReason,
+    }
+  }
+  return result
 }

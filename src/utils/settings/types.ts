@@ -965,6 +965,14 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'Whether the user has accepted the bypass permissions mode dialog',
         ),
+      commandApproval: z
+        .enum(['always', 'dangerous', 'never'])
+        .optional()
+        .describe(
+          'Terminal command approval policy: "always" asks before every command, ' +
+            '"dangerous" only asks for heuristically dangerous commands (default), ' +
+            '"never" auto-approves commands that pass deny rules without prompting',
+        ),
       ...(feature('TRANSCRIPT_CLASSIFIER')
         ? {
             skipAutoPermissionPrompt: z

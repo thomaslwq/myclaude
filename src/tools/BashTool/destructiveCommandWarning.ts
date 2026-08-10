@@ -86,6 +86,26 @@ const DESTRUCTIVE_PATTERNS: DestructivePattern[] = [
     pattern: /\bterraform\s+destroy\b/,
     warning: 'Note: may destroy Terraform infrastructure',
   },
+
+  // Privilege escalation / raw device access
+  {
+    pattern: /\bsudo\b/,
+    warning: 'Note: runs with elevated privileges',
+  },
+  {
+    pattern:
+      /\bdd\b[^;&|\n]*\bof=(?:\/dev\/(?!null\b)[a-zA-Z0-9]+|\/dev\/disk)/,
+    warning: 'Note: may overwrite a raw block device',
+  },
+  {
+    pattern:
+      /\bchmod\b[^;&|\n]*(?:-[a-zA-Z]*R[a-zA-Z]*|\s+[0-7]{3,4}\s+\/)/,
+    warning: 'Note: recursively changes permissions (may break system files)',
+  },
+  {
+    pattern: /\bmkfs(?:\.\w+)?\b/,
+    warning: 'Note: will format/erase a filesystem',
+  },
 ]
 
 /**
