@@ -28,15 +28,17 @@ export async function migrateReplBridgeEnabledToRemoteControlAtStartup(): Promis
     const oldValue = legacy.replBridgeEnabled
     if (oldValue === undefined) return prev
     if (prev.remoteControlAtStartup !== undefined) return prev
-    // Use a blacklist of known falsy values instead of a whitelist.
-    // Any non-empty string that is not a known falsy value is treated as truthy,
-    // to avoid converting unexpected values (e.g., 'active', 'enable') to false.
+    // Use a whitelist of known truthy and falsy values.
+    // Unknown strings are treated as falsy to avoid enabling a feature
+    // based on an unexpected string value (e.g., 'null', 'undefined', '0.0').
+    const truthyValues = ['true', '1', 'yes', 'on', 'enabled']
     const falsyValues = ['false', '0', 'no', 'off', 'disabled', '']
+    const normalizedString = typeof oldValue === 'string' ? oldValue.toLowerCase().trim() : ''
     const newValue =
-      typeof oldValue === 'string'
-        ? !falsyValues.includes(oldValue.toLowerCase().trim())
-        : typeof oldValue === 'boolean'
-          ? oldValue
+      typeof oldValue === 'boolean'
+        ? oldValue
+        : typeof oldValue === 'string'
+          ? truthyValues.includes(normalizedString)
           : !!oldValue
     const { replBridgeEnabled: _unused, ...rest } = legacy
     const next = { ...rest, remoteControlAtStartup: newValue }
