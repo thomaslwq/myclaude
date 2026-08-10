@@ -153,25 +153,70 @@ export async function runMigrationsSafe(
 }> {
   const completedSet = new Set(completedMigrationNames)
 
-  // Filter out dependencies that are already completed (e.g., removed/deprecated migrations)
-  // This prevents topologicalSort from throwing on missing dependencies that are already done
-  const filteredMigrations = migrations.map(m => ({
-    ...m,
-    dependsOn: m.dependsOn?.filter(dep => !completedSet.has(dep)),
-  }))
+  // Build a set of all available migration names (including completed ones)
+  const allMigrationNames = new Set(migrations.map(m => m.name))
 
-  // Topologically sort migrations
+  // Identify migrations that have missing dependencies (deps not in migration list and not completed)
+  // and handle them gracefully: mark them as failed, but keep them in the migration list
+  // so that topologicalSort doesn't throw and dependents can see them as failed.
+  const missingDepMigrations: { migration: Migration; missingDeps: string[] }[] = []
+  const missingDepNames = new Set<string>()
+
+  for (const m of migrations) {
+    const missingDeps: string[] = []
+    if (m.dependsOn) {
+      for (const dep of m.dependsOn) {
+        if (!allMigrationNames.has(dep) && !completedSet.has(dep)) {
+          missingDeps.push(dep)
+        }
+      }
+    }
+    if (missingDeps.length > 0) {
+      missingDepMigrations.push({ migration: m, missingDeps })
+      missingDepNames.add(m.name)
+    }
+  }
+
+  // Build a migration list that is safe for topologicalSort:
+  // - Keep all migrations (including those with missing deps) so dependency chains are intact
+  // - For each migration, filter out:
+  //   1. Missing dependencies (not in migration list, not completed)
+  //   2. Already completed dependencies
+  // This ensures topologicalSort won't throw on missing deps, and completed deps are ignored
+  const sanitizedMigrations: Migration[] = migrations.map(m => {
+    const sanitizedDeps = m.dependsOn?.filter(
+      dep => allMigrationNames.has(dep) && !completedSet.has(dep)
+    )
+    return {
+      ...m,
+      dependsOn: sanitizedDeps && sanitizedDeps.length > 0 ? sanitizedDeps : undefined,
+    }
+  })
+
+  // Topologically sort sanitized migrations
   let sortedMigrations: Migration[]
   try {
-    sortedMigrations = topologicalSort(filteredMigrations)
+    sortedMigrations = topologicalSort(sanitizedMigrations)
   } catch (error) {
-    // If sorting fails (circular dep or missing dep), mark all migrations as failed
+    // If sorting fails (circular dependency), mark all remaining migrations as failed
     const errorMessage = error instanceof Error ? error.message : String(error)
-    const results: MigrationResult[] = migrations.map(m => ({
-      success: false,
-      error: errorMessage,
-      migrationName: m.name,
-    }))
+    const results: MigrationResult[] = migrations.map(m => {
+      // Check if this migration was already handled as missing dependency
+      const missingDep = missingDepMigrations.find(md => md.migration.name === m.name)
+      if (missingDep) {
+        return {
+          success: false,
+          error: `Missing dependency${missingDep.missingDeps.length > 1 ? 'ies' : ''}: ${missingDep.missingDeps.join(', ')}. ` +
+            `Dependency must be included in the migration list or already completed.`,
+          migrationName: m.name,
+        }
+      }
+      return {
+        success: false,
+        error: errorMessage,
+        migrationName: m.name,
+      }
+    })
     return {
       total: migrations.length,
       successful: 0,
@@ -190,8 +235,31 @@ export async function runMigrationsSafe(
 
   // Track which dependencies have succeeded (subset of completedSet + newly completed)
   const succeededSet = new Set(completedSet)
+  // Track which migrations have failed (including missing dependencies) so dependents can be skipped
+  const failedMigrationNames = new Set<string>()
+
+  // Handle migrations with missing dependencies first - they are marked as failed
+  // and their name is added to the failed set so dependents can be skipped
+  for (const { migration: m, missingDeps } of missingDepMigrations) {
+    const errorMessage = `Missing dependency${missingDeps.length > 1 ? 'ies' : ''}: ${missingDeps.join(', ')}. ` +
+      `Dependency must be included in the migration list or already completed.`
+    results.push({
+      success: false,
+      error: errorMessage,
+      migrationName: m.name,
+    })
+    failed++
+    // Add to succeededSet? No - we want dependents to know this failed.
+    // We track failed migrations separately so dependents can be skipped.
+    failedMigrationNames.add(m.name)
+  }
 
   for (const { name, migration, dependsOn } of sortedMigrations) {
+    // Skip migrations already handled as missing dependency
+    if (missingDepNames.has(name)) {
+      continue
+    }
+
     // Check if already completed
     if (completedSet.has(name)) {
       results.push({
@@ -209,7 +277,7 @@ export async function runMigrationsSafe(
     let dependencyError = ''
     if (dependsOn) {
       for (const dep of dependsOn) {
-        if (!succeededSet.has(dep)) {
+        if (!succeededSet.has(dep) || failedMigrationNames.has(dep)) {
           dependencyFailed = true
           dependencyError = `Dependency ${dep} failed or was skipped`
           break
