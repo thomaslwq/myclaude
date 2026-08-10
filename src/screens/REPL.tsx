@@ -100,7 +100,7 @@ const useVoiceIntegration: typeof import('../hooks/useVoiceIntegration.js').useV
   handleKeyEvent: () => {},
   resetAnchor: () => {}
 });
-const VoiceKeybindingHandler: typeof import('../hooks/useVoiceIntegration.js').VoiceKeybindingHandler = feature('VOICE_MODE') ? require('../hooks/useVoiceIntegration.js').VoiceKeybindingHandler : () => null;
+const useVoiceKeybindingHandler: typeof import('../hooks/useVoiceIntegration.js').useVoiceKeybindingHandler = feature('VOICE_MODE') ? require('../hooks/useVoiceIntegration.js').useVoiceKeybindingHandler : () => ({ handleKeyDown: () => {} });
 // Frustration detection is ant-only (dogfooding). Conditional require so external
 // builds eliminate the module entirely (including its two O(n) useMemos that run
 // on every messages change, plus the GrowthBook fetch).
@@ -389,7 +389,8 @@ function TranscriptSearchBar({
 }): React.ReactNode {
   const {
     query,
-    cursorOffset
+    cursorOffset,
+    handleKeyDown: searchHandleKeyDown
   } = useSearchInput({
     isActive: true,
     initialQuery,
@@ -446,7 +447,7 @@ function TranscriptSearchBar({
   }, [query, warmDone]);
   const off = cursorOffset;
   const cursorChar = off < query.length ? query[off] : ' ';
-  return <Box borderTopDimColor borderBottom={false} borderLeft={false} borderRight={false} borderStyle="single" marginTop={1} paddingLeft={2} width="100%"
+  return <Box borderTopDimColor borderBottom={false} borderLeft={false} borderRight={false} borderStyle="single" marginTop={1} paddingLeft={2} width="100%" tabIndex={0} autoFocus onKeyDown={searchHandleKeyDown}
   // applySearchHighlight scans the whole screen buffer. The query
   // text rendered here IS on screen — /foo matches its own 'foo' in
   // the bar. With no content matches that's the ONLY visible match →
@@ -4079,6 +4080,18 @@ export function REPL({
     resetAnchor: () => {},
     interimRange: null
   };
+  // Hold-to-talk voice activation (VOICE_MODE builds only). REPL wires the
+  // resulting handleKeyDown to <Box onKeyDown> below (issue #259).
+  const { handleKeyDown: voiceHandleKeyDown } = feature('VOICE_MODE') ?
+  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
+  useVoiceKeybindingHandler({
+    voiceHandleKeyEvent: voice.handleKeyEvent,
+    stripTrailing: voice.stripTrailing,
+    resetAnchor: voice.resetAnchor,
+    isActive: !toolJSX?.isLocalJSXCommand
+  }) : {
+    handleKeyDown: () => {}
+  };
   useInboxPoller({
     enabled: isAgentSwarmsEnabled(),
     isLoading,
@@ -4438,9 +4451,15 @@ export function REPL({
   // Handle shift+down for teammate navigation and background task management.
   // Guard onOpenBackgroundTasks when a local-jsx dialog (e.g. /mcp) is open —
   // otherwise Shift+Down stacks BackgroundTasksDialog on top and deadlocks input.
-  useBackgroundTaskNavigation({
+  const { handleKeyDown: bgTaskHandleKeyDown } = useBackgroundTaskNavigation({
     onOpenBackgroundTasks: isShowingLocalJSXCommand ? undefined : () => setShowBashesDialog(true)
   });
+  // Compose global REPL key handlers wired to <Box onKeyDown> (issue #259):
+  // background-task teammate navigation + voice hold-to-talk.
+  const replKeyDown = (e: import('../ink/events/keyboard-event.js').KeyboardEvent): void => {
+    bgTaskHandleKeyDown(e);
+    voiceHandleKeyDown(e);
+  };
   // Auto-exit viewing mode when teammate completes or errors
   useTeammateViewAutoExit();
   if (screen === 'transcript') {
@@ -4457,10 +4476,9 @@ export function REPL({
     const transcriptToolJSX = toolJSX && <Box flexDirection="column" width="100%">
         {toolJSX.jsx}
       </Box>;
-    const transcriptReturn = <KeybindingSetup>
+    const transcriptReturn = <Box flexGrow={1} flexDirection="column" onKeyDown={replKeyDown}><KeybindingSetup>
         <AnimatedTerminalTitle isAnimating={titleIsAnimating} title={terminalTitle} disabled={titleDisabled} noPrefix={showStatusInTerminalTab} />
         <GlobalKeybindingHandlers {...globalKeybindingProps} />
-        {feature('VOICE_MODE') ? <VoiceKeybindingHandler voiceHandleKeyEvent={voice.handleKeyEvent} stripTrailing={voice.stripTrailing} resetAnchor={voice.resetAnchor} isActive={!toolJSX?.isLocalJSXCommand} /> : null}
         <CommandKeybindingHandlers onSubmit={onSubmit} isActive={!toolJSX?.isLocalJSXCommand} />
         {transcriptScrollRef ?
       // ScrollKeybindingHandler must mount before CancelRequestHandler so
@@ -4526,7 +4544,7 @@ export function REPL({
             <SandboxViolationExpandedView />
             <TranscriptModeFooter showAllInTranscript={showAllInTranscript} virtualScroll={false} suppressShowAll={dumpMode} status={editorStatus || undefined} />
           </>}
-      </KeybindingSetup>;
+      </KeybindingSetup></Box>;
     // The virtual-scroll branch (FullscreenLayout above) needs
     // <AlternateScreen>'s <Box height={rows}> constraint — without it,
     // ScrollBox's flexGrow has no ceiling, viewport = content height,
@@ -4599,10 +4617,9 @@ export function REPL({
   // flexGrow in FullscreenLayout resolves against this Box. The transcript
   // early return above wraps its virtual-scroll branch the same way; only
   // the 30-cap dump branch stays unwrapped for native terminal scrollback.
-  const mainReturn = <KeybindingSetup>
+  const mainReturn = <Box flexGrow={1} flexDirection="column" onKeyDown={replKeyDown}><KeybindingSetup>
       <AnimatedTerminalTitle isAnimating={titleIsAnimating} title={terminalTitle} disabled={titleDisabled} noPrefix={showStatusInTerminalTab} />
       <GlobalKeybindingHandlers {...globalKeybindingProps} />
-      {feature('VOICE_MODE') ? <VoiceKeybindingHandler voiceHandleKeyEvent={voice.handleKeyEvent} stripTrailing={voice.stripTrailing} resetAnchor={voice.resetAnchor} isActive={!toolJSX?.isLocalJSXCommand} /> : null}
       <CommandKeybindingHandlers onSubmit={onSubmit} isActive={!toolJSX?.isLocalJSXCommand} />
       {/* ScrollKeybindingHandler must mount before CancelRequestHandler so
           ctrl+c-with-selection copies instead of cancelling the active task.
@@ -5049,7 +5066,7 @@ export function REPL({
               {true && !(companionNarrow && isFullscreenEnvEnabled()) && companionVisible ? <CompanionSprite /> : null}
             </Box>} />
       </MCPConnectionManager>
-    </KeybindingSetup>;
+    </KeybindingSetup></Box>;
   const stabilizedReturn = <ReplRuntimeBoundary>{mainReturn}</ReplRuntimeBoundary>;
   if (isFullscreenEnvEnabled()) {
     return <AlternateScreen mouseTracking={isMouseTrackingEnabled()}>

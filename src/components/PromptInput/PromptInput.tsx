@@ -353,7 +353,8 @@ function PromptInput({
     historyQuery,
     setHistoryQuery,
     historyMatch,
-    historyFailedMatch
+    historyFailedMatch,
+    handleKeyDown: historySearchHandleKeyDown
   } = useHistorySearch(entry => {
     setPastedContents(entry.pastedContents);
     void onSubmit(entry.display);
@@ -1108,7 +1109,8 @@ function PromptInput({
     selectedSuggestion,
     commandArgumentHint,
     inlineGhostText,
-    maxColumnWidth
+    maxColumnWidth,
+    handleKeyDown: typeaheadHandleKeyDown
   } = useTypeahead({
     commands,
     onInputChange: trackAndSetInput,
@@ -1124,6 +1126,13 @@ function PromptInput({
     markAccepted,
     onModeChange
   });
+
+  // Compose PromptInput key handlers wired to <Box onKeyDown> (issue #259):
+  // history-search + typeahead. Events bubble from the focused TextInput.
+  const promptInputKeyDown = (e: import('../../ink/events/keyboard-event.js').KeyboardEvent): void => {
+    historySearchHandleKeyDown(e);
+    typeaheadHandleKeyDown(e);
+  };
 
   // Track if prompt suggestion should be shown (computed later with terminal width).
   // Hidden in teammate view — suggestion is leader-context only.
@@ -2241,7 +2250,7 @@ function PromptInput({
       </Box>;
   }
   const textInputElement = isVimModeEnabled() ? <VimTextInput {...baseProps} initialMode={vimMode} onModeChange={setVimMode} /> : <TextInput {...baseProps} />;
-  return <Box flexDirection="column" marginTop={briefOwnsGap ? 0 : 1}>
+  return <Box flexDirection="column" marginTop={briefOwnsGap ? 0 : 1} onKeyDown={promptInputKeyDown}>
       {!isFullscreenEnvEnabled() && <PromptInputQueuedCommands />}
       {hasSuppressedDialogs && <Box marginTop={1} marginLeft={2}>
           <Text dimColor>Waiting for permission…</Text>

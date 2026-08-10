@@ -1,7 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { KeyboardEvent } from '../ink/events/keyboard-event.js'
-// eslint-disable-next-line custom-rules/prefer-use-keybindings -- backward-compat bridge until REPL wires handleKeyDown to <Box onKeyDown>
-import { useInput } from '../ink.js'
 import {
   type AppState,
   useAppState,
@@ -238,14 +236,6 @@ export function useBackgroundTaskNavigation(options?: {
       return
     }
   }
-
-  // Backward-compat bridge: REPL.tsx doesn't yet wire handleKeyDown to
-  // <Box onKeyDown>. Subscribe via useInput and adapt InputEvent →
-  // KeyboardEvent until the consumer is migrated (separate PR).
-  // TODO(onKeyDown-migration): remove once REPL passes handleKeyDown.
-  useInput((_input, _key, event) => {
-    handleKeyDown(new KeyboardEvent(event.keypress))
-  })
 
   return { handleKeyDown }
 }
