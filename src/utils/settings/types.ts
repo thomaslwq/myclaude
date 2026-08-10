@@ -322,6 +322,32 @@ export const SettingsSchema = lazySchema(() =>
           'Whether file picker should respect .gitignore files (default: true). ' +
             'Note: .ignore files are always respected.',
         ),
+      instructionProfiles: z
+        .array(
+          z.object({
+            name: z
+              .string()
+              .min(1)
+              .describe('Profile name shown in /profiles and match diagnostics'),
+            content: z
+              .string()
+              .describe('Instruction text injected into the system prompt when matched'),
+            // Optional path glob/keyword condition. When omitted, the profile
+            // always applies. When set, the profile applies if the current
+            // working directory matches the glob (e.g. "**/src/**").
+            condition: z
+              .string()
+              .optional()
+              .describe(
+                'Optional glob condition on the current working directory (e.g. "**/tests/**"). Omitted = always apply.',
+              ),
+          }),
+        )
+        .optional()
+        .describe(
+          'Custom instruction profiles (personas) applied per project/path. ' +
+            'Matched profile contents are injected into the system prompt.',
+        ),
       cleanupPeriodDays: z
         .number()
         .nonnegative()

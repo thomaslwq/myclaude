@@ -16,6 +16,7 @@ import { execFileNoThrow } from './utils/execFileNoThrow.js'
 import { getBranch, getDefaultBranch, getIsGit, gitExe } from './utils/git.js'
 import { shouldIncludeGitInstructions } from './utils/gitSettings.js'
 import { logError } from './utils/log.js'
+import { buildInstructionProfilesPrompt } from './utils/instructionProfiles.js'
 
 const MAX_STATUS_CHARS = 2000
 
@@ -183,6 +184,9 @@ export const getUserContext = memoize(
 
     return {
       ...(claudeMd && { claudeMd }),
+      ...(buildInstructionProfilesPrompt() !== null
+        ? { instructionProfiles: buildInstructionProfilesPrompt() }
+        : {}),
       currentDate: `Today's date is ${getLocalISODate()}.`,
     }
   },

@@ -50,24 +50,27 @@
 - **涉及**: `src/tools/` 新工具、`src/services/api/dumpPrompts.ts` 旁的自愈编排服务、`src/commands/` 暴露 `/autofix`。
 
 ### #336 多步自主执行(Autonomous Mode) — priority-high
-- **方案**: 引入 plan-execute 双阶段:LLM 先生成任务 DAG(步骤/依赖/验证条件),TUI 展示后按序执行,每步可选"自动/确认"策略;配合 #501 的自愈闭环实现无监督执行。
-- **涉及**: 新增 `src/execution/` 编排模块、状态机、`src/components/` 进度 UI。
+- **现状核实(2026-08-10)**: 多步自主执行核心**已在代码库实现**——`/plan` 命令(plan mode)+ `EnterPlanModeTool`/`ExitPlanModeV2Tool`(计划-批准-实施闭环,含 plan 文件落盘与权限请求)、`TaskCreateTool`/`TaskListTool`/`TaskGetTool`/`TaskOutputTool`(子任务管理)、`TodoWriteTool`(todo 跟踪),配合 #501 已实现的 `runAndVerify` 自愈循环,构成"目标→拆解→执行→验证"的自主闭环。
+- **缺口**: 无监督全自动模式(每步零确认)与任务 DAG 可视化进度 UI 未实现——属策略层增强。
+- **建议**: 利用现有 plan+tasks+todo 基础设施,在 plan 批准后增加"自动连续执行"选项,作为独立迭代推进。
 
 ### #316 联网搜索与文档抓取 — priority-high
 - **方案**: 新增 `web_search` / `web_fetch` 工具(封装 SerpAPI/Tavily 或自建搜索),结果进入上下文;需在 `ALL_AGENT_DISALLOWED_TOOLS`(见 #62 已延迟求值)处按 agent 类型放行。
 - **涉及**: `src/tools/` 新工具、`src/constants/tools.ts` 放行名单、MCP 透传。
 
 ### #148 / #96 代码库语义索引与深度上下文 — priority-high
-- **方案**: 用本地嵌入模型(如 `bge-small`)建仓库向量索引,持久化到 `~/.myclaude/index`;通过 `@file` / `@symbol` 提及触发检索,结果按相关度截断注入系统提示。
-- **涉及**: 新增 `src/indexing/`(embedding + 向量检索 + 增量更新)、`src/context/` 注入管道;注意冷启动与内存上限(#100 模式可复用)。
+- **现状核实(2026-08-10)**: 文件索引与深度上下文核心**已在代码库实现**——`src/native-ts/file-index/index.ts` 的 `FileIndex` 类(高性能模糊文件搜索,带 test 路径惩罚、异步分块构建、queryable 信号)与 `src/hooks/fileSuggestions.ts`(@-mention 路径/目录名补全、`startBackgroundCacheRefresh` 后台刷新),被 `QuickOpenDialog`、`useTypeahead`、`unifiedSuggestions` 使用。
+- **缺口**: 基于嵌入向量的**语义检索**(如 Cursor/Copilot 的相似代码召回)尚未实现——需引入本地嵌入模型 + 向量索引 + 增量更新。
+- **建议**: 在现有 FileIndex 之上叠加可选语义层(embedding 缓存持久化到 `~/.myclaude/index`),作为独立工程推进;先利用现有文件补全覆盖 @-mention 场景。
 
 ### #55 终端命令沙箱与确认 — priority-high
 - **方案**: 在终端工具层拦截命令,危险命令(`rm -rf`、`sudo`、`dd` 等)启发式标记,弹 Y/N 确认;新增 `commandApproval: always|dangerous|never` 配置;远期支持 Docker 沙箱。
 - **涉及**: `src/skills/terminal.ts` 拦截、`src/config.ts` 配置、`src/components/Prompt/` 确认组件。
 
 ### #54 多文件编辑与 Diff 预览 — priority-high
-- **方案**: 会话内批量收集文件修改,生成 unified diff,新增 `DiffView` 组件高亮展示,支持全部接受/拒绝/逐块挑选,确认后统一写入。
-- **涉及**: `src/components/` 新增 DiffView、文件写入 skill 改为队列模式、`/diff` 命令。
+- **现状核实(2026-08-10)**: Diff 预览基础设施**已在代码库实现**——`/diff` 命令(per-turn 多文件 diff)调用 `src/components/diff/DiffDialog.tsx`,支持多文件列表、统计(±行数)、列表/详情视图切换、大文件/二进制/截断处理;`StructuredDiff.tsx`/`colorDiff.ts` 提供高亮;FileEditTool 计算 git diff。
+- **缺口**: "接受全部/拒绝全部/逐块挑选"的批量审批流尚未实现(当前 DiffDialog 为只读查看)。
+- **建议**: 在 DiffDialog 上增加审批操作(全部接受/拒绝、按文件/按 hunk 挑选),应用前先快照以便撤销;作为独立 PR 配合交互式 TUI 测试实施。
 
 ### #95 行内补全(Tab 补全) — priority-medium
 - **方案**: 对输入行做轻量上下文补全:优先基于历史命令/文件名的模糊匹配(fuse.js 已有依赖),远期接 LLM 补全 API;幽灵文本渲染 + Tab 接受。
@@ -86,8 +89,8 @@
 - **涉及**: `src/commands/benchmark.ts`、`src/services/api/` 多 provider 调用。
 
 ### #224 语音输入 — priority-low
-- **方案**: 通过麦克风采集 → Whisper(本地或云端)转写 → 注入输入框;依赖系统音频权限,TUI 环境需先确认兼容性。
-- **涉及**: 新增 `src/hooks/useVoiceInput.ts`、`src/audio/`。
+- **现状核实(2026-08-10)**: 语音输入**已在代码库完整实现**——`src/hooks/useVoice.ts`(hold-to-talk 麦克风采集 + Anthropic `voice_stream` STT + 无音频检测/权限处理)、`src/hooks/useVoiceIntegration.tsx`(interim 转写实时注入输入框光标处)、`useVoiceEnabled.ts`/`voiceModeEnabled.ts`(auth + GrowthBook kill-switch)、`/voice` 命令与 `VoiceIndicator`/`VoiceModeNotice` UI。VOICE_MODE 构建内置。
+- **结论**: #224 需求已满足,无需新增实现。
 
 ### #223 检查点/撤销系统 — priority-low
 - **方案**: 每次 AI 修改前自动 `git commit`(Aider 模式)或保存 workspace 快照;`/undo` 回退到上一检查点;需与用户手动 git 使用习惯协调。
