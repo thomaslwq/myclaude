@@ -20,9 +20,9 @@ import { createHash } from 'crypto'
  * Merge behavior:
  * - Existing settings arrays are preserved in order with new servers appended
  * - Duplicates are removed (first occurrence wins, preserving original order)
- * - If a server appears in both enabled and disabled lists, the conflict is preserved
- *   and logged as a warning event for user review, rather than silently overriding
- *   user intent.
+ * - If a server appears in both enabled and disabled lists, the disabled list takes
+ *   precedence. The server is removed from the enabled list and logged as a warning
+ *   event for user review.
  * - Other settings fields are never overwritten
  *
  * Idempotency: Uses a global config flag `hasCompletedMcpServerMigration` to ensure
