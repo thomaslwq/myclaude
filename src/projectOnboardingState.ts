@@ -31,17 +31,20 @@ export type Step = {
 // still detecting changes when they occur.
 
 const CACHE_TTL_MS = 5000 // 5 seconds
-let cachedSteps: Step[] | null = null
-let cachedStepsTimestamp: number = 0
-let cachedClaudeMdMtime: number | null = null
-let cachedIsWorkspaceDirEmpty: boolean | null = null
+
+// All cache state is stored in a single object so that updates are atomic.
+// A concurrent call that reads the cache mid-update will either see the old
+// complete object or the new complete object — never a partially-updated one.
+let cache: {
+  steps: Step[]
+  timestamp: number
+  claudeMdMtime: number | null
+  isWorkspaceDirEmpty: boolean
+} | null = null
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
-  cachedSteps = null
-  cachedStepsTimestamp = 0
-  cachedClaudeMdMtime = null
-  cachedIsWorkspaceDirEmpty = null
+  cache = null
 }
 
 /**
@@ -53,12 +56,10 @@ export function clearCachedSteps(): void {
  * if it exists, is less than CACHE_TTL_MS old, and CLAUDE.md's mtime has not
  * changed since it was cached.
  */
-function isCacheValid(): boolean {
-  if (!cachedSteps) return false
-
+function isCacheValid(cached: NonNullable<typeof cache>): boolean {
   // Check if the cache has expired (older than CACHE_TTL_MS)
   const now = Date.now()
-  if (now - cachedStepsTimestamp > CACHE_TTL_MS) {
+  if (now - cached.timestamp > CACHE_TTL_MS) {
     return false
   }
 
@@ -68,17 +69,17 @@ function isCacheValid(): boolean {
   const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
   if (hasClaudeMd) {
     const currentMtime = fs.statSync(join(cwd, 'CLAUDE.md'))?.mtimeMs ?? null
-    if (currentMtime !== cachedClaudeMdMtime) {
+    if (currentMtime !== cached.claudeMdMtime) {
       return false
     }
-  } else if (cachedClaudeMdMtime !== null) {
+  } else if (cached.claudeMdMtime !== null) {
     // CLAUDE.md was deleted
     return false
   }
 
   // Check if directory emptiness has changed (files added/removed)
   const currentIsWorkspaceDirEmpty = isDirEmptySync(cwd)
-  if (currentIsWorkspaceDirEmpty !== cachedIsWorkspaceDirEmpty) {
+  if (currentIsWorkspaceDirEmpty !== cached.isWorkspaceDirEmpty) {
     return false
   }
 
@@ -86,28 +87,22 @@ function isCacheValid(): boolean {
 }
 
 export function getSteps(): Step[] {
-  if (isCacheValid()) {
-    return cachedSteps!
+  // Fast path: return the cached steps if they're still valid.
+  if (cache && isCacheValid(cache)) {
+    return cache.steps
   }
 
+  // Cache is invalid (or empty) — build a fresh cache.
   const cwd = getCwd()
   const fs = getFsImplementation()
   const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
   const isWorkspaceDirEmpty = isDirEmptySync(cwd)
 
-  cachedStepsTimestamp = Date.now()
+  const claudeMdMtime = hasClaudeMd
+    ? fs.statSync(join(cwd, 'CLAUDE.md'))?.mtimeMs ?? null
+    : null
 
-  // Cache the directory emptiness so isCacheValid can detect changes.
-  cachedIsWorkspaceDirEmpty = isWorkspaceDirEmpty
-
-  // Cache the CLAUDE.md mtime so isCacheValid can detect changes.
-  if (hasClaudeMd) {
-    cachedClaudeMdMtime = fs.statSync(join(cwd, 'CLAUDE.md'))?.mtimeMs ?? null
-  } else {
-    cachedClaudeMdMtime = null
-  }
-
-  cachedSteps = [
+  const steps: Step[] = [
     {
       key: 'workspace',
       text: 'Ask Claude to create a new app or clone a repository',
@@ -124,7 +119,18 @@ export function getSteps(): Step[] {
     },
   ]
 
-  return cachedSteps
+  // Build the complete cache object first, then assign it in one step.
+  // This makes the cache update atomic — a concurrent reader will never
+  // observe a partially-updated cache (e.g. new steps with old timestamps).
+  const newCache = {
+    steps,
+    timestamp: Date.now(),
+    claudeMdMtime,
+    isWorkspaceDirEmpty,
+  }
+  cache = newCache
+
+  return steps
 }
 
 export function isProjectOnboardingComplete(): boolean {
