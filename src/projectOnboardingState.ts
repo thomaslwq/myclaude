@@ -58,7 +58,9 @@ export function clearCachedSteps(): void {
  */
 function isCacheValid(cached: NonNullable<typeof cache>): boolean {
   // Check if the cache has expired (older than CACHE_TTL_MS)
-  const now = Date.now()
+  // Use performance.now() for a monotonic clock that is not affected by
+  // system clock adjustments (e.g. NTP sync, daylight saving time).
+  const now = performance.now()
   if (now - cached.timestamp > CACHE_TTL_MS) {
     return false
   }
@@ -124,7 +126,7 @@ export function getSteps(): Step[] {
   // observe a partially-updated cache (e.g. new steps with old timestamps).
   const newCache = {
     steps,
-    timestamp: Date.now(),
+    timestamp: performance.now(),
     claudeMdMtime,
     isWorkspaceDirEmpty,
   }

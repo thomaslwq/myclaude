@@ -76,7 +76,7 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
   }
 
   // Start with existing settings arrays as the base
-  const existingEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
+  let existingEnabledServers = Array.isArray(existingSettings.enabledMcpjsonServers)
     ? [...existingSettings.enabledMcpjsonServers]
     : []
   const existingDisabledServers = Array.isArray(existingSettings.disabledMcpjsonServers)
@@ -109,21 +109,28 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
   }
 
   // Detect overlapping servers: if a server appears in both enabled and disabled lists,
-  // preserve the conflict for user review rather than silently overriding user intent.
+  // resolve the conflict by removing it from the enabled list (disabled takes precedence).
   const overlappingServers = existingEnabledServers.filter(server =>
     existingDisabledServers.includes(server)
   )
 
   if (overlappingServers.length > 0) {
+    // Remove overlapping servers from the enabled list to resolve the conflict.
+    // This ensures that a server is not both enabled and disabled, which would
+    // cause inconsistent state and unpredictable behavior.
+    existingEnabledServers = existingEnabledServers.filter(
+      server => !existingDisabledServers.includes(server)
+    )
+
     // Server names may contain sensitive information (internal service names, project
     // identifiers), so we hash them before logging to analytics to avoid leaking
     // internal infrastructure details.
     const hashedOverlappingServers = overlappingServers.map(server =>
       createHash('sha256').update(server).digest('hex')
     )
-    logEvent('tengu_migrate_mcp_server_conflict_detected', {
+    logEvent('tengu_migrate_mcp_server_conflict_resolved', {
       overlappingServers: hashedOverlappingServers.join(','),
-      conflictResolution: 'preserved_for_user_review',
+      conflictResolution: 'removed_from_enabled_list',
     })
   }
 
