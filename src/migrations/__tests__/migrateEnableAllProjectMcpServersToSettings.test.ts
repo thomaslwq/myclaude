@@ -715,4 +715,49 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['serverA', 'serverB', 'serverC'])
     expect(globalConfigStore.hasCompletedMcpServerMigration).toBe(true)
   })
+
+  test('should not copy prototype properties from existing settings (prototype pollution fix)', async () => {
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock existing settings with a prototype property (simulating a malicious source)
+    const maliciousSettings = Object.create({ __proto__: { maliciousProp: 'should-not-exist' } })
+    maliciousSettings.enabledMcpjsonServers = ['serverA']
+
+    // Mock getSettingsForSource to return the malicious object
+    const getSettingsMock = mock((source: string) => maliciousSettings)
+    mock.module(join(import.meta.dir, '../../utils/settings/settings.js'), () => ({
+      getSettingsForSource: getSettingsMock,
+      updateSettingsForSource: (source: string, updates: any) => {
+        if (!settingsStore[source]) {
+          settingsStore[source] = {}
+        }
+        for (const key of Object.keys(updates)) {
+          if (updates[key] === undefined) {
+            delete settingsStore[source][key]
+          } else {
+            settingsStore[source][key] = updates[key]
+          }
+        }
+        return { error: undefined }
+      },
+      deleteSettingsField: (source: string, field: string) => {
+        if (settingsStore[source]) {
+          delete settingsStore[source][field]
+        }
+      },
+    }))
+
+    // Mock project config with only enabled servers
+    projectConfigStore = {
+      enabledMcpjsonServers: ['serverB'],
+    }
+
+    // Run migration
+    await migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify that the malicious prototype property was NOT copied
+    expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['serverA', 'serverB'])
+    expect(settingsStore.localSettings.maliciousProp).toBeUndefined()
+    expect(globalConfigStore.hasCompletedMcpServerMigration).toBe(true)
+  })
 })

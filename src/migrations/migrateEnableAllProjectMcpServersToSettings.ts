@@ -67,8 +67,12 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
   // are never lost regardless of how updateSettingsForSource is implemented.
   const existingSettings = getSettingsForSource('localSettings') || {}
 
-  // Start with a shallow copy of all existing settings as the base
-  const updates: Record<string, unknown> = { ...existingSettings }
+  // Start with a null-prototype object and copy only own enumerable properties
+  // to avoid prototype pollution from a malicious source.
+  const updates: Record<string, unknown> = Object.create(null)
+  for (const key of Object.keys(existingSettings)) {
+    updates[key] = (existingSettings as Record<string, unknown>)[key]
+  }
 
   // Migrate enableAllProjectMcpServers if it exists
   if (hasEnableAll) {
