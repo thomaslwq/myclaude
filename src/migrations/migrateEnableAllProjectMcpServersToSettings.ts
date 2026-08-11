@@ -140,7 +140,7 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
   }
 
   // Apply the merged MCP settings to the updates object
-  if (hasEnabledServers) {
+  if (hasEnabledServers || existingSettings.enabledMcpjsonServers !== undefined) {
     updates.enabledMcpjsonServers = existingEnabledServers
   }
   if (hasDisabledServers || existingSettings.disabledMcpjsonServers !== undefined) {

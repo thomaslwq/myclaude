@@ -489,6 +489,30 @@ describe('migrateEnableAllProjectMcpServersToSettings', () => {
     expect(globalConfigStore.hasCompletedMcpServerMigration).toBe(true)
   })
 
+  test('should resolve overlapping servers when project config has no enabled list but existing settings have overlap', async () => {
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Mock existing settings with overlapping servers (serverA in both lists)
+    settingsStore.localSettings = {
+      enabledMcpjsonServers: ['serverA', 'serverB'],
+      disabledMcpjsonServers: ['serverA', 'serverC'],
+    }
+
+    // Mock project config with only disabled servers (no enabled list)
+    projectConfigStore = {
+      disabledMcpjsonServers: ['serverD'],
+    }
+
+    // Run migration
+    await migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify that serverA was removed from enabled list (conflict resolved)
+    expect(settingsStore.localSettings.enabledMcpjsonServers).toEqual(['serverB'])
+    // Verify that serverA is preserved in disabled list
+    expect(settingsStore.localSettings.disabledMcpjsonServers).toEqual(['serverA', 'serverC', 'serverD'])
+    expect(globalConfigStore.hasCompletedMcpServerMigration).toBe(true)
+  })
+
   test('should not log event when no servers overlap between enabled and disabled lists', async () => {
     const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
 

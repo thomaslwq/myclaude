@@ -13,7 +13,8 @@
  * (SDK -p mode via query.enableRemoteControl).
  */
 
-import { feature } from 'bun:bundle'
+// Use globalThis.feature injected by build script, or fallback to false
+const feature = (globalThis as any).feature || function (name: string) { return false; };
 import { hostname } from 'os'
 import { getOriginalCwd, getSessionId } from '../bootstrap/state.js'
 import type { SDKMessage } from '../entrypoints/agentSdkTypes.js'
