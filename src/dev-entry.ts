@@ -203,42 +203,120 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
   
   const missing: MissingImport[] = []
   const seen = new Set<string>()
-  const importPattern = /(?:import|export)\s+[^'"]*?from\s+['"`](\..?\/[^'"]+)['"`]/g
-  const requirePattern = /require\(\s*['"`](\..?\/[^'"]+)['"`]\s*\)/g
-  const dynamicImportPattern = /import\(\s*['"`](\..?\/[^'"]+)['"`]\s*\)/g
+
+  // ReDoS-safe import extraction using indexOf (O(n) per file, no backtracking)
+  function extractRelativeImports(text: string): string[] {
+    const results: string[] = []
+    const len = text.length
+
+    // Pattern 1: import/export ... from './...' (handles multi-line imports)
+    let i = 0
+    let inImportStatement = false
+    while (i < len) {
+      // Detect import/export keyword (standalone word)
+      if ((text[i] === 'i' && text.startsWith('import', i)) ||
+          (text[i] === 'e' && text.startsWith('export', i))) {
+        const before = i > 0 ? text[i - 1] : ' '
+        const after = text[i + 6] ?? ' '
+        if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+          inImportStatement = true
+          i += 6
+          continue
+        }
+      }
+      // Inside an import/export statement, try to extract a specifier after 'from'
+      if (inImportStatement && text[i] === 'f' && text.startsWith('from', i)) {
+        const before = i > 0 ? text[i - 1] : ' '
+        const after = text[i + 4] ?? ' '
+        if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+          let j = i + 4
+          while (j < len && /\s/.test(text[j])) j++
+          if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
+            const quote = text[j]
+            const specStart = j + 1
+            const specEnd = text.indexOf(quote, specStart)
+            if (specEnd !== -1) {
+              const spec = text.slice(specStart, specEnd)
+              if (spec.startsWith('./') || spec.startsWith('../')) {
+                results.push(spec)
+              }
+            }
+            inImportStatement = false
+            i = specEnd !== -1 ? specEnd + 1 : j + 1
+            continue
+          }
+          i = j + 1
+          continue
+        }
+      }
+      // A semicolon terminates an import/export statement
+      if (inImportStatement && text[i] === ';') {
+        inImportStatement = false
+      }
+      i++
+    }
+
+    // Pattern 2: require('./...')
+    i = 0
+    while (i < len) {
+      if (text[i] === 'r' && text.startsWith('require(', i)) {
+        const before = i > 0 ? text[i - 1] : ' '
+        const after = text[i + 7] ?? ' '
+        if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+          let j = i + 7
+          while (j < len && /\s/.test(text[j])) j++
+          if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
+            const quote = text[j]
+            const specStart = j + 1
+            const specEnd = text.indexOf(quote, specStart)
+            if (specEnd !== -1) {
+              const spec = text.slice(specStart, specEnd)
+              if (spec.startsWith('./') || spec.startsWith('../')) {
+                results.push(spec)
+              }
+            }
+            i = specEnd !== -1 ? specEnd + 1 : j + 1
+            continue
+          }
+        }
+      }
+      i++
+    }
+
+    // Pattern 3: import('./...')
+    i = 0
+    while (i < len) {
+      if (text[i] === 'i' && text.startsWith('import(', i)) {
+        const before = i > 0 ? text[i - 1] : ' '
+        const after = text[i + 6] ?? ' '
+        if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+          let j = i + 6
+          while (j < len && /\s/.test(text[j])) j++
+          if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
+            const quote = text[j]
+            const specStart = j + 1
+            const specEnd = text.indexOf(quote, specStart)
+            if (specEnd !== -1) {
+              const spec = text.slice(specStart, specEnd)
+              if (spec.startsWith('./') || spec.startsWith('../')) {
+                results.push(spec)
+              }
+            }
+            i = specEnd !== -1 ? specEnd + 1 : j + 1
+            continue
+          }
+        }
+      }
+      i++
+    }
+
+    return results
+  }
 
   for (const file of files) {
     const text = await getFileContent(file)
     if (!text) continue
-    for (const match of text.matchAll(importPattern)) {
-      const specifier = match[1]
-      if (!specifier) continue
-      const target = resolve(dirname(file), specifier)
-      if (await hasResolvableTarget(target)) continue
-      const key = `${file} -> ${specifier}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      missing.push({
-        importer: file,
-        specifier,
-      })
-    }
-    for (const match of text.matchAll(requirePattern)) {
-      const specifier = match[1]
-      if (!specifier) continue
-      const target = resolve(dirname(file), specifier)
-      if (await hasResolvableTarget(target)) continue
-      const key = `${file} -> ${specifier}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      missing.push({
-        importer: file,
-        specifier,
-      })
-    }
-    for (const match of text.matchAll(dynamicImportPattern)) {
-      const specifier = match[1]
-      if (!specifier) continue
+    for (const specifier of extractRelativeImports(text)) {
       const target = resolve(dirname(file), specifier)
       if (await hasResolvableTarget(target)) continue
       const key = `${file} -> ${specifier}`

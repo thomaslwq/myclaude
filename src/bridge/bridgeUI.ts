@@ -87,6 +87,11 @@ export function createBridgeLogger(options: {
   let connectingTimer: ReturnType<typeof setInterval> | null = null
   let connectingTick = 0
 
+  // Reconnecting/failed state data (stored so renderStatusLine can re-render them)
+  let reconnectingDelayStr = ''
+  let reconnectingElapsedStr = ''
+  let failedError = ''
+
   /**
    * Count how many visual terminal rows a string occupies, accounting for
    * line wrapping. Each `\n` is one row, and content wider than the terminal
@@ -186,10 +191,53 @@ export function createBridgeLogger(options: {
 
   /** Render and write the current status lines based on state. */
   function renderStatusLine(): void {
-    if (currentState === 'reconnecting' || currentState === 'failed') {
-      // These states are handled separately (updateReconnectingStatus /
-      // updateFailedStatus). Return before clearing so callers like toggleQr
-      // and setSpawnModeDisplay don't blank the display during these states.
+    if (currentState === 'reconnecting') {
+      // Re-render reconnecting status with current QR visibility
+      clearStatusLines()
+
+      // QR code above the status line
+      if (qrVisible) {
+        for (const line of qrLines) {
+          writeStatus(`${chalk.dim(line)}\n`)
+        }
+      }
+
+      const frame =
+        BRIDGE_SPINNER_FRAMES[connectingTick % BRIDGE_SPINNER_FRAMES.length]!
+      connectingTick++
+      writeStatus(
+        `${chalk.yellow(frame)} ${chalk.yellow('Reconnecting')} ${chalk.dim('\u00b7')} ${chalk.dim(`retrying in ${reconnectingDelayStr}`)} ${chalk.dim('\u00b7')} ${chalk.dim(`disconnected ${reconnectingElapsedStr}`)}\n`,
+      )
+      return
+    }
+
+    if (currentState === 'failed') {
+      // Re-render failed status with current QR visibility
+      clearStatusLines()
+
+      // QR code above the status line
+      if (qrVisible) {
+        for (const line of qrLines) {
+          writeStatus(`${chalk.dim(line)}\n`)
+        }
+      }
+
+      let suffix = ''
+      if (repoName) {
+        suffix += chalk.dim(' \u00b7 ') + chalk.dim(repoName)
+      }
+      if (branch) {
+        suffix += chalk.dim(' \u00b7 ') + chalk.dim(branch)
+      }
+
+      writeStatus(
+        `${chalk.red(BRIDGE_FAILED_INDICATOR)} ${chalk.red('Remote Control Failed')}${suffix}\n`,
+      )
+      writeStatus(`${chalk.dim(FAILED_FOOTER_TEXT)}\n`)
+
+      if (failedError) {
+        writeStatus(`${chalk.red(failedError)}\n`)
+      }
       return
     }
 
@@ -408,6 +456,8 @@ export function createBridgeLogger(options: {
       stopConnecting()
       clearStatusLines()
       currentState = 'reconnecting'
+      reconnectingDelayStr = delayStr
+      reconnectingElapsedStr = elapsedStr
 
       // QR code above the status line
       if (qrVisible) {
@@ -428,6 +478,7 @@ export function createBridgeLogger(options: {
       stopConnecting()
       clearStatusLines()
       currentState = 'failed'
+      failedError = error
 
       let suffix = ''
       if (repoName) {
@@ -521,9 +572,6 @@ export function createBridgeLogger(options: {
     },
 
     refreshDisplay(): void {
-      // Skip during reconnecting/failed — renderStatusLine clears then returns
-      // early for those states, which would erase the spinner/error.
-      if (currentState === 'reconnecting' || currentState === 'failed') return
       renderStatusLine()
     },
   }
