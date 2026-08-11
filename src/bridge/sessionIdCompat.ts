@@ -53,5 +53,6 @@ export function toCompatSessionId(id: string): string {
  */
 export function toInfraSessionId(id: string): string {
   if (!id.startsWith('session_')) return id
+  if (_isCseShimEnabled && !_isCseShimEnabled()) return id
   return 'cse_' + id.slice('session_'.length)
 }
