@@ -85,10 +85,9 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       replBridgeEnabled: '0',
     })
     expect(result.remoteControlAtStartup).toBe(false)
-    expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle string "" correctly', async () => {
+  it('should handle string "yes" correctly', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -99,10 +98,9 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
 
     const result = calls[0]({
       remoteControlAtStartup: undefined,
-      replBridgeEnabled: '',
+      replBridgeEnabled: 'yes',
     })
-    expect(result.remoteControlAtStartup).toBe(false)
-    expect(result.replBridgeEnabled).toBeUndefined()
+    expect(result.remoteControlAtStartup).toBe(true)
   })
 
   it('should handle string "no" correctly', async () => {
@@ -119,7 +117,22 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       replBridgeEnabled: 'no',
     })
     expect(result.remoteControlAtStartup).toBe(false)
-    expect(result.replBridgeEnabled).toBeUndefined()
+  })
+
+  it('should handle string "on" correctly', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'on',
+    })
+    expect(result.remoteControlAtStartup).toBe(true)
   })
 
   it('should handle string "off" correctly', async () => {
@@ -136,7 +149,22 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       replBridgeEnabled: 'off',
     })
     expect(result.remoteControlAtStartup).toBe(false)
-    expect(result.replBridgeEnabled).toBeUndefined()
+  })
+
+  it('should handle string "enabled" correctly', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'enabled',
+    })
+    expect(result.remoteControlAtStartup).toBe(true)
   })
 
   it('should handle string "disabled" correctly', async () => {
@@ -153,10 +181,9 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       replBridgeEnabled: 'disabled',
     })
     expect(result.remoteControlAtStartup).toBe(false)
-    expect(result.replBridgeEnabled).toBeUndefined()
   })
 
-  it('should handle object value as truthy', async () => {
+  it('should handle empty string correctly', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -167,303 +194,12 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
 
     const result = calls[0]({
       remoteControlAtStartup: undefined,
-      replBridgeEnabled: { enabled: true },
+      replBridgeEnabled: '',
     })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
+    expect(result.remoteControlAtStartup).toBe(false)
   })
 
-  it('should handle string "active" (unknown) as truthy', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'active',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
-  })
-
-  it('should handle string "null" as truthy (edge case, non-empty string)', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'null',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
-  })
-
-  it('should handle string "undefined" as truthy (edge case, non-empty string)', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'undefined',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
-  })
-
-  it('should handle string "enable" as truthy (preserving original Boolean() behavior)', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'enable',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
-  })
-
-  it('should handle string "1" as truthy', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: '1',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
-  })
-
-  it('should handle string "yes" as truthy', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'yes',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
-  })
-
-  it('should handle string "on" as truthy', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'on',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
-  })
-
-  it('should handle string "enabled" as truthy', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'enabled',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-    expect(result.replBridgeEnabled).toBeUndefined()
-  })
-
-  it('should not migrate if old key is undefined', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: undefined,
-    })
-    expect(result).toEqual({
-      remoteControlAtStartup: undefined,
-    })
-  })
-
-  it('should not migrate if new key already exists', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    const result = calls[0]({
-      remoteControlAtStartup: true,
-      replBridgeEnabled: true,
-    })
-    expect(result).toEqual({
-      remoteControlAtStartup: true,
-      replBridgeEnabled: true,
-    })
-  })
-
-  it('should handle async delayed write correctly', async () => {
-    // Simulate a delayed async write (e.g. file I/O taking time)
-    const delay = 10
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      await new Promise(resolve => setTimeout(resolve, delay))
-      return cb({
-        remoteControlAtStartup: undefined,
-        replBridgeEnabled: true,
-      })
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalled()
-  })
-
-  it('should handle async failure gracefully', async () => {
-    // Simulate an async failure (e.g. file I/O error)
-    mockSaveGlobalConfig.mockRejectedValue(new Error('File system error'))
-    await expect(migrateReplBridgeEnabledToRemoteControlAtStartup()).rejects.toThrow('File system error')
-  })
-
-  it('should not log sensitive data for unknown string values', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    // Test with an API key - the raw value should NOT appear in the log message
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 'sk-1234567890abcdef',
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-
-    // Verify that logForDebugging was called WITHOUT the raw value
-    // i.e., the raw value should not be in any log message
-    for (const args of mockLogForDebugging.mock.calls) {
-      const message = args[0] as string
-      expect(message).not.toContain('sk-1234567890abcdef')
-    }
-  })
-
-  it('should not log sensitive data for unknown string values with special characters', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    // Test with a JWT token
-    const jwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: jwtToken,
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-
-    // Verify that logForDebugging was called WITHOUT the raw value
-    for (const args of mockLogForDebugging.mock.calls) {
-      const message = args[0] as string
-      expect(message).not.toContain(jwtToken)
-    }
-  })
-
-  it('should not log sensitive data for unknown object values', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    // Test with an object containing sensitive data
-    const obj = { apiKey: 'sk-1234567890abcdef', secret: 'secret123' }
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: obj,
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-
-    // Verify that logForDebugging was called WITHOUT the raw object value
-    for (const args of mockLogForDebugging.mock.calls) {
-      const message = args[0] as string
-      expect(message).not.toContain('sk-1234567890abcdef')
-      expect(message).not.toContain('secret123')
-    }
-  })
-
-  it('should not log sensitive data for unknown number values', async () => {
-    const calls: ((prev: any) => any)[] = []
-    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
-      calls.push(cb)
-    })
-    await migrateReplBridgeEnabledToRemoteControlAtStartup()
-
-    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
-
-    // Test with a number (should be truthy)
-    const result = calls[0]({
-      remoteControlAtStartup: undefined,
-      replBridgeEnabled: 12345,
-    })
-    expect(result.remoteControlAtStartup).toBe(true)
-
-    // Verify that logForDebugging was called WITHOUT the raw value
-    for (const args of mockLogForDebugging.mock.calls) {
-      const message = args[0] as string
-      expect(message).not.toContain('12345')
-    }
-  })
-
-  it('should log the type of the value instead of the raw value', async () => {
+  it('should handle unknown string values by defaulting to false and logging a warning', async () => {
     const calls: ((prev: any) => any)[] = []
     mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
       calls.push(cb)
@@ -477,13 +213,105 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
       remoteControlAtStartup: undefined,
       replBridgeEnabled: 'some-unknown-value',
     })
-    expect(result.remoteControlAtStartup).toBe(true)
+    expect(result.remoteControlAtStartup).toBe(false)
 
-    // Verify that logForDebugging was called with the type rather than the raw value
+    // Verify that logForDebugging was called with a warning
     expect(mockLogForDebugging).toHaveBeenCalled()
     const message = mockLogForDebugging.mock.calls[0][0] as string
-    expect(message).toContain('string')
-    expect(message).not.toContain('some-unknown-value')
+    expect(message).toContain('Unknown replBridgeEnabled value')
+    expect(message).toContain('some-unknown-value')
+  })
+
+  it('should handle unknown string values with trailing spaces by defaulting to false and logging a warning', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    // Test with an unknown string value with trailing spaces
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'on_typo ',
+    })
+    expect(result.remoteControlAtStartup).toBe(false)
+
+    // Verify that logForDebugging was called with a warning
+    expect(mockLogForDebugging).toHaveBeenCalled()
+    const message = mockLogForDebugging.mock.calls[0][0] as string
+    expect(message).toContain('Unknown replBridgeEnabled value')
+    expect(message).toContain('on_typo ')
+  })
+
+  it('should handle unknown string values with leading spaces by defaulting to false and logging a warning', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    // Test with an unknown string value with leading spaces
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: ' enable',
+    })
+    expect(result.remoteControlAtStartup).toBe(false)
+
+    // Verify that logForDebugging was called with a warning
+    expect(mockLogForDebugging).toHaveBeenCalled()
+    const message = mockLogForDebugging.mock.calls[0][0] as string
+    expect(message).toContain('Unknown replBridgeEnabled value')
+    expect(message).toContain(' enable')
+  })
+
+  it('should handle unknown string values with mixed case by defaulting to false and logging a warning', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    // Test with an unknown string value with mixed case
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'EnAbLe',
+    })
+    expect(result.remoteControlAtStartup).toBe(false)
+
+    // Verify that logForDebugging was called with a warning
+    expect(mockLogForDebugging).toHaveBeenCalled()
+    const message = mockLogForDebugging.mock.calls[0][0] as string
+    expect(message).toContain('Unknown replBridgeEnabled value')
+    expect(message).toContain('EnAbLe')
+  })
+
+  it('should handle non-string, non-boolean values by defaulting to false and logging a warning', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    // Test with an unknown number value
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 12345,
+    })
+    expect(result.remoteControlAtStartup).toBe(false)
+
+    // Verify that logForDebugging was called with a warning
+    expect(mockLogForDebugging).toHaveBeenCalled()
+    const message = mockLogForDebugging.mock.calls[0][0] as string
+    expect(message).toContain('Unknown replBridgeEnabled value')
+    expect(message).toContain('number')
   })
 
   it('should not call logForDebugging for known values', async () => {
@@ -504,5 +332,88 @@ describe('migrateReplBridgeEnabledToRemoteControlAtStartup', () => {
 
     // Verify that logForDebugging was NOT called for known values
     expect(mockLogForDebugging).not.toHaveBeenCalled()
+  })
+
+  it('should not call logForDebugging for boolean values', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    // Test with a boolean value
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: true,
+    })
+    expect(result.remoteControlAtStartup).toBe(true)
+
+    // Verify that logForDebugging was NOT called for boolean values
+    expect(mockLogForDebugging).not.toHaveBeenCalled()
+  })
+
+  it('should not call logForDebugging for undefined values', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    // Test with undefined value
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: undefined,
+    })
+    expect(result.remoteControlAtStartup).toBe(undefined)
+
+    // Verify that logForDebugging was NOT called for undefined values
+    expect(mockLogForDebugging).not.toHaveBeenCalled()
+  })
+
+  it('should not migrate if remoteControlAtStartup already exists', async () => {
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      return cb({
+        remoteControlAtStartup: true,
+        replBridgeEnabled: 'true',
+      })
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+    expect(mockSaveGlobalConfig).toHaveBeenCalledWith(expect.any(Function))
+  })
+
+  it('should not migrate if replBridgeEnabled is undefined', async () => {
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      return cb({
+        remoteControlAtStartup: undefined,
+        replBridgeEnabled: undefined,
+      })
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+    expect(mockSaveGlobalConfig).toHaveBeenCalledWith(expect.any(Function))
+  })
+
+  it('should remove replBridgeEnabled after migration', async () => {
+    const calls: ((prev: any) => any)[] = []
+    mockSaveGlobalConfig.mockImplementation(async (cb: (prev: any) => any) => {
+      calls.push(cb)
+    })
+    await migrateReplBridgeEnabledToRemoteControlAtStartup()
+
+    expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
+
+    const result = calls[0]({
+      remoteControlAtStartup: undefined,
+      replBridgeEnabled: 'true',
+    })
+    expect(result.remoteControlAtStartup).toBe(true)
+    expect(result.replBridgeEnabled).toBe(undefined)
   })
 })

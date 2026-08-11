@@ -30,8 +30,8 @@ export async function migrateReplBridgeEnabledToRemoteControlAtStartup(): Promis
     if (oldValue === undefined) return prev
     if (prev.remoteControlAtStartup !== undefined) return prev
     // Use a whitelist of known truthy and falsy values.
-    // Unknown strings are treated as truthy to preserve the original Boolean() behavior
-    // and avoid silently disabling a feature for users with non-standard configurations.
+    // Unknown strings are treated as falsy to be safe and avoid silently
+    // enabling a feature for users with malformed config values.
     const truthyValues = ['true', '1', 'yes', 'on', 'enabled']
     const falsyValues = ['false', '0', 'no', 'off', 'disabled', '']
     const normalizedString = typeof oldValue === 'string' ? oldValue.toLowerCase().trim() : ''
@@ -44,16 +44,21 @@ export async function migrateReplBridgeEnabledToRemoteControlAtStartup(): Promis
       } else if (falsyValues.includes(normalizedString)) {
         newValue = false
       } else {
-        // Unknown string value: preserve the original Boolean() behavior (truthy)
-        // and log a warning so the user can review the value manually.
+        // Unknown string value: default to false (safer) and log a warning
+        // so the user can review the value manually.
         logForDebugging(
-          `Unknown replBridgeEnabled value of type "${typeof oldValue}" during migration to remoteControlAtStartup; treating as truthy. Please review this value manually.`,
+          `Unknown replBridgeEnabled value "${oldValue}" during migration to remoteControlAtStartup; defaulting to false. Please review this value manually.`,
           { level: 'warn' },
         )
-        newValue = true
+        newValue = false
       }
     } else {
-      newValue = !!oldValue
+      // For non-string, non-boolean values, default to false and log a warning
+      logForDebugging(
+        `Unknown replBridgeEnabled value of type "${typeof oldValue}" during migration to remoteControlAtStartup; defaulting to false. Please review this value manually.`,
+        { level: 'warn' },
+      )
+      newValue = false
     }
     const { replBridgeEnabled: _unused, ...rest } = legacy
     const next = { ...rest, remoteControlAtStartup: newValue }
