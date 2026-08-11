@@ -61,14 +61,14 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
     return
   }
 
-  // Build updates for settings migration
-  const updates: Partial<{
-    enableAllProjectMcpServers: boolean
-    enabledMcpjsonServers: string[]
-    disabledMcpjsonServers: string[]
-  }> = {}
-
+  // Build the complete settings object by merging MCP fields into existing settings.
+  // We explicitly merge here rather than relying on updateSettingsForSource's internal
+  // merge behavior, ensuring that non-MCP settings (e.g., model, permissions, fastMode)
+  // are never lost regardless of how updateSettingsForSource is implemented.
   const existingSettings = getSettingsForSource('localSettings') || {}
+
+  // Start with a shallow copy of all existing settings as the base
+  const updates: Record<string, unknown> = { ...existingSettings }
 
   // Migrate enableAllProjectMcpServers if it exists
   if (hasEnableAll) {
@@ -128,15 +128,14 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
     const hashedOverlappingServers = overlappingServers.map(server =>
       createHash('sha256').update(server).digest('hex')
     )
+
     logEvent('tengu_migrate_mcp_server_conflict_resolved', {
       overlappingServers: hashedOverlappingServers.join(','),
       conflictResolution: 'removed_from_enabled_list',
     })
   }
 
-  // Set the merged arrays in updates
-  // The disabled list is preserved as-is (including any overlapping servers) so that
-  // an explicit user intent to disable a server is not silently overridden.
+  // Apply the merged MCP settings to the updates object
   if (hasEnabledServers) {
     updates.enabledMcpjsonServers = existingEnabledServers
   }
