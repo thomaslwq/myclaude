@@ -161,6 +161,7 @@ import {
   finishHotfixCmd,
 } from './commands/git-flow/index.js'
 import frontendTdd from './commands/frontend-tdd.js'
+import agenticTdd from './commands/agentic-tdd.js'
 import remember from './commands/remember.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
@@ -325,6 +326,7 @@ const COMMANDS = memoize((): Command[] => [
   newHotfixCmd,
   finishHotfixCmd,
   frontendTdd,
+  agenticTdd,
   tag,
   theme,
   feedback,
