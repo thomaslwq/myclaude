@@ -47,7 +47,7 @@ export async function migrateReplBridgeEnabledToRemoteControlAtStartup(): Promis
         // Unknown string value: preserve the original Boolean() behavior (truthy)
         // and log a warning so the user can review the value manually.
         logForDebugging(
-          `Unknown replBridgeEnabled value "${oldValue}" during migration to remoteControlAtStartup; treating as truthy. Please review this value manually.`,
+          `Unknown replBridgeEnabled value of type "${typeof oldValue}" during migration to remoteControlAtStartup; treating as truthy. Please review this value manually.`,
           { level: 'warn' },
         )
         newValue = true
