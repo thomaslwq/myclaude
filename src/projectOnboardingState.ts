@@ -6,7 +6,6 @@ import {
 import { getCwd } from './utils/cwd.js'
 import { isDirEmptySync } from './utils/file.js'
 import { getFsImplementation } from './utils/fsOperations.js'
-import { watchFile, unwatchFile } from 'fs'
 
 export type Step = {
   key: string
@@ -41,14 +40,10 @@ let cache: {
   timestamp: number
   claudeMdMtime: number | null
   isWorkspaceDirEmpty: boolean
-  watcher?: NodeJS.WatchListener
 } | null = null
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
 export function clearCachedSteps(): void {
-  if (cache?.watcher) {
-    unwatchFile(join(getCwd(), 'CLAUDE.md'), cache.watcher)
-  }
   cache = null
 }
 
