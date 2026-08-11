@@ -96,6 +96,44 @@ describe('resetAutoModeOptInForDefaultOffer', () => {
     expect(mockSaveGlobalConfig).toHaveBeenCalled()
   })
 
+  it('should read fresh settings after clearing (no stale cache) (issue #592)', () => {
+    // Simulate the real settings.ts behavior: updateSettingsForSource deletes
+    // undefined-valued keys and resets the cache, so the follow-up read in the
+    // migration sees the flag as cleared — no stale-cache warning.
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') {
+        return {
+          skipAutoPermissionPrompt: true,
+          permissions: { defaultMode: 'ask' },
+        }
+      }
+      if (source === 'localSettings') return {}
+      if (source === 'projectSettings') return {}
+      return null
+    })
+    mockUpdateSettingsForSource.mockImplementation((source: string, updates: any) => {
+      for (const key of Object.keys(updates)) {
+        if (updates[key] === undefined) {
+          mockGetSettingsForSource.mockImplementation((s: string) => {
+            if (s === source) return { permissions: { defaultMode: 'ask' } }
+            if (s === 'userSettings') return { permissions: { defaultMode: 'ask' } }
+            return {}
+          })
+        }
+      }
+    })
+
+    resetAutoModeOptInForDefaultOffer()
+
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { skipAutoPermissionPrompt: undefined },
+    )
+    // The post-clear read must see the flag cleared — no warning about stale data
+    expect(console.warn).not.toHaveBeenCalled()
+    expect(mockSaveGlobalConfig).toHaveBeenCalled()
+  })
+
   it('should throw error when updateSettingsForSource fails', () => {
     mockGetSettingsForSource.mockImplementation((source: string) => {
       if (source === 'userSettings') return {

@@ -235,6 +235,34 @@ describe('migrateFennecToOpus', () => {
     expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
   })
 
+  it('should skip non-string model values without crashing (issue #590)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    mockGetSettingsForSource.mockReturnValue({ model: 123 })
+
+    expect(() => migrateFennecToOpus()).not.toThrow()
+    expect(mockUpdateSettingsForSource).not.toHaveBeenCalled()
+  })
+
+  it('should not write fastMode when the current source has no fastMode set (issue #605)', () => {
+    mockGetAPIProvider.mockReturnValue('firstParty')
+    // userSettings has the fennec alias but no fastMode; projectSettings
+    // (higher precedence) explicitly sets fastMode: false.
+    mockGetSettingsForSource.mockImplementation((source: string) => {
+      if (source === 'userSettings') return { model: 'fennec-fast-latest' }
+      if (source === 'projectSettings') return { model: 'opus', fastMode: false }
+      return null
+    })
+
+    migrateFennecToOpus()
+
+    // The userSettings update must NOT introduce fastMode: true — it would
+    // shadow the user's explicit fastMode: false in projectSettings.
+    expect(mockUpdateSettingsForSource).toHaveBeenCalledWith(
+      'userSettings',
+      { model: 'opus' },
+    )
+  })
+
   it('should log error and re-throw', () => {
     mockGetAPIProvider.mockReturnValue('firstParty')
     mockGetSettingsForSource.mockImplementation(() => {
