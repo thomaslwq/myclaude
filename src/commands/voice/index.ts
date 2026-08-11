@@ -1,19 +1,10 @@
 import type { Command } from '../../commands.js'
-import {
-  isVoiceGrowthBookEnabled,
-  isVoiceModeEnabled,
-} from '../../voice/voiceModeEnabled.js'
 
 const voice = {
-  type: 'local',
+  type: 'local-jsx',
   name: 'voice',
-  description: 'Toggle voice mode',
-  availability: ['claude-ai'],
-  isEnabled: () => isVoiceGrowthBookEnabled(),
-  get isHidden() {
-    return !isVoiceModeEnabled()
-  },
-  supportsNonInteractive: false,
+  description: 'Start voice input mode for hands-free coding',
+  aliases: ['v'],
   load: () => import('./voice.js'),
 } satisfies Command
 
