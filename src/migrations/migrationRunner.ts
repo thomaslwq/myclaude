@@ -50,6 +50,16 @@ export function topologicalSort(migrations: Migration[]): Migration[] {
     nameToMigration.set(m.name, m)
   }
 
+  // Check for self-dependency
+  for (const m of migrations) {
+    if (m.dependsOn?.includes(m.name)) {
+      throw new Error(
+        `Self-dependency detected in migration '${m.name}'. ` +
+        `A migration cannot depend on itself.`,
+      )
+    }
+  }
+
   // Validate all dependencies exist and deduplicate them
   const dependsOnMap = new Map<string, Set<string>>()
   for (const m of migrations) {
