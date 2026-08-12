@@ -16,6 +16,11 @@ import { getClaudeAIOAuthTokens } from '../utils/auth.js'
 
 /** Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined. */
 export function getBridgeTokenOverride(): string | undefined {
+  // Gate dev overrides behind a build-time feature flag to prevent
+  // production builds from being vulnerable to environment variable attacks
+  if (!feature('DEV_BRIDGE_OVERRIDES')) {
+    return undefined
+  }
   return (
     (process.env.USER_TYPE === 'ant' &&
       process.env.CLAUDE_BRIDGE_OAUTH_TOKEN) ||
@@ -25,6 +30,11 @@ export function getBridgeTokenOverride(): string | undefined {
 
 /** Ant-only dev override: CLAUDE_BRIDGE_BASE_URL, else undefined. */
 export function getBridgeBaseUrlOverride(): string | undefined {
+  // Gate dev overrides behind a build-time feature flag to prevent
+  // production builds from being vulnerable to environment variable attacks
+  if (!feature('DEV_BRIDGE_OVERRIDES')) {
+    return undefined
+  }
   return (
     (process.env.USER_TYPE === 'ant' && process.env.CLAUDE_BRIDGE_BASE_URL) ||
     undefined

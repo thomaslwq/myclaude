@@ -140,6 +140,7 @@ export function createBridgeLogger(options: {
   function printLog(line: string): void {
     clearStatusLines()
     write(line)
+    renderStatusLine()
   }
 
   /** Regenerate the QR code with the given URL. */
