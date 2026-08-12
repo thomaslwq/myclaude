@@ -230,6 +230,27 @@ export { y } from './real2'
     }
   });
 
+  test('scanFiles should find files deeper than 10 levels of nesting', async () => {
+    const { scanFiles } = await import('../dev-entry.js');
+    
+    const testDir = createTempDir();
+    try {
+      // Create a deeply nested structure: testDir/a/b/c/.../n/file.ts (15 levels deep)
+      const deepPath = join(testDir, ...Array(15).fill('subdir'));
+      mkdirSync(deepPath, { recursive: true });
+      writeFileSync(join(deepPath, 'deep-file.ts'), 'console.log("deep");');
+      
+      const files: string[] = [];
+      // Use default maxDepth (should be 100, not 10)
+      await scanFiles(testDir, files);
+      
+      // Should find the deeply nested file
+      expect(files.some(f => f.includes('deep-file.ts'))).toBe(true);
+    } finally {
+      cleanupTempDir(testDir);
+    }
+  });
+
   test('file content cache should avoid re-reading unchanged files', async () => {
     const { collectMissingRelativeImports } = await import('../dev-entry.js');
     

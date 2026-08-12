@@ -66,7 +66,7 @@ async function getFileContent(filePath: string): Promise<string | null> {
 
 const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'])
 
-export async function scanFiles(dir: string, out: string[], maxDepth = 10, currentDepth = 0): Promise<void> {
+export async function scanFiles(dir: string, out: string[], maxDepth = 100, currentDepth = 0): Promise<void> {
   if (currentDepth > maxDepth) return
   let dirHandle
   try {
@@ -336,7 +336,7 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
     if (cached && (now - cached.timestamp) < SCAN_CACHE_TTL_MS) {
       files.push(...cached.files)
     } else {
-      await scanFiles(srcDir, files, 10)
+      await scanFiles(srcDir, files)
       scanCache.set(srcDir, { files: [...files], timestamp: now })
     }
   }
