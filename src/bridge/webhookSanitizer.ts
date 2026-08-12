@@ -28,11 +28,11 @@ export function sanitizeInboundWebhookContent<T>(content: T): T {
       .trim()
 
     // Escape any remaining HTML entities to prevent log injection
-    return escape(sanitized) as any
+    return escape(sanitized) as T
   }
 
   if (Array.isArray(content)) {
-    return content.map(item => sanitizeInboundWebhookContent(item)) as any
+    return content.map(item => sanitizeInboundWebhookContent(item)) as T
   }
 
   if (typeof content === 'object' && content !== null) {
@@ -42,7 +42,7 @@ export function sanitizeInboundWebhookContent<T>(content: T): T {
         sanitized[key] = sanitizeInboundWebhookContent(content[key])
       }
     }
-    return sanitized as any
+    return sanitized as T
   }
 
   return content
