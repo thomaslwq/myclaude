@@ -299,7 +299,13 @@ export function createBridgeLogger(options: {
       regenerateQr(connectUrl)
 
       if (verbose) {
-        write(chalk.dim(`Remote Control`) + ` v${MACRO.VERSION}\n`)
+        // MACRO is only assigned to globalThis by dev-entry.ts; fall back to
+        // an empty string so importing this module elsewhere doesn't throw
+        // ReferenceError (issue #650).
+        const version =
+          (globalThis as typeof globalThis & { MACRO?: { VERSION?: string } })
+            .MACRO?.VERSION ?? ''
+        write(chalk.dim(`Remote Control`) + ` v${version}\n`)
       }
       if (verbose) {
         if (config.spawnMode !== 'single-session') {

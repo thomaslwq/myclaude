@@ -133,10 +133,17 @@ export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
     const changed = diffResult.stdout.trim().split('\n').filter(Boolean)
     const untracked = untrackedResult.stdout.trim().split('\n').filter(Boolean)
     const files = [...changed, ...untracked]
+    // Resolve git-relative paths against the repo root, not the process CWD,
+    // so running from a subdirectory doesn't produce src/src/... paths (#648).
+    const { stdout: rootOut } = await exec('git rev-parse --show-toplevel', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    })
+    const repoRoot = rootOut.trim()
     // Filter to only source files we care about
     return files
       .filter(f => SUPPORTED_EXTENSIONS.has(extname(f)) && f.startsWith('src/'))
-      .map(f => resolve(f))
+      .map(f => join(repoRoot, f))
   } catch {
     // If git is not available or not a git repo, return empty to fall back to full scan
     console.debug('getChangedFilesSinceLastCommit: Git command failed (no commits or not a git repo), falling back to full directory scan')
@@ -183,6 +190,91 @@ export async function hasResolvableTarget(basePath: string): Promise<boolean> {
   }
 }
 
+/**
+ * Extract relative-import specifiers from source text, ignoring matches that
+ * appear inside comments or string literals (issue #649).
+ *
+ * The previous scanner matched `import`/`export ... from` patterns against
+ * the raw text, so a commented-out import or a string literal containing
+ * `from './x'` produced false "missing import" reports. This builds a mask of
+ * positions inside comments/strings and only keeps matches that start in real
+ * code.
+ */
+export function extractRelativeImports(text: string): string[] {
+  const n = text.length
+  const masked = new Uint8Array(n)
+  let i = 0
+  while (i < n) {
+    const ch = text[i]
+    const next = text[i + 1]
+    // Line comment
+    if (ch === '/' && next === '/') {
+      while (i < n && text[i] !== '\n') {
+        masked[i] = 1
+        i++
+      }
+      continue
+    }
+    // Block comment
+    if (ch === '/' && next === '*') {
+      masked[i] = 1
+      masked[i + 1] = 1
+      i += 2
+      while (i < n && !(text[i] === '*' && text[i + 1] === '/')) {
+        masked[i] = 1
+        i++
+      }
+      if (i < n) {
+        masked[i] = 1
+        masked[i + 1] = 1
+        i += 2
+      }
+      continue
+    }
+    // String literal (handles escapes)
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const quote = ch
+      masked[i] = 1
+      i++
+      while (i < n && text[i] !== quote) {
+        if (text[i] === '\\') {
+          masked[i] = 1
+          i++
+          if (i < n) {
+            masked[i] = 1
+            i++
+          }
+          continue
+        }
+        masked[i] = 1
+        i++
+      }
+      if (i < n) {
+        masked[i] = 1
+        i++
+      }
+      continue
+    }
+    i++
+  }
+
+  const specifiers: string[] = []
+  const patterns = [
+    /(?:import|export)\s+[^'"]*?from\s+['"`](\..?\/[^'"]+)['"`]/g,
+    /require\(\s*['"`](\..?\/[^'"]+)['"`]\s*\)/g,
+    /import\(\s*['"`](\..?\/[^'"]+)['"`]\s*\)/g,
+  ]
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      if (match.index !== undefined && masked[match.index] === 0) {
+        const spec = match[1]
+        if (spec) specifiers.push(spec)
+      }
+    }
+  }
+  return specifiers
+}
+
 export async function collectMissingRelativeImports(): Promise<MissingImport[]> {
   const files: string[] = []
   
@@ -207,42 +299,11 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
   
   const missing: MissingImport[] = []
   const seen = new Set<string>()
-  const importPattern = /(?:import|export)\s+[^'"]*?from\s+['"`](\..?\/[^'"]+)['"`]/g
-  const requirePattern = /require\(\s*['"`](\..?\/[^'"]+)['"`]\s*\)/g
-  const dynamicImportPattern = /import\(\s*['"`](\..?\/[^'"]+)['"`]\s*\)/g
 
   for (const file of files) {
     const text = await getFileContent(file)
     if (!text) continue
-    for (const match of text.matchAll(importPattern)) {
-      const specifier = match[1]
-      if (!specifier) continue
-      const target = resolve(dirname(file), specifier)
-      if (await hasResolvableTarget(target)) continue
-      const key = `${file} -> ${specifier}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      missing.push({
-        importer: file,
-        specifier,
-      })
-    }
-    for (const match of text.matchAll(requirePattern)) {
-      const specifier = match[1]
-      if (!specifier) continue
-      const target = resolve(dirname(file), specifier)
-      if (await hasResolvableTarget(target)) continue
-      const key = `${file} -> ${specifier}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      missing.push({
-        importer: file,
-        specifier,
-      })
-    }
-    for (const match of text.matchAll(dynamicImportPattern)) {
-      const specifier = match[1]
-      if (!specifier) continue
+    for (const specifier of extractRelativeImports(text)) {
       const target = resolve(dirname(file), specifier)
       if (await hasResolvableTarget(target)) continue
       const key = `${file} -> ${specifier}`

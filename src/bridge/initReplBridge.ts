@@ -14,6 +14,7 @@
  */
 
 import { feature } from 'bun:bundle'
+import { createRequire } from 'node:module'
 import { hostname } from 'os'
 import { getOriginalCwd, getSessionId } from '../bootstrap/state.js'
 import type { SDKMessage } from '../entrypoints/agentSdkTypes.js'
@@ -475,10 +476,11 @@ export async function initReplBridge(
   // assistant module out of external builds entirely.
   let workerType: BridgeWorkerType = 'claude_code'
   if (feature('KAIROS')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
+    // ESM source: bare require() is undefined under Node. Use createRequire
+    // so this branch still works when run with the Node runtime (issue #647).
+    const req = createRequire(import.meta.url)
     const { isAssistantMode } =
-      require('../assistant/index.js') as typeof import('../assistant/index.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
+      req('../assistant/index.js') as typeof import('../assistant/index.js')
     if (isAssistantMode()) {
       workerType = 'claude_code_assistant'
     }
