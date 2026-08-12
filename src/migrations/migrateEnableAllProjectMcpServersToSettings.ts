@@ -172,11 +172,11 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
     throw error
   }
 
-  // Step 2: Remove migrated fields from project config (atomic write)
+  // Step 2: Remove migrated fields from project config (atomic write via temp file + rename)
   // If this fails, the fields exist in both places (harmless, migration is idempotent).
-  // However, if saveCurrentProjectConfig partially writes (non-atomic fallback), the
-  // project config could be corrupted. Wrapping in try-catch ensures the migration is
-  // not marked as complete, so it will re-run on next startup and attempt recovery.
+  // The write is always atomic — no non-atomic fallback is used, so a partial write cannot
+  // corrupt the project config. Wrapping in try-catch ensures the migration is not marked
+  // as complete, so it will re-run on next startup and attempt recovery.
   try {
     await saveCurrentProjectConfig((config: Record<string, any>) => {
       const updated = { ...config }
