@@ -40,6 +40,7 @@ let cache: {
   timestamp: number
   claudeMdMtime: number | null
   isWorkspaceDirEmpty: boolean
+  accessCount: number
 } | null = null
 
 /** Clear the steps cache (called after /init so the new CLAUDE.md is picked up). */
@@ -62,6 +63,14 @@ function isCacheValid(cached: NonNullable<typeof cache>): boolean {
   // system clock adjustments (e.g. NTP sync, daylight saving time).
   const now = performance.now()
   if (now - cached.timestamp > CACHE_TTL_MS) {
+    return false
+  }
+
+  // Check if the cache has been accessed too many times (potential overflow protection).
+  // If the cache has been accessed more than 1 million times, reset it to prevent
+  // potential integer overflow in the timestamp difference calculation.
+  // 1 million accesses at 5 second intervals = ~5.8 days of continuous operation.
+  if (cached.accessCount > 1_000_000) {
     return false
   }
 
@@ -91,6 +100,7 @@ function isCacheValid(cached: NonNullable<typeof cache>): boolean {
 export function getSteps(): Step[] {
   // Fast path: return the cached steps if they're still valid.
   if (cache && isCacheValid(cache)) {
+    cache.accessCount++
     return cache.steps
   }
 
@@ -129,6 +139,7 @@ export function getSteps(): Step[] {
     timestamp: performance.now(),
     claudeMdMtime,
     isWorkspaceDirEmpty,
+    accessCount: 0,
   }
   cache = newCache
 

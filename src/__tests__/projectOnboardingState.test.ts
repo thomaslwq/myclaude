@@ -149,6 +149,27 @@ describe('projectOnboardingState', () => {
       expect(mockIsDirEmptySync).toHaveBeenCalledTimes(2) // I/O occurred
     })
 
+    it('should invalidate cache after excessive accesses to prevent overflow', () => {
+      mockIsDirEmptySync.mockReturnValue(true)
+
+      // Initial call - workspace is empty
+      const steps1 = getSteps()
+      expect(steps1[0].isEnabled).toBe(true) // workspace step enabled
+
+      // Simulate many cache accesses (more than 1 million)
+      mockIsDirEmptySync.mockReturnValue(true)
+      for (let i = 0; i < 1_000_001; i++) {
+        getSteps()
+      }
+
+      // Reduce mock calls to verify the cache was rebuilt
+      // The cache should be invalidated due to excessive access count
+      // and the steps should still be correct
+      const steps2 = getSteps()
+      expect(steps2[0].isEnabled).toBe(true) // workspace step still enabled
+      expect(mockIsDirEmptySync.mock.calls.length).toBeGreaterThan(2)
+    })
+
     it('should invalidate cache when CLAUDE.md is deleted', () => {
       mockIsDirEmptySync.mockReturnValue(false)
       mockExistsSync.mockReturnValue(true)
