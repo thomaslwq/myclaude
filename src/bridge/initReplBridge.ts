@@ -43,7 +43,6 @@ import {
   isSyntheticMessage,
 } from '../utils/messages.js'
 import type { PermissionMode } from '../utils/permissions/PermissionMode.js'
-import { getCurrentSessionTitle } from '../utils/sessionStorage.js'
 import {
   extractConversationText,
   generateSessionTitle,
@@ -111,6 +110,12 @@ export type InitBridgeOptions = {
 export async function initReplBridge(
   options?: InitBridgeOptions,
 ): Promise<ReplBridgeHandle | null> {
+  // Dynamically import getCurrentSessionTitle to avoid statically pulling in
+  // src/utils/sessionStorage.ts → src/commands.ts → the entire slash command
+  // + React component tree (~1300 modules) via the static import chain.
+  // The heavy module is only loaded when initReplBridge is actually called.
+  const { getCurrentSessionTitle } = await import('../utils/sessionStorage.js')
+
   const {
     onInboundMessage,
     onPermissionResponse,
