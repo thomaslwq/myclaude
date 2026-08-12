@@ -355,10 +355,10 @@ export async function initReplBridge(
     // the new session gets its own count-3 derivation; hasTitle stays true
     // (new session was created via getCurrentTitle(), which reads the count-1
     // title from this closure), so count-1 of the fresh cycle correctly skips.
-    if (
-      lastBridgeSessionId !== undefined &&
-      lastBridgeSessionId !== bridgeSessionId
-    ) {
+    // Also reset when transitioning from no session (undefined) to a real
+    // session ID, so a stale count from pre-session messages doesn't leak
+    // into the first real session's count-3 derivation.
+    if (lastBridgeSessionId !== bridgeSessionId) {
       userMessageCount = 0
     }
     lastBridgeSessionId = bridgeSessionId
