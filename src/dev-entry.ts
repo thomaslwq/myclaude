@@ -252,10 +252,9 @@ export function extractRelativeImports(text: string): string[] {
         continue
       }
     }
-    // A newline terminates an import/export statement (semicolons are optional in JS/TS)
-    if (inImportStatement && (text[i] === '\n' || text[i] === '\r')) {
-      inImportStatement = false
-    }
+    // A newline does NOT terminate an import/export statement — multi-line imports/exports
+    // (e.g., import {\n  foo,\n  bar\n} from './utils') span multiple lines.
+    // Only a semicolon or successful 'from' extraction resets the flag.
     // A semicolon terminates an import/export statement
     if (inImportStatement && text[i] === ';') {
       inImportStatement = false

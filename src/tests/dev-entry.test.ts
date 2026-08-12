@@ -96,10 +96,66 @@ export { y } from './real2';
     expect(result).not.toContain('./comment-module-2');
   });
 
+  test('extractRelativeImports should handle multi-line import statements', async () => {
+    const { extractRelativeImports } = await import('../dev-entry.js');
+    
+    // Multi-line import: import {\n  foo,\n  bar\n} from './utils'
+    const text = `import {
+  foo,
+  bar
+} from './utils'
+`;
+    
+    const result = extractRelativeImports(text);
+    expect(result).toContain('./utils');
+  });
+
+  test('extractRelativeImports should handle multi-line export statements', async () => {
+    const { extractRelativeImports } = await import('../dev-entry.js');
+    
+    const text = `export {
+  foo,
+  bar
+} from './utils'
+`;
+    
+    const result = extractRelativeImports(text);
+    expect(result).toContain('./utils');
+  });
+
+  test('extractRelativeImports should handle mixed single-line and multi-line imports', async () => {
+    const { extractRelativeImports } = await import('../dev-entry.js');
+    
+    const text = `import foo from './foo'
+import {
+  bar,
+  baz
+} from './bar'
+import qux from './qux'
+`;
+    
+    const result = extractRelativeImports(text);
+    expect(result).toEqual(['./foo', './bar', './qux']);
+  });
+
+  test('extractRelativeImports should handle multi-line imports with trailing semicolon', async () => {
+    const { extractRelativeImports } = await import('../dev-entry.js');
+    
+    const text = `import {
+  foo,
+  bar
+} from './utils';
+`;
+    
+    const result = extractRelativeImports(text);
+    expect(result).toContain('./utils');
+  });
+
   test('extractRelativeImports should reset state on newlines (no semicolons)', async () => {
     const { extractRelativeImports } = await import('../dev-entry.js');
     
-    // Test with no semicolons (valid JS/TS) - newlines should reset state
+    // Test with no semicolons (valid JS/TS) - newlines between statements reset state,
+    // but NOT within a multi-line import/export statement
     const text = `
 import { x } from './real'
 const msg = "from './not-a-real-module'"
