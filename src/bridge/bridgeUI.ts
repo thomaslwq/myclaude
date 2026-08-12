@@ -1,5 +1,6 @@
 import chalk from 'chalk'
 import { toString as qrToString } from 'qrcode'
+import terminalSize from 'terminal-size'
 import {
   BRIDGE_FAILED_INDICATOR,
   BRIDGE_READY_INDICATOR,
@@ -38,6 +39,28 @@ const QR_OPTIONS = {
 async function generateQr(url: string): Promise<string[]> {
   const qr = await qrToString(url, QR_OPTIONS)
   return qr.split('\n').filter((line: string) => line.length > 0)
+}
+
+export function countVisualLines(text: string): number {
+  if (text.length === 0) return 0
+  const { columns: cols } = terminalSize()
+  let count = 0
+  // Split on newlines to get logical lines
+  for (const logical of text.split('\n')) {
+    if (logical.length === 0) {
+      // Empty segment between consecutive \n — counts as 1 row
+      count++
+      continue
+    }
+    const width = stringWidth(logical)
+    count += Math.max(1, Math.ceil(width / cols))
+  }
+  // The trailing \n in "line\n" produces an empty last element — don't count it
+  // because the cursor sits at the start of the next line, not a new visual row.
+  if (text.endsWith('\n')) {
+    count--
+  }
+  return count
 }
 
 export function createBridgeLogger(options: {
@@ -92,33 +115,6 @@ export function createBridgeLogger(options: {
   let reconnectingDelayStr = ''
   let reconnectingElapsedStr = ''
   let failedError = ''
-
-  /**
-   * Count how many visual terminal rows a string occupies, accounting for
-   * line wrapping. Each `\n` is one row, and content wider than the terminal
-   * wraps to additional rows.
-   */
-  function countVisualLines(text: string): number {
-    // eslint-disable-next-line custom-rules/prefer-use-terminal-size
-    const cols = process.stdout.columns || 80 // non-React CLI context
-    let count = 0
-    // Split on newlines to get logical lines
-    for (const logical of text.split('\n')) {
-      if (logical.length === 0) {
-        // Empty segment between consecutive \n — counts as 1 row
-        count++
-        continue
-      }
-      const width = stringWidth(logical)
-      count += Math.max(1, Math.ceil(width / cols))
-    }
-    // The trailing \n in "line\n" produces an empty last element — don't count it
-    // because the cursor sits at the start of the next line, not a new visual row.
-    if (text.endsWith('\n')) {
-      count--
-    }
-    return count
-  }
 
   /** Write a status line and track its visual line count. */
   function writeStatus(text: string): void {
