@@ -168,6 +168,9 @@ export async function hasResolvableTarget(basePath: string): Promise<boolean> {
         if (subFiles.has('index.ts')) return true
         if (subFiles.has('index.tsx')) return true
         if (subFiles.has('index.js')) return true
+        if (subFiles.has('index.jsx')) return true
+        if (subFiles.has('index.mjs')) return true
+        if (subFiles.has('index.cjs')) return true
       } catch {
         // Directory not readable
       }
