@@ -126,17 +126,29 @@ export async function migrateEnableAllProjectMcpServersToSettings(): Promise<voi
       server => !existingDisabledServers.includes(server)
     )
 
-    // Server names may contain sensitive information (internal service names, project
-    // identifiers), so we hash them before logging to analytics to avoid leaking
-    // internal infrastructure details.
-    const hashedOverlappingServers = overlappingServers.map(server =>
-      createHash('sha256').update(server).digest('hex')
+    // Check if the overlapping servers were already in the original settings' disabled list.
+    // If they were, the conflict was already resolved in a previous run (step 1 succeeded
+    // but step 2/3 failed). We suppress the duplicate event to avoid misleading analytics.
+    const existingDisabledServersFromSettings = Array.isArray(existingSettings.disabledMcpjsonServers)
+      ? existingSettings.disabledMcpjsonServers
+      : []
+    const isDuplicateConflict = overlappingServers.every(server =>
+      existingDisabledServersFromSettings.includes(server)
     )
 
-    logEvent('tengu_migrate_mcp_server_conflict_resolved', {
-      overlappingServers: hashedOverlappingServers.join(','),
-      conflictResolution: 'removed_from_enabled_list',
-    })
+    if (!isDuplicateConflict) {
+      // Server names may contain sensitive information (internal service names, project
+      // identifiers), so we hash them before logging to analytics to avoid leaking
+      // internal infrastructure details.
+      const hashedOverlappingServers = overlappingServers.map(server =>
+        createHash('sha256').update(server).digest('hex')
+      )
+
+      logEvent('tengu_migrate_mcp_server_conflict_resolved', {
+        overlappingServers: hashedOverlappingServers.join(','),
+        conflictResolution: 'removed_from_enabled_list',
+      })
+    }
   }
 
   // Apply the merged MCP settings to the updates object

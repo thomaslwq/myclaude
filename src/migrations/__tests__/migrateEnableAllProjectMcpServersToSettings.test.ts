@@ -67,6 +67,68 @@ beforeEach(() => {
 })
 
 describe('migrateEnableAllProjectMcpServersToSettings', () => {
+  test('should not log duplicate conflict event when settings already written', async () => {
+    // Set up initial state: settings already have the resolved values from a previous partial run
+    settingsStore['localSettings'] = {
+      enableAllProjectMcpServers: false,
+      enabledMcpjsonServers: ['serverA'],
+      disabledMcpjsonServers: ['serverB'],
+    }
+
+    // Project config still has the original overlapping values (step 2 failed)
+    projectConfigStore = {
+      enableAllProjectMcpServers: false,
+      enabledMcpjsonServers: ['serverA', 'serverB'],
+      disabledMcpjsonServers: ['serverB'],
+      otherField: 'keep-me',
+    }
+
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Run migration
+    await migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify the conflict event was NOT logged because the conflict was already resolved
+    const conflictEvents = logEventMock.mock.calls.filter(
+      (call: any) => call[0] === 'tengu_migrate_mcp_server_conflict_resolved'
+    )
+    expect(conflictEvents.length).toBe(0)
+
+    // But the migration completion event should still be logged
+    const completionEvents = logEventMock.mock.calls.filter(
+      (call: any) => call[0] === 'tengu_migrate_enable_all_project_mcp_servers_to_settings'
+    )
+    expect(completionEvents.length).toBe(1)
+  })
+
+  test('should still log conflict event when new overlapping servers appear', async () => {
+    // Set up initial state: settings already have some values
+    settingsStore['localSettings'] = {
+      enableAllProjectMcpServers: false,
+      enabledMcpjsonServers: ['serverA', 'serverC'],
+      disabledMcpjsonServers: ['serverB'],
+    }
+
+    // Project config has a NEW overlapping server 'serverC' that wasn't resolved before
+    projectConfigStore = {
+      enableAllProjectMcpServers: false,
+      enabledMcpjsonServers: ['serverA', 'serverC'],
+      disabledMcpjsonServers: ['serverB', 'serverC'],
+      otherField: 'keep-me',
+    }
+
+    const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
+
+    // Run migration
+    await migrateEnableAllProjectMcpServersToSettings()
+
+    // Verify the conflict event IS logged because 'serverC' is a new overlapping server
+    const conflictEvents = logEventMock.mock.calls.filter(
+      (call: any) => call[0] === 'tengu_migrate_mcp_server_conflict_resolved'
+    )
+    expect(conflictEvents.length).toBe(1)
+  })
+
   test('should only remove fields that were migrated (single field)', async () => {
     // Dynamic import after mocks are set up
     const { migrateEnableAllProjectMcpServersToSettings } = await import('../migrateEnableAllProjectMcpServersToSettings.js')
