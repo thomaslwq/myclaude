@@ -182,6 +182,144 @@ export async function hasResolvableTarget(basePath: string): Promise<boolean> {
   }
 }
 
+// ReDoS-safe import extraction using indexOf (O(n) per file, no backtracking)
+export function extractRelativeImports(text: string): string[] {
+  const results: string[] = []
+  const len = text.length
+
+  // Pattern 1: import/export ... from './...' (handles multi-line imports)
+  let i = 0
+  let inImportStatement = false
+  while (i < len) {
+    // Skip string literals (single, double, backtick) before any keyword checks
+    if (text[i] === '"' || text[i] === "'" || text[i] === '`') {
+      const quote = text[i]
+      let j = i + 1
+      while (j < len && text[j] !== quote) {
+        if (text[j] === '\\') j++ // skip escaped character
+        j++
+      }
+      i = j < len ? j + 1 : j
+      continue
+    }
+    // Skip single-line comments
+    if (text[i] === '/' && text[i + 1] === '/') {
+      let j = i + 2
+      while (j < len && text[j] !== '\n') j++
+      i = j
+      continue
+    }
+    // Skip multi-line comments
+    if (text[i] === '/' && text[i + 1] === '*') {
+      let j = i + 2
+      while (j < len - 1 && !(text[j] === '*' && text[j + 1] === '/')) j++
+      i = j + 2
+      continue
+    }
+    // Detect import/export keyword (standalone word)
+    if ((text[i] === 'i' && text.startsWith('import', i)) ||
+        (text[i] === 'e' && text.startsWith('export', i))) {
+      const before = i > 0 ? text[i - 1] : ' '
+      const after = text[i + 6] ?? ' '
+      if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+        inImportStatement = true
+        i += 6
+        continue
+      }
+    }
+    // Inside an import/export statement, try to extract a specifier after 'from'
+    if (inImportStatement && text[i] === 'f' && text.startsWith('from', i)) {
+      const before = i > 0 ? text[i - 1] : ' '
+      const after = text[i + 4] ?? ' '
+      if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+        let j = i + 4
+        while (j < len && /\s/.test(text[j])) j++
+        if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
+          const quote = text[j]
+          const specStart = j + 1
+          const specEnd = text.indexOf(quote, specStart)
+          if (specEnd !== -1) {
+            const spec = text.slice(specStart, specEnd)
+            if (spec.startsWith('./') || spec.startsWith('../')) {
+              results.push(spec)
+            }
+          }
+          inImportStatement = false
+          i = specEnd !== -1 ? specEnd + 1 : j + 1
+          continue
+        }
+        i = j + 1
+        continue
+      }
+    }
+    // A newline terminates an import/export statement (semicolons are optional in JS/TS)
+    if (inImportStatement && (text[i] === '\n' || text[i] === '\r')) {
+      inImportStatement = false
+    }
+    // A semicolon terminates an import/export statement
+    if (inImportStatement && text[i] === ';') {
+      inImportStatement = false
+    }
+    i++
+  }
+
+  // Pattern 2: require('./...')
+  i = 0
+  while (i < len) {
+    if (text[i] === 'r' && text.startsWith('require(', i)) {
+      const before = i > 0 ? text[i - 1] : ' '
+      const after = text[i + 7] ?? ' '
+      if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+        let j = i + 7
+        while (j < len && /\s/.test(text[j])) j++
+        if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
+          const quote = text[j]
+          const specStart = j + 1
+          const specEnd = text.indexOf(quote, specStart)
+          if (specEnd !== -1) {
+            const spec = text.slice(specStart, specEnd)
+            if (spec.startsWith('./') || spec.startsWith('../')) {
+              results.push(spec)
+            }
+          }
+          i = specEnd !== -1 ? specEnd + 1 : j + 1
+          continue
+        }
+      }
+    }
+    i++
+  }
+
+  // Pattern 3: import('./...')
+  i = 0
+  while (i < len) {
+    if (text[i] === 'i' && text.startsWith('import(', i)) {
+      const before = i > 0 ? text[i - 1] : ' '
+      const after = text[i + 6] ?? ' '
+      if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+        let j = i + 6
+        while (j < len && /\s/.test(text[j])) j++
+        if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
+          const quote = text[j]
+          const specStart = j + 1
+          const specEnd = text.indexOf(quote, specStart)
+          if (specEnd !== -1) {
+            const spec = text.slice(specStart, specEnd)
+            if (spec.startsWith('./') || spec.startsWith('../')) {
+              results.push(spec)
+            }
+          }
+          i = specEnd !== -1 ? specEnd + 1 : j + 1
+          continue
+        }
+      }
+    }
+    i++
+  }
+
+  return results
+}
+
 export async function collectMissingRelativeImports(): Promise<MissingImport[]> {
   const files: string[] = []
   
@@ -206,115 +344,6 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
   
   const missing: MissingImport[] = []
   const seen = new Set<string>()
-
-  // ReDoS-safe import extraction using indexOf (O(n) per file, no backtracking)
-  function extractRelativeImports(text: string): string[] {
-    const results: string[] = []
-    const len = text.length
-
-    // Pattern 1: import/export ... from './...' (handles multi-line imports)
-    let i = 0
-    let inImportStatement = false
-    while (i < len) {
-      // Detect import/export keyword (standalone word)
-      if ((text[i] === 'i' && text.startsWith('import', i)) ||
-          (text[i] === 'e' && text.startsWith('export', i))) {
-        const before = i > 0 ? text[i - 1] : ' '
-        const after = text[i + 6] ?? ' '
-        if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
-          inImportStatement = true
-          i += 6
-          continue
-        }
-      }
-      // Inside an import/export statement, try to extract a specifier after 'from'
-      if (inImportStatement && text[i] === 'f' && text.startsWith('from', i)) {
-        const before = i > 0 ? text[i - 1] : ' '
-        const after = text[i + 4] ?? ' '
-        if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
-          let j = i + 4
-          while (j < len && /\s/.test(text[j])) j++
-          if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
-            const quote = text[j]
-            const specStart = j + 1
-            const specEnd = text.indexOf(quote, specStart)
-            if (specEnd !== -1) {
-              const spec = text.slice(specStart, specEnd)
-              if (spec.startsWith('./') || spec.startsWith('../')) {
-                results.push(spec)
-              }
-            }
-            inImportStatement = false
-            i = specEnd !== -1 ? specEnd + 1 : j + 1
-            continue
-          }
-          i = j + 1
-          continue
-        }
-      }
-      // A semicolon terminates an import/export statement
-      if (inImportStatement && text[i] === ';') {
-        inImportStatement = false
-      }
-      i++
-    }
-
-    // Pattern 2: require('./...')
-    i = 0
-    while (i < len) {
-      if (text[i] === 'r' && text.startsWith('require(', i)) {
-        const before = i > 0 ? text[i - 1] : ' '
-        const after = text[i + 7] ?? ' '
-        if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
-          let j = i + 7
-          while (j < len && /\s/.test(text[j])) j++
-          if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
-            const quote = text[j]
-            const specStart = j + 1
-            const specEnd = text.indexOf(quote, specStart)
-            if (specEnd !== -1) {
-              const spec = text.slice(specStart, specEnd)
-              if (spec.startsWith('./') || spec.startsWith('../')) {
-                results.push(spec)
-              }
-            }
-            i = specEnd !== -1 ? specEnd + 1 : j + 1
-            continue
-          }
-        }
-      }
-      i++
-    }
-
-    // Pattern 3: import('./...')
-    i = 0
-    while (i < len) {
-      if (text[i] === 'i' && text.startsWith('import(', i)) {
-        const before = i > 0 ? text[i - 1] : ' '
-        const after = text[i + 6] ?? ' '
-        if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
-          let j = i + 6
-          while (j < len && /\s/.test(text[j])) j++
-          if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
-            const quote = text[j]
-            const specStart = j + 1
-            const specEnd = text.indexOf(quote, specStart)
-            if (specEnd !== -1) {
-              const spec = text.slice(specStart, specEnd)
-              if (spec.startsWith('./') || spec.startsWith('../')) {
-                results.push(spec)
-              }
-            }
-            i = specEnd !== -1 ? specEnd + 1 : j + 1
-            continue
-          }
-        }
-      }
-      i++
-    }
-
-    return results
-  }
 
   for (const file of files) {
     const text = await getFileContent(file)

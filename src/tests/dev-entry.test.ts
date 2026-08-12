@@ -70,6 +70,54 @@ describe('collectMissingRelativeImports performance', () => {
     expect(typeof collectMissingRelativeImports).toBe('function');
   });
 
+  test('extractRelativeImports should not produce false positives from strings and comments', async () => {
+    const { extractRelativeImports } = await import('../dev-entry.js');
+    
+    // Test with a string containing 'from' with a relative path - should NOT be extracted
+    const text = `
+import { x } from './real';
+const msg = "from './not-a-real-module'";
+const msg2 = \`from './not-a-real-module-2'\`;
+// from './comment-module'
+/* from './comment-module-2' */
+export { y } from './real2';
+`;
+    
+    const result = extractRelativeImports(text);
+    
+    // Should find the two real imports
+    expect(result).toContain('./real');
+    expect(result).toContain('./real2');
+    
+    // Should NOT include false positives from strings/comments
+    expect(result).not.toContain('./not-a-real-module');
+    expect(result).not.toContain('./not-a-real-module-2');
+    expect(result).not.toContain('./comment-module');
+    expect(result).not.toContain('./comment-module-2');
+  });
+
+  test('extractRelativeImports should reset state on newlines (no semicolons)', async () => {
+    const { extractRelativeImports } = await import('../dev-entry.js');
+    
+    // Test with no semicolons (valid JS/TS) - newlines should reset state
+    const text = `
+import { x } from './real'
+const msg = "from './not-a-real-module'"
+export { y } from './real2'
+`;
+    
+    const result = extractRelativeImports(text);
+    
+    // Should find the two real imports
+    expect(result).toContain('./real');
+    expect(result).toContain('./real2');
+    
+    // Should NOT include the false positive from the string
+    expect(result).not.toContain('./not-a-real-module');
+  });
+
+
+
   test('scanFiles should continue despite permission errors on subdirectories', async () => {
     const { scanFiles } = await import('../dev-entry.js');
     
