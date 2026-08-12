@@ -26,6 +26,7 @@ import type {
   SessionActivity,
   SpawnMode,
 } from './types.js'
+import pkg from '../../package.json'
 
 const QR_OPTIONS = {
   type: 'utf8' as const,
@@ -347,7 +348,7 @@ export function createBridgeLogger(options: {
       regenerateQr(connectUrl)
 
       if (verbose) {
-        write(chalk.dim(`Remote Control`) + ` v${MACRO.VERSION}\n`)
+        write(chalk.dim(`Remote Control`) + ` v${(globalThis as any).MACRO?.VERSION ?? pkg.version}\n`)
       }
       if (verbose) {
         if (config.spawnMode !== 'single-session') {
