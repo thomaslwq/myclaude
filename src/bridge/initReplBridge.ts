@@ -317,6 +317,10 @@ export async function initReplBridge(
   let userMessageCount = 0
   let lastBridgeSessionId: string | undefined
   let genSeq = 0
+  // AbortController for cancelling the previous title generation call when a
+  // new one is made. Prevents wasted API calls when the user sends messages
+  // quickly (e.g. pasting multiple lines).
+  let titleController = new AbortController()
   const patch = (
     derived: string,
     bridgeSessionId: string,
@@ -335,11 +339,19 @@ export async function initReplBridge(
   // Fire-and-forget Haiku generation with post-await guards. Re-checks /rename
   // (sessionStorage), v1 env-lost (lastBridgeSessionId), and same-session
   // out-of-order resolution (genSeq — count-1's Haiku resolving after count-3
-  // would clobber the richer title). generateSessionTitle never rejects.
+  // would clobber the richer title). Aborts the previous title generation call
+  // when a new one is made to avoid wasting API quota and CPU on stale requests.
+  // generateSessionTitle never rejects.
   const generateAndPatch = (input: string, bridgeSessionId: string): void => {
+    // Abort any previous title generation call that is still in-flight
+    titleController.abort()
+    titleController = new AbortController()
     const gen = ++genSeq
     const atCount = userMessageCount
-    void generateSessionTitle(input, AbortSignal.timeout(15_000)).then(
+    // Combine the 15-second timeout with the abort controller so we can cancel
+    // the previous call when a new user message arrives
+    const signal = AbortSignal.any([titleController.signal, AbortSignal.timeout(15_000)])
+    void generateSessionTitle(input, signal).then(
       generated => {
         if (
           generated &&
