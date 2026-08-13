@@ -70,8 +70,13 @@ function isCacheValid(cached: NonNullable<typeof cache>): boolean {
   const fs = getFsImplementation()
   const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
   if (hasClaudeMd) {
-    const currentMtime = fs.statSync(join(cwd, 'CLAUDE.md'))?.mtimeMs ?? null
-    if (currentMtime !== cached.claudeMdMtime) {
+    try {
+      const currentMtime = fs.statSync(join(cwd, 'CLAUDE.md'))?.mtimeMs ?? null
+      if (currentMtime !== cached.claudeMdMtime) {
+        return false
+      }
+    } catch {
+      // If we can't stat CLAUDE.md, treat it as if it doesn't exist
       return false
     }
   } else if (cached.claudeMdMtime !== null) {
@@ -80,7 +85,14 @@ function isCacheValid(cached: NonNullable<typeof cache>): boolean {
   }
 
   // Check if directory emptiness has changed (files added/removed)
-  const currentIsWorkspaceDirEmpty = isDirEmptySync(cwd)
+  let currentIsWorkspaceDirEmpty: boolean
+  try {
+    currentIsWorkspaceDirEmpty = isDirEmptySync(cwd)
+  } catch {
+    // If we can't check directory emptiness, treat workspace as not empty
+    // to avoid incorrectly marking onboarding as complete
+    currentIsWorkspaceDirEmpty = false
+  }
   if (currentIsWorkspaceDirEmpty !== cached.isWorkspaceDirEmpty) {
     return false
   }
@@ -97,12 +109,34 @@ export function getSteps(): Step[] {
   // Cache is invalid (or empty) — build a fresh cache.
   const cwd = getCwd()
   const fs = getFsImplementation()
-  const hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
-  const isWorkspaceDirEmpty = isDirEmptySync(cwd)
 
-  const claudeMdMtime = hasClaudeMd
-    ? fs.statSync(join(cwd, 'CLAUDE.md'))?.mtimeMs ?? null
-    : null
+  let hasClaudeMd: boolean
+  let isWorkspaceDirEmpty: boolean
+  let claudeMdMtime: number | null = null
+
+  try {
+    hasClaudeMd = fs.existsSync(join(cwd, 'CLAUDE.md'))
+  } catch {
+    // If we can't check for CLAUDE.md, treat it as not existing
+    hasClaudeMd = false
+  }
+
+  try {
+    isWorkspaceDirEmpty = isDirEmptySync(cwd)
+  } catch {
+    // If we can't check directory emptiness, treat workspace as not empty
+    // to avoid incorrectly marking onboarding as complete
+    isWorkspaceDirEmpty = false
+  }
+
+  if (hasClaudeMd) {
+    try {
+      claudeMdMtime = fs.statSync(join(cwd, 'CLAUDE.md'))?.mtimeMs ?? null
+    } catch {
+      // If we can't stat CLAUDE.md, treat it as if it doesn't exist
+      hasClaudeMd = false
+    }
+  }
 
   const steps: Step[] = [
     {
