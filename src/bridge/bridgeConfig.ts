@@ -14,6 +14,9 @@
 import { getOauthConfig } from '../constants/oauth.js'
 import { getClaudeAIOAuthTokens } from '../utils/auth.js'
 
+// Use globalThis.feature injected by build script, or fallback to false
+const feature = (globalThis as any).feature || function (name: string) { return false; };
+
 /** Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined. */
 export function getBridgeTokenOverride(): string | undefined {
   // Gate dev overrides behind a build-time feature flag to prevent

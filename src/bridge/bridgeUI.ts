@@ -110,6 +110,7 @@ export function createBridgeLogger(options: {
   // Connecting spinner state
   let connectingTimer: ReturnType<typeof setInterval> | null = null
   let connectingTick = 0
+  let reconnectingTimer: ReturnType<typeof setInterval> | null = null
 
   // Reconnecting/failed state data (stored so renderStatusLine can re-render them)
   let reconnectingDelayStr = ''
@@ -187,6 +188,14 @@ export function createBridgeLogger(options: {
     }
   }
 
+  /** Stop the reconnecting spinner timer. */
+  function stopReconnecting(): void {
+    if (reconnectingTimer) {
+      clearInterval(reconnectingTimer)
+      reconnectingTimer = null
+    }
+  }
+
   /** Render and write the current status lines based on state. */
   function renderStatusLine(): void {
     if (currentState === 'reconnecting') {
@@ -202,7 +211,6 @@ export function createBridgeLogger(options: {
 
       const frame =
         BRIDGE_SPINNER_FRAMES[connectingTick % BRIDGE_SPINNER_FRAMES.length]!
-      connectingTick++
       writeStatus(
         `${chalk.yellow(frame)} ${chalk.yellow('Reconnecting')} ${chalk.dim('\u00b7')} ${chalk.dim(`retrying in ${reconnectingDelayStr}`)} ${chalk.dim('\u00b7')} ${chalk.dim(`disconnected ${reconnectingElapsedStr}`)}\n`,
       )
@@ -421,6 +429,7 @@ export function createBridgeLogger(options: {
 
     updateIdleStatus(): void {
       stopConnecting()
+      stopReconnecting()
 
       currentState = 'idle'
       currentStateText = 'Ready'
@@ -433,6 +442,7 @@ export function createBridgeLogger(options: {
 
     setAttached(sessionId: string): void {
       stopConnecting()
+      stopReconnecting()
       currentState = 'attached'
       currentStateText = 'Connected'
       lastToolSummary = null
@@ -452,6 +462,7 @@ export function createBridgeLogger(options: {
 
     updateReconnectingStatus(delayStr: string, elapsedStr: string): void {
       stopConnecting()
+      stopReconnecting()
       clearStatusLines()
       currentState = 'reconnecting'
       reconnectingDelayStr = delayStr
@@ -470,10 +481,17 @@ export function createBridgeLogger(options: {
       writeStatus(
         `${chalk.yellow(frame)} ${chalk.yellow('Reconnecting')} ${chalk.dim('\u00b7')} ${chalk.dim(`retrying in ${delayStr}`)} ${chalk.dim('\u00b7')} ${chalk.dim(`disconnected ${elapsedStr}`)}\n`,
       )
+
+      // Start the reconnecting spinner timer
+      reconnectingTimer = setInterval(() => {
+        connectingTick++
+        renderStatusLine()
+      }, 150)
     },
 
     updateFailedStatus(error: string): void {
       stopConnecting()
+      stopReconnecting()
       clearStatusLines()
       currentState = 'failed'
       failedError = error
@@ -512,6 +530,7 @@ export function createBridgeLogger(options: {
 
     clearStatus(): void {
       stopConnecting()
+      stopReconnecting()
       clearStatusLines()
     },
 
