@@ -187,35 +187,44 @@ export function extractRelativeImports(text: string): string[] {
   const results: string[] = []
   const len = text.length
 
+  // Helper function to skip string literals and comments
+  const skipStringAndComment = (i: number): number => {
+    while (i < len) {
+      // Skip string literals (single, double, backtick)
+      if (text[i] === '"' || text[i] === "'" || text[i] === '`') {
+        const quote = text[i]
+        let j = i + 1
+        while (j < len && text[j] !== quote) {
+          if (text[j] === '\\') j++ // skip escaped character
+          j++
+        }
+        i = j < len ? j + 1 : j
+        continue
+      }
+      // Skip single-line comments
+      if (text[i] === '/' && text[i + 1] === '/') {
+        let j = i + 2
+        while (j < len && text[j] !== '\n') j++
+        i = j
+        continue
+      }
+      // Skip multi-line comments
+      if (text[i] === '/' && text[i + 1] === '*') {
+        let j = i + 2
+        while (j < len - 1 && !(text[j] === '*' && text[j + 1] === '/')) j++
+        i = j + 2
+        continue
+      }
+      break
+    }
+    return i
+  }
+
   // Pattern 1: import/export ... from './...' (handles multi-line imports)
   let i = 0
   let inImportStatement = false
   while (i < len) {
-    // Skip string literals (single, double, backtick) before any keyword checks
-    if (text[i] === '"' || text[i] === "'" || text[i] === '`') {
-      const quote = text[i]
-      let j = i + 1
-      while (j < len && text[j] !== quote) {
-        if (text[j] === '\\') j++ // skip escaped character
-        j++
-      }
-      i = j < len ? j + 1 : j
-      continue
-    }
-    // Skip single-line comments
-    if (text[i] === '/' && text[i + 1] === '/') {
-      let j = i + 2
-      while (j < len && text[j] !== '\n') j++
-      i = j
-      continue
-    }
-    // Skip multi-line comments
-    if (text[i] === '/' && text[i + 1] === '*') {
-      let j = i + 2
-      while (j < len - 1 && !(text[j] === '*' && text[j + 1] === '/')) j++
-      i = j + 2
-      continue
-    }
+    i = skipStringAndComment(i)
     // Detect import/export keyword (standalone word)
     if ((text[i] === 'i' && text.startsWith('import', i)) ||
         (text[i] === 'e' && text.startsWith('export', i))) {
@@ -265,11 +274,13 @@ export function extractRelativeImports(text: string): string[] {
   // Pattern 2: require('./...')
   i = 0
   while (i < len) {
+    i = skipStringAndComment(i)
     if (text[i] === 'r' && text.startsWith('require(', i)) {
       const before = i > 0 ? text[i - 1] : ' '
       const after = text[i + 7] ?? ' '
       if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
-        let j = i + 7
+        // Skip past 'require(' to find the opening quote
+        let j = i + 8
         while (j < len && /\s/.test(text[j])) j++
         if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
           const quote = text[j]
@@ -292,11 +303,13 @@ export function extractRelativeImports(text: string): string[] {
   // Pattern 3: import('./...')
   i = 0
   while (i < len) {
+    i = skipStringAndComment(i)
     if (text[i] === 'i' && text.startsWith('import(', i)) {
       const before = i > 0 ? text[i - 1] : ' '
       const after = text[i + 6] ?? ' '
       if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
-        let j = i + 6
+        // Skip past 'import(' to find the opening quote
+        let j = i + 7
         while (j < len && /\s/.test(text[j])) j++
         if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
           const quote = text[j]

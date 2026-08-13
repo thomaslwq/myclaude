@@ -25,9 +25,10 @@ import {
  * 'enabled' (they reached the old dialog via bare Shift+Tab, which requires
  * 'enabled'), but the guard makes it safe regardless.
  *
- * The migration body always executes when called — the feature flag was removed
- * because it was a hardcoded `false` fallback that made the migration dead code
- * outside of Bun's compile-time macro system.
+ * The migration is guarded at runtime by getAutoModeEnabledState() !== 'enabled',
+ * which checks the tengu_auto_mode_config GrowthBook feature flag. This replaces
+ * the previous compile-time macro (feature('...')) which had a hardcoded `false`
+ * fallback that made the migration dead code outside of Bun's bundle system.
  */
 export async function resetAutoModeOptInForDefaultOffer(): Promise<void> {
   const config = getGlobalConfig()

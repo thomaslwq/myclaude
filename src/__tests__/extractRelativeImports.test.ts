@@ -1,0 +1,89 @@
+import { describe, it, expect } from 'bun:test';
+import { extractRelativeImports } from '../dev-entry';
+
+describe('extractRelativeImports', () => {
+  it('should extract require() imports', () => {
+    const code = `const x = require('./utils/helper');`;
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
+
+  it('should extract import() dynamic imports', () => {
+    const code = `const x = await import('./utils/helper');`;
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
+
+  it('should extract import/export from statements', () => {
+    const code = `import { foo } from './utils/helper';`;
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
+
+  it('should NOT extract require() inside a string literal', () => {
+    const code = `const msg = "use require('./utils/helper')";`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT extract import() inside a string literal', () => {
+    const code = `const msg = "use import('./utils/helper')";`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT extract require() inside a template literal', () => {
+    const code = 'const msg = `use require(\'./utils/helper\')`;';
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT extract import() inside a template literal', () => {
+    const code = 'const msg = `use import(\'./utils/helper\')`;';
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT extract require() inside a single-line comment', () => {
+    const code = `// this is a require('./utils/helper') call`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT extract import() inside a single-line comment', () => {
+    const code = `// this is an import('./utils/helper') call`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT extract require() inside a multi-line comment', () => {
+    const code = `/*
+ * this is a require('./utils/helper') call
+ */`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT extract import() inside a multi-line comment', () => {
+    const code = `/*
+ * this is an import('./utils/helper') call
+ */`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should handle mixed content with real and fake imports', () => {
+    const code = [
+      `import { real } from './real/module';`,
+      `const a = "fake require('./fake/module')";`,
+      `const b = 'fake import(\"./other/fake\")';`,
+      `const c = require('./real/helper');`,
+      `// const d = require('./commented/out');`,
+      `const e = await import('./real/dynamic');`,
+    ].join('\n');
+    expect(extractRelativeImports(code)).toEqual([
+      './real/module',
+      './real/helper',
+      './real/dynamic',
+    ]);
+  });
+
+  it('should handle string literal with escaped quotes', () => {
+    const code = `const msg = "escaped \\"require('./utils/helper')\""`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should handle require inside a single-quoted string', () => {
+    const code = "const msg = 'require(\"./utils/helper\")';";
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+});
