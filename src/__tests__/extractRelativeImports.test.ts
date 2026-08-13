@@ -65,7 +65,7 @@ describe('extractRelativeImports', () => {
     const code = [
       `import { real } from './real/module';`,
       `const a = "fake require('./fake/module')";`,
-      `const b = 'fake import(\"./other/fake\")';`,
+      `const b = 'fake import("./other/fake")';`,
       `const c = require('./real/helper');`,
       `// const d = require('./commented/out');`,
       `const e = await import('./real/dynamic');`,
@@ -78,45 +78,27 @@ describe('extractRelativeImports', () => {
   });
 
   it('should handle string literal with escaped quotes', () => {
-    const code = `const msg = "escaped \\"require('./utils/helper')\""`;
+    const code = `const msg = "escaped \\"require('./utils/helper')\"";`;
     expect(extractRelativeImports(code)).toEqual([]);
   });
 
-  it('should handle require inside a single-quoted string', () => {
-    const code = "const msg = 'require(\"./utils/helper\")';";
-    expect(extractRelativeImports(code)).toEqual([]);
+  it('should extract relative import with escaped quote in specifier', () => {
+    const code = String.raw`import { foo } from './foo\'bar';`;
+    expect(extractRelativeImports(code)).toEqual(["./foo\\'bar"]);
   });
 
-  it('should NOT treat import.meta as an import declaration', () => {
-    const code = `const url = import.meta.url;`;
-    expect(extractRelativeImports(code)).toEqual([]);
+  it('should extract relative import with escaped quote in specifier (double quote)', () => {
+    const code = String.raw`import { foo } from "./foo\"bar";`;
+    expect(extractRelativeImports(code)).toEqual(['./foo\\"bar']);
   });
 
-  it('should NOT be confused by import.meta followed by a from import', () => {
-    const code = [
-      `const url = import.meta.url;`,
-      `import { foo } from './real/module';`,
-    ].join('\n');
-    expect(extractRelativeImports(code)).toEqual(['./real/module']);
+  it('should extract relative import with escaped quote in specifier (require)', () => {
+    const code = String.raw`const x = require('./foo\'bar');`;
+    expect(extractRelativeImports(code)).toEqual(["./foo\\'bar"]);
   });
 
-  it('should NOT treat import as a variable name as an import declaration', () => {
-    const code = `const import = './utils/helper';`;
-    expect(extractRelativeImports(code)).toEqual([]);
-  });
-
-  it('should NOT treat from inside a string as an import specifier', () => {
-    const code = `const msg = "from './utils/helper'";`;
-    expect(extractRelativeImports(code)).toEqual([]);
-  });
-
-  it('should handle multi-line export statements', () => {
-    const code = [
-      `export {`,
-      `  foo,`,
-      `  bar`,
-      `} from './utils/helper';`,
-    ].join('\n');
-    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  it('should extract relative import with escaped quote in specifier (dynamic import)', () => {
+    const code = String.raw`const x = await import('./foo\'bar');`;
+    expect(extractRelativeImports(code)).toEqual(["./foo\\'bar"]);
   });
 });

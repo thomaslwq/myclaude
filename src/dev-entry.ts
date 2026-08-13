@@ -251,15 +251,19 @@ export function extractRelativeImports(text: string): string[] {
         if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
           const quote = text[j]
           const specStart = j + 1
-          const specEnd = text.indexOf(quote, specStart)
-          if (specEnd !== -1) {
+          let specEnd = specStart
+          while (specEnd < len && text[specEnd] !== quote) {
+            if (text[specEnd] === '\\') specEnd++ // skip escaped character
+            specEnd++
+          }
+          if (specEnd < len) {
             const spec = text.slice(specStart, specEnd)
             if (spec.startsWith('./') || spec.startsWith('../')) {
               results.push(spec)
             }
           }
           inImportStatement = false
-          i = specEnd !== -1 ? specEnd + 1 : j + 1
+          i = specEnd + 1
           continue
         }
         i = j + 1
@@ -290,14 +294,18 @@ export function extractRelativeImports(text: string): string[] {
         if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
           const quote = text[j]
           const specStart = j + 1
-          const specEnd = text.indexOf(quote, specStart)
-          if (specEnd !== -1) {
+          let specEnd = specStart
+          while (specEnd < len && text[specEnd] !== quote) {
+            if (text[specEnd] === '\\') specEnd++ // skip escaped character
+            specEnd++
+          }
+          if (specEnd < len) {
             const spec = text.slice(specStart, specEnd)
             if (spec.startsWith('./') || spec.startsWith('../')) {
               results.push(spec)
             }
           }
-          i = specEnd !== -1 ? specEnd + 1 : j + 1
+          i = specEnd + 1
           continue
         }
       }
@@ -319,14 +327,18 @@ export function extractRelativeImports(text: string): string[] {
         if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
           const quote = text[j]
           const specStart = j + 1
-          const specEnd = text.indexOf(quote, specStart)
-          if (specEnd !== -1) {
+          let specEnd = specStart
+          while (specEnd < len && text[specEnd] !== quote) {
+            if (text[specEnd] === '\\') specEnd++ // skip escaped character
+            specEnd++
+          }
+          if (specEnd < len) {
             const spec = text.slice(specStart, specEnd)
             if (spec.startsWith('./') || spec.startsWith('../')) {
               results.push(spec)
             }
           }
-          i = specEnd !== -1 ? specEnd + 1 : j + 1
+          i = specEnd + 1
           continue
         }
       }

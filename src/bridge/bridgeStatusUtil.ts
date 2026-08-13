@@ -159,5 +159,11 @@ export const FAILED_FOOTER_TEXT = 'Something went wrong, please try again'
  * countVisualLines in bridgeUI.ts remains accurate.
  */
 export function wrapWithOsc8Link(text: string, url: string): string {
-  return `\x1b]8;;${url}\x07${text}\x1b]8;;\x07`
+  // Sanitize the URL to prevent OSC 8 escape sequence injection.
+  // Characters that can break the OSC 8 sequence (e.g., \x07 BEL, \x1b ESC,
+  // other control characters, and semicolons) are percent-encoded.
+  const sanitizedUrl = url.replace(/[\x00-\x1f\x7f;]/g, (char) => {
+    return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
+  })
+  return `\x1b]8;;${sanitizedUrl}\x07${text}\x1b]8;;\x07`
 }
