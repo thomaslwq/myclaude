@@ -50,7 +50,7 @@ export function topologicalSort(migrations: Migration[]): Migration[] {
     nameToMigration.set(m.name, m)
   }
 
-  // Check for self-dependency
+  // Check for direct self-dependency
   for (const m of migrations) {
     if (m.dependsOn?.includes(m.name)) {
       throw new Error(
@@ -130,6 +130,46 @@ export function topologicalSort(migrations: Migration[]): Migration[] {
     for (const name of sorted) {
       unsorted.delete(name)
     }
+
+    // Check for indirect self-dependency (a node that can reach itself via a cycle)
+    // If any node in the unsorted set has a dependency path back to itself,
+    // it's an indirect self-dependency
+    const hasIndirectSelfDependency = () => {
+      for (const node of unsorted) {
+        // DFS from node to see if we can reach back to node
+        const visited = new Set<string>()
+        const stack = [node]
+        while (stack.length > 0) {
+          const current = stack.pop()!
+          if (current === node && visited.size > 0) {
+            return true
+          }
+          if (visited.has(current)) continue
+          visited.add(current)
+          const deps = dependsOnMap.get(current)
+          if (deps) {
+            for (const dep of deps) {
+              if (dep === node) {
+                return true
+              }
+              if (!visited.has(dep)) {
+                stack.push(dep)
+              }
+            }
+          }
+        }
+      }
+      return false
+    }
+
+    if (hasIndirectSelfDependency()) {
+      const selfDepNames = Array.from(unsorted).join(', ')
+      throw new Error(
+        `Self-dependency detected in migration(s): ${selfDepNames}. ` +
+        `A migration cannot depend on itself, directly or indirectly.`,
+      )
+    }
+
     const cycleNames = Array.from(unsorted).join(', ')
     throw new Error(
       `Circular dependency detected in migrations: ${cycleNames}. ` +

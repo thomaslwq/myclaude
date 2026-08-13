@@ -137,8 +137,9 @@ describe('topologicalSort', () => {
       createMigration('B', ['A']),
     ]
 
+    // A -> B -> A is an indirect self-dependency
     expect(() => topologicalSort(migrations)).toThrow(
-      /Circular dependency detected.*/i
+      /Self-dependency detected.*/i
     )
   })
 
