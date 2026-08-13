@@ -231,6 +231,11 @@ export function extractRelativeImports(text: string): string[] {
       const before = i > 0 ? text[i - 1] : ' '
       const after = text[i + 6] ?? ' '
       if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
+        // Skip import.meta — it's a property access, not an import declaration
+        if (text[i] === 'i' && text[i + 6] === '.') {
+          i += 1
+          continue
+        }
         inImportStatement = true
         i += 6
         continue

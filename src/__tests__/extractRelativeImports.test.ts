@@ -86,4 +86,37 @@ describe('extractRelativeImports', () => {
     const code = "const msg = 'require(\"./utils/helper\")';";
     expect(extractRelativeImports(code)).toEqual([]);
   });
+
+  it('should NOT treat import.meta as an import declaration', () => {
+    const code = `const url = import.meta.url;`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT be confused by import.meta followed by a from import', () => {
+    const code = [
+      `const url = import.meta.url;`,
+      `import { foo } from './real/module';`,
+    ].join('\n');
+    expect(extractRelativeImports(code)).toEqual(['./real/module']);
+  });
+
+  it('should NOT treat import as a variable name as an import declaration', () => {
+    const code = `const import = './utils/helper';`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should NOT treat from inside a string as an import specifier', () => {
+    const code = `const msg = "from './utils/helper'";`;
+    expect(extractRelativeImports(code)).toEqual([]);
+  });
+
+  it('should handle multi-line export statements', () => {
+    const code = [
+      `export {`,
+      `  foo,`,
+      `  bar`,
+      `} from './utils/helper';`,
+    ].join('\n');
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
 });
