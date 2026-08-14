@@ -3,6 +3,54 @@ import { wrapWithOsc8Link } from '../bridge/bridgeStatusUtil.js'
 // Test that the URL is properly sanitized to prevent OSC 8 escape sequence injection
 
 describe('wrapWithOsc8Link', () => {
+  it('should encode percent signs in URL to prevent injection of percent-encoded escape sequences', () => {
+    // A URL containing %1B (ESC) or %07 (BEL) should have the % encoded to %25
+    // to prevent injection of escape sequences.
+    const url = 'https://example.com/%1B%5D8;;malicious%07'
+    const text = 'Link'
+
+    const result = wrapWithOsc8Link(text, url)
+
+    expect(result).toContain(text)
+    expect(result).toContain('\x1b]8;;')
+    expect(result).toContain('\x07')
+    // The % should be encoded to %25, so %1B becomes %251B, %5D becomes %255D, etc.
+    expect(result).toContain('%251B')
+    expect(result).toContain('%2507')
+    // The original %1B should NOT appear in the result
+    expect(result).not.toContain('%1B]8;;')
+  })
+
+  it('should encode backslash characters in URL', () => {
+    const url = 'https://example.com/path\\backslash'
+    const text = 'Link'
+
+    const result = wrapWithOsc8Link(text, url)
+
+    expect(result).toContain(text)
+    expect(result).toContain('\x1b]8;;')
+    expect(result).toContain('\x07')
+    // Backslash should be encoded
+    expect(result).toContain('%5C')
+  })
+
+  it('should prevent injection of OSC 8 escape sequence via URL', () => {
+    // An attacker could try to close the OSC 8 link early and inject arbitrary escape codes
+    const url = 'https://example.com/\x1b]8;;https://evil.com\x07clicked'
+    const text = 'Link'
+
+    const result = wrapWithOsc8Link(text, url)
+
+    expect(result).toContain(text)
+    expect(result).toContain('\x1b]8;;')
+    expect(result).toContain('\x07')
+    // The ESC character should be encoded to %1B
+    expect(result).toContain('%1B')
+    // The malicious URL should not appear as a separate OSC 8 sequence
+    expect(result).not.toContain('\x1b]8;;https://evil.com')
+  })
+
+
   it('should not break the OSC 8 sequence with special characters in URL', () => {
     // This test verifies that special characters like semicolons, newlines, and
     // escape sequences are properly handled to prevent breaking the OSC 8 escape sequence
