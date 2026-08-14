@@ -162,7 +162,8 @@ export function wrapWithOsc8Link(text: string, url: string): string {
   // Sanitize the URL to prevent OSC 8 escape sequence injection.
   // Characters that can break the OSC 8 sequence (e.g., \x07 BEL, \x1b ESC,
   // other control characters, and semicolons) are percent-encoded.
-  const sanitizedUrl = url.replace(/[\x00-\x1f\x7f;%\\]/g, (char) => {
+  // If url is not a string (e.g., null, undefined), treat it as an empty string.
+  const sanitizedUrl = (typeof url === 'string' ? url : '').replace(/[\x00-\x1f\x7f;%\\]/g, (char) => {
     return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
   })
   return `\x1b]8;;${sanitizedUrl}\x07${text}\x1b]8;;\x07`
