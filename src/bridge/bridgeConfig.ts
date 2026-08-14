@@ -15,13 +15,19 @@ import { getOauthConfig } from '../constants/oauth.js'
 import { getClaudeAIOAuthTokens } from '../utils/auth.js'
 
 // Use globalThis.feature injected by build script, or fallback to false
-const feature = (globalThis as any).feature || function (name: string) { return false; };
+// Dynamic lookup so tests can override globalThis.feature after module load
+function feature(name: string): boolean {
+  const fn = (globalThis as any).feature
+  return typeof fn === 'function' ? fn(name) : false
+}
 
 /** Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined. */
 export function getBridgeTokenOverride(): string | undefined {
   // Gate dev overrides behind a build-time feature flag to prevent
-  // production builds from being vulnerable to environment variable attacks
-  if (!feature('DEV_BRIDGE_OVERRIDES')) {
+  // production builds from being vulnerable to environment variable attacks.
+  // Also add a runtime check: never allow overrides in production mode
+  // even if the feature flag is misconfigured.
+  if (!feature('DEV_BRIDGE_OVERRIDES') || process.env.NODE_ENV === 'production') {
     return undefined
   }
   return (
@@ -34,8 +40,10 @@ export function getBridgeTokenOverride(): string | undefined {
 /** Ant-only dev override: CLAUDE_BRIDGE_BASE_URL, else undefined. */
 export function getBridgeBaseUrlOverride(): string | undefined {
   // Gate dev overrides behind a build-time feature flag to prevent
-  // production builds from being vulnerable to environment variable attacks
-  if (!feature('DEV_BRIDGE_OVERRIDES')) {
+  // production builds from being vulnerable to environment variable attacks.
+  // Also add a runtime check: never allow overrides in production mode
+  // even if the feature flag is misconfigured.
+  if (!feature('DEV_BRIDGE_OVERRIDES') || process.env.NODE_ENV === 'production') {
     return undefined
   }
   return (

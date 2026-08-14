@@ -3,6 +3,7 @@ import { realpathSync } from 'fs'
 import { readFile, readdir } from 'fs/promises'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
+import pMap from 'p-map'
 
 // Apply MYCLAUDE_* env var aliases before any code reads them
 import { applyEnvAliases } from './utils/envCompat.js'
@@ -74,11 +75,12 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 100, curr
   } catch {
     return
   }
-  // Process entries in batches to avoid unbounded concurrency
-  const BATCH_SIZE = 50
-  for (let i = 0; i < dirHandle.length; i += BATCH_SIZE) {
-    const batch = dirHandle.slice(i, i + BATCH_SIZE)
-    const promises = batch.map(async (entry) => {
+  // Process entries with bounded concurrency to avoid excessive memory usage
+  // on large directory trees
+  const CONCURRENCY = 10
+  await pMap(
+    dirHandle,
+    async (entry) => {
       try {
         const fullPath = join(dir, entry.name)
         if (entry.isDirectory()) {
@@ -93,9 +95,9 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 100, curr
       } catch {
         // Gracefully skip this entry (e.g., permission error, I/O failure)
       }
-    })
-    await Promise.all(promises)
-  }
+    },
+    { concurrency: CONCURRENCY }
+  )
 }
 
 export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
