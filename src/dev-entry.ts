@@ -4,6 +4,7 @@ import { readFile, readdir } from 'fs/promises'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import pMap from 'p-map'
+import { LRUCache } from 'lru-cache'
 
 // Apply MYCLAUDE_* env var aliases before any code reads them
 import { applyEnvAliases } from './utils/envCompat.js'
@@ -40,13 +41,14 @@ export type MissingImport = {
   specifier: string
 }
 
+const SCAN_CACHE_TTL_MS = 60_000 // 1 minute TTL for scan cache
+
 // Cache for file contents to avoid re-reading unchanged files
-const fileContentCache = new Map<string, { content: string; mtime: number }>()
+export const fileContentCache = new LRUCache<string, { content: string; mtime: number }>({ max: 1000 })
 
 // Cache for directory scan results to avoid full re-scan on every call
 // Used in the fallback path when git diff is not available
-const scanCache = new Map<string, { files: string[]; timestamp: number }>()
-const SCAN_CACHE_TTL_MS = 60_000 // 1 minute TTL for scan cache
+export const scanCache = new LRUCache<string, { files: string[]; timestamp: number }>({ max: 1000, ttl: SCAN_CACHE_TTL_MS })
 
 async function getFileContent(filePath: string): Promise<string | null> {
   try {
@@ -415,13 +417,12 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
   } else {
     // Fall back to full directory scan with depth limit, using cache
     const srcDir = resolve('src')
-    const now = Date.now()
     const cached = scanCache.get(srcDir)
-    if (cached && (now - cached.timestamp) < SCAN_CACHE_TTL_MS) {
+    if (cached) {
       files.push(...cached.files)
     } else {
       await scanFiles(srcDir, files)
-      scanCache.set(srcDir, { files: [...files], timestamp: now })
+      scanCache.set(srcDir, { files: [...files], timestamp: Date.now() })
     }
   }
   
