@@ -307,7 +307,6 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
         ...deps.env,
         // Strip the bridge's OAuth token so the child CC process uses
         // the session access token for inference instead.
-        CLAUDE_CODE_OAUTH_TOKEN: undefined,
         CLAUDE_CODE_ENVIRONMENT_KIND: 'bridge',
         ...(deps.sandbox && { CLAUDE_CODE_FORCE_SANDBOX: '1' }),
         CLAUDE_CODE_SESSION_ACCESS_TOKEN: opts.accessToken,
@@ -321,6 +320,7 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
           CLAUDE_CODE_WORKER_EPOCH: String(opts.workerEpoch),
         }),
       }
+      delete env.CLAUDE_CODE_OAUTH_TOKEN
 
       deps.onDebug(
         `[bridge:session] Spawning sessionId=${opts.sessionId} sdkUrl=${opts.sdkUrl} accessToken=${opts.accessToken ? 'present' : 'MISSING'}`,
@@ -446,6 +446,17 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
       }
 
       const done = new Promise<SessionDoneStatus>(resolve => {
+        // Close transcript stream when the child process exits.
+        // We handle both 'close' and 'exit' because 'close' waits for
+        // stdio to close, which may never happen if the child has
+        // spawned subprocesses that inherit our pipes. The 'exit' event
+        // fires immediately when the process terminates.
+        child.on('exit', () => {
+          if (transcriptStream) {
+            transcriptStream.end()
+            transcriptStream = null
+          }
+        })
         child.on('close', (code, signal) => {
           // Close transcript stream on exit
           if (transcriptStream) {
