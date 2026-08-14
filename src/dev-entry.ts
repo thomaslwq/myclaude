@@ -454,8 +454,13 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
 // (not when imported as a module for testing)
 // Uses realpathSync to resolve symlinks and case-insensitive paths
 // fileURLToPath converts the import.meta.url to a file path
-const isMainModule = process.argv[1] &&
-  realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))
+let isMainModule = false
+try {
+  isMainModule = process.argv[1] &&
+    realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))
+} catch {
+  // If realpathSync fails (e.g., non-existent path), treat as not main module
+}
 
 if (isMainModule) {
   const args = process.argv.slice(2)
