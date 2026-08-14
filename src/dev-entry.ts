@@ -1,5 +1,5 @@
 import pkg from '../package.json'
-import { realpathSync } from 'fs'
+import { realpathSync, lstatSync } from 'fs'
 import { readFile, readdir } from 'fs/promises'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
@@ -83,6 +83,13 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 100, curr
     async (entry) => {
       try {
         const fullPath = join(dir, entry.name)
+        // Check if entry is a symbolic link to avoid infinite recursion
+        let isSymlink = false
+        try {
+          const stats = lstatSync(fullPath)
+          isSymlink = stats.isSymbolicLink()
+        } catch {}
+        if (isSymlink) return
         if (entry.isDirectory()) {
           // Skip node_modules, .git, and other common large directories (but allow .github)
           if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
