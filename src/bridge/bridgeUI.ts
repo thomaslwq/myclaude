@@ -89,6 +89,7 @@ export function createBridgeLogger(options: {
   // QR code lines for the current URL
   let qrLines: string[] = []
   let qrVisible = false
+  let qrGenerationVersion = 0
 
   // Tool activity for the second status line
   let lastToolSummary: string | null = null
@@ -142,8 +143,13 @@ export function createBridgeLogger(options: {
 
   /** Regenerate the QR code with the given URL. */
   function regenerateQr(url: string): void {
+    const version = ++qrGenerationVersion
     generateQr(url)
       .then(lines => {
+        if (version !== qrGenerationVersion) {
+          // A newer QR generation was requested, discard this stale result
+          return
+        }
         qrLines = lines
         renderStatusLine()
       })
