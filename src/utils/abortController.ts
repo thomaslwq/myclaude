@@ -6,6 +6,43 @@ import { setMaxListeners } from 'events'
 const DEFAULT_MAX_LISTENERS = 50
 
 /**
+ * Combines multiple AbortSignals into a single AbortSignal.
+ * Uses the native AbortSignal.any when available (Node ≥20.5 / 18.19),
+ * otherwise falls back to a manual implementation that aborts the
+ * combined signal when any of the input signals abort.
+ *
+ * This is needed because the project supports Node 18.17, which does not
+ * include AbortSignal.any.
+ */
+export function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
+  // Use native implementation if available
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any(signals)
+  }
+
+  // Manual fallback for Node 18.17/18.18
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort()
+      return controller.signal
+    }
+    signal.addEventListener('abort', abort, { once: true })
+  }
+
+  // Clean up listeners once the combined signal fires
+  controller.signal.addEventListener('abort', () => {
+    for (const signal of signals) {
+      signal.removeEventListener('abort', abort)
+    }
+  })
+
+  return controller.signal
+}
+
+/**
  * Creates an AbortController with proper event listener limits set.
  * This prevents MaxListenersExceededWarning when multiple listeners
  * are attached to the abort signal.

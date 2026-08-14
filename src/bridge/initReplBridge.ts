@@ -31,6 +31,7 @@ import {
   getClaudeAIOAuthTokens,
   handleOAuth401Error,
 } from '../utils/auth.js'
+import { combineAbortSignals } from '../utils/abortController.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { logForDebugging } from '../utils/debug.js'
 import { stripDisplayTagsAllowEmpty } from '../utils/displayTags.js'
@@ -350,7 +351,7 @@ export async function initReplBridge(
     const atCount = userMessageCount
     // Combine the 15-second timeout with the abort controller so we can cancel
     // the previous call when a new user message arrives
-    const signal = AbortSignal.any([titleController.signal, AbortSignal.timeout(15_000)])
+    const signal = combineAbortSignals([titleController.signal, AbortSignal.timeout(15_000)])
     void generateSessionTitle(input, signal).then(
       generated => {
         if (

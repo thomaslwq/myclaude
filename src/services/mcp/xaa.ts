@@ -25,6 +25,7 @@ import { z } from 'zod/v4'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { logMCPDebug } from '../../utils/log.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
+import { combineAbortSignals } from '../../utils/abortController.js'
 
 const XAA_REQUEST_TIMEOUT_MS = 30000
 
@@ -42,11 +43,7 @@ const ID_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id_token'
 function makeXaaFetch(abortSignal?: AbortSignal): FetchLike {
   return (url, init) => {
     const timeout = AbortSignal.timeout(XAA_REQUEST_TIMEOUT_MS)
-    const signal = abortSignal
-      ? // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
-        AbortSignal.any([timeout, abortSignal])
-      : timeout
-    // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
+    const signal = abortSignal ? combineAbortSignals([timeout, abortSignal]) : timeout
     return fetch(url, { ...init, signal })
   }
 }
