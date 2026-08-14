@@ -220,6 +220,29 @@ export function extractRelativeImports(text: string): string[] {
     return i
   }
 
+  // Helper function to skip whitespace and comments (but NOT string literals)
+  const skipWhitespaceAndComment = (i: number): number => {
+    while (i < len) {
+      while (i < len && /\s/.test(text[i])) i++
+      // Skip single-line comments
+      if (text[i] === '/' && text[i + 1] === '/') {
+        let j = i + 2
+        while (j < len && text[j] !== '\n') j++
+        i = j
+        continue
+      }
+      // Skip multi-line comments
+      if (text[i] === '/' && text[i + 1] === '*') {
+        let j = i + 2
+        while (j < len - 1 && !(text[j] === '*' && text[j + 1] === '/')) j++
+        i = j + 2
+        continue
+      }
+      break
+    }
+    return i
+  }
+
   // Pattern 1: import/export ... from './...' (handles multi-line imports)
   let i = 0
   let inImportStatement = false
@@ -238,6 +261,29 @@ export function extractRelativeImports(text: string): string[] {
         }
         inImportStatement = true
         i += 6
+        // Skip whitespace/comments between the keyword and the rest of the
+        // statement. This allows side-effect imports like `import /* comment */ './foo'`
+        // and ensures comments before `from` are skipped.
+        i = skipWhitespaceAndComment(i)
+        // Handle side-effect imports: `import './foo'` or `import /* c */ './foo'`
+        if (i < len && (text[i] === '"' || text[i] === "'" || text[i] === '`')) {
+          const quote = text[i]
+          const specStart = i + 1
+          let specEnd = specStart
+          while (specEnd < len && text[specEnd] !== quote) {
+            if (text[specEnd] === '\\') specEnd++ // skip escaped character
+            specEnd++
+          }
+          if (specEnd < len) {
+            const spec = text.slice(specStart, specEnd)
+            if (spec.startsWith('./') || spec.startsWith('../')) {
+              results.push(spec)
+            }
+          }
+          inImportStatement = false
+          i = specEnd + 1
+          continue
+        }
         continue
       }
     }
@@ -246,8 +292,7 @@ export function extractRelativeImports(text: string): string[] {
       const before = i > 0 ? text[i - 1] : ' '
       const after = text[i + 4] ?? ' '
       if (!/[A-Za-z0-9_$]/.test(before) && !/[A-Za-z0-9_$]/.test(after)) {
-        let j = i + 4
-        while (j < len && /\s/.test(text[j])) j++
+        let j = skipWhitespaceAndComment(i + 4)
         if (j < len && (text[j] === '"' || text[j] === "'" || text[j] === '`')) {
           const quote = text[j]
           const specStart = j + 1

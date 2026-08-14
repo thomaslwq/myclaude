@@ -101,4 +101,29 @@ describe('extractRelativeImports', () => {
     const code = String.raw`const x = await import('./foo\'bar');`;
     expect(extractRelativeImports(code)).toEqual(["./foo\\'bar"]);
   });
+
+  it('should extract specifier when comment appears after from', () => {
+    const code = `import { foo } from /* comment */ './utils/helper';`;
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
+
+  it('should extract specifier when comments appear throughout import statement', () => {
+    const code = `import /* c1 */ { foo } /* c2 */ from /* c3 */ './utils/helper';`;
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
+
+  it('should extract side-effect import specifier', () => {
+    const code = `import './utils/helper';`;
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
+
+  it('should extract side-effect import specifier with comment', () => {
+    const code = `import /* comment */ './utils/helper';`;
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
+
+  it('should extract specifier when comment appears after export from', () => {
+    const code = `export { foo } from /* comment */ './utils/helper';`;
+    expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
+  });
 });
