@@ -34,7 +34,8 @@ export function getBridgeTokenOverride(): string | undefined {
     return undefined
   }
   return (
-    (process.env.USER_TYPE === 'ant' &&
+    (process.env.NODE_ENV === 'development' &&
+      process.env.USER_TYPE === 'ant' &&
       process.env.CLAUDE_BRIDGE_OAUTH_TOKEN) ||
     undefined
   )
@@ -53,7 +54,9 @@ export function getBridgeBaseUrlOverride(): string | undefined {
     return undefined
   }
   return (
-    (process.env.USER_TYPE === 'ant' && process.env.CLAUDE_BRIDGE_BASE_URL) ||
+    (process.env.NODE_ENV === 'development' &&
+      process.env.USER_TYPE === 'ant' &&
+      process.env.CLAUDE_BRIDGE_BASE_URL) ||
     undefined
   )
 }

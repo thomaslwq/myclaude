@@ -30,8 +30,9 @@ describe('bridgeConfig security', () => {
       expect(getBridgeTokenOverride()).toBeUndefined()
     })
 
-    it('should return the token when feature flag is enabled and USER_TYPE is ant', () => {
+    it('should return the token when feature flag is enabled and USER_TYPE is ant (and NODE_ENV is development)', () => {
       (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'development'
       process.env.USER_TYPE = 'ant'
       process.env.CLAUDE_BRIDGE_OAUTH_TOKEN = 'test-token'
       expect(getBridgeTokenOverride()).toBe('test-token')
@@ -53,6 +54,45 @@ describe('bridgeConfig security', () => {
       process.env.CLAUDE_BRIDGE_OAUTH_TOKEN = 'test-token'
       expect(getBridgeTokenOverride()).toBeUndefined()
     })
+
+    it('should require NODE_ENV === "development" even if USER_TYPE is ant', () => {
+      // Defense-in-depth: Even if the build-time macro is enabled,
+      // the override should only work in development mode.
+      (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'production'
+      process.env.USER_TYPE = 'ant'
+      process.env.CLAUDE_BRIDGE_OAUTH_TOKEN = 'test-token'
+      expect(getBridgeTokenOverride()).toBeUndefined()
+    })
+
+    it('should require NODE_ENV === "development" even if USER_TYPE is ant (production)', () => {
+      // Defense-in-depth: Even if the build-time macro is enabled,
+      // the override should only work in development mode.
+      (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'production'
+      process.env.USER_TYPE = 'ant'
+      process.env.CLAUDE_BRIDGE_OAUTH_TOKEN = 'test-token'
+      expect(getBridgeTokenOverride()).toBeUndefined()
+    })
+
+    it('should work in development mode when USER_TYPE is ant', () => {
+      // The override should work when both the build-time macro is enabled
+      // AND NODE_ENV is development.
+      (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'development'
+      process.env.USER_TYPE = 'ant'
+      process.env.CLAUDE_BRIDGE_OAUTH_TOKEN = 'test-token'
+      expect(getBridgeTokenOverride()).toBe('test-token')
+    })
+
+    it('should not work in development mode when USER_TYPE is not ant', () => {
+      // The override should not work even in development mode if USER_TYPE is not ant.
+      (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'development'
+      process.env.USER_TYPE = 'user'
+      process.env.CLAUDE_BRIDGE_OAUTH_TOKEN = 'test-token'
+      expect(getBridgeTokenOverride()).toBeUndefined()
+    })
   })
 
   describe('getBridgeBaseUrlOverride', () => {
@@ -66,11 +106,12 @@ describe('bridgeConfig security', () => {
       expect(getBridgeBaseUrlOverride()).toBeUndefined()
     })
 
-    it('should return the base URL when feature flag is enabled and USER_TYPE is ant', () => {
+    it('should return the base URL when feature flag is enabled and USER_TYPE is ant (and NODE_ENV is development)', () => {
       (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'development'
       process.env.USER_TYPE = 'ant'
-      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://override.example.com'
-      expect(getBridgeBaseUrlOverride()).toBe('https://override.example.com')
+      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://dev.example.com'
+      expect(getBridgeBaseUrlOverride()).toBe('https://dev.example.com')
     })
 
     it('should return undefined when feature flag is enabled but base URL is not set', () => {
@@ -86,7 +127,36 @@ describe('bridgeConfig security', () => {
       (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: false }
       process.env.NODE_ENV = 'development'
       process.env.USER_TYPE = 'ant'
-      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://override.example.com'
+      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://dev.example.com'
+      expect(getBridgeBaseUrlOverride()).toBeUndefined()
+    })
+
+    it('should require NODE_ENV === "development" even if USER_TYPE is ant', () => {
+      // Defense-in-depth: Even if the build-time macro is enabled,
+      // the override should only work in development mode.
+      (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'production'
+      process.env.USER_TYPE = 'ant'
+      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://dev.example.com'
+      expect(getBridgeBaseUrlOverride()).toBeUndefined()
+    })
+
+    it('should work in development mode when USER_TYPE is ant', () => {
+      // The override should work when both the build-time macro is enabled
+      // AND NODE_ENV is development.
+      (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'development'
+      process.env.USER_TYPE = 'ant'
+      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://dev.example.com'
+      expect(getBridgeBaseUrlOverride()).toBe('https://dev.example.com')
+    })
+
+    it('should not work in development mode when USER_TYPE is not ant', () => {
+      // The override should not work even in development mode if USER_TYPE is not ant.
+      (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'development'
+      process.env.USER_TYPE = 'user'
+      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://dev.example.com'
       expect(getBridgeBaseUrlOverride()).toBeUndefined()
     })
   })
@@ -98,6 +168,7 @@ describe('bridgeConfig security', () => {
 
     it('should return the override token when feature flag is enabled and USER_TYPE is ant', () => {
       (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'development'
       process.env.USER_TYPE = 'ant'
       process.env.CLAUDE_BRIDGE_OAUTH_TOKEN = 'test-token'
       expect(getBridgeAccessToken()).toBe('test-token')
@@ -107,9 +178,10 @@ describe('bridgeConfig security', () => {
   describe('getBridgeBaseUrl', () => {
     it('should return the override URL when feature flag is enabled and USER_TYPE is ant', () => {
       (globalThis as any).MACRO = { DEV_BRIDGE_OVERRIDES_ENABLED: true }
+      process.env.NODE_ENV = 'development'
       process.env.USER_TYPE = 'ant'
-      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://override.example.com'
-      expect(getBridgeBaseUrl()).toBe('https://override.example.com')
+      process.env.CLAUDE_BRIDGE_BASE_URL = 'https://dev.example.com'
+      expect(getBridgeBaseUrl()).toBe('https://dev.example.com')
     })
   })
 })
