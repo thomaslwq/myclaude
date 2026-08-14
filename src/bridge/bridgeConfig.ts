@@ -14,20 +14,23 @@
 import { getOauthConfig } from '../constants/oauth.js'
 import { getClaudeAIOAuthTokens } from '../utils/auth.js'
 
-// Use globalThis.feature injected by build script, or fallback to false
-// Dynamic lookup so tests can override globalThis.feature after module load
-function feature(name: string): boolean {
-  const fn = (globalThis as any).feature
-  return typeof fn === 'function' ? fn(name) : false
+// Use globalThis.MACRO injected by build script at compile time.
+// This is a build-time constant that cannot be changed at runtime.
+// In production builds, DEV_BRIDGE_OVERRIDES_ENABLED is always false.
+function isDevBridgeOverridesEnabled(): boolean {
+  return (globalThis as any).MACRO?.DEV_BRIDGE_OVERRIDES_ENABLED === true
 }
 
 /** Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined. */
 export function getBridgeTokenOverride(): string | undefined {
-  // Gate dev overrides behind a build-time feature flag to prevent
+  // Gate dev overrides behind a build-time macro to prevent
   // production builds from being vulnerable to environment variable attacks.
-  // Also add a runtime check: never allow overrides in production mode
-  // even if the feature flag is misconfigured.
-  if (!feature('DEV_BRIDGE_OVERRIDES') || process.env.NODE_ENV === 'production') {
+  // The isDevBridgeOverridesEnabled() function checks globalThis.MACRO which
+  // is injected at compile time by the build script. In production builds,
+  // DEV_BRIDGE_OVERRIDES_ENABLED is always false. This is a compile-time
+  // constant, not a runtime check, so it cannot be bypassed by setting
+  // NODE_ENV or other environment variables.
+  if (!isDevBridgeOverridesEnabled()) {
     return undefined
   }
   return (
@@ -39,11 +42,14 @@ export function getBridgeTokenOverride(): string | undefined {
 
 /** Ant-only dev override: CLAUDE_BRIDGE_BASE_URL, else undefined. */
 export function getBridgeBaseUrlOverride(): string | undefined {
-  // Gate dev overrides behind a build-time feature flag to prevent
+  // Gate dev overrides behind a build-time macro to prevent
   // production builds from being vulnerable to environment variable attacks.
-  // Also add a runtime check: never allow overrides in production mode
-  // even if the feature flag is misconfigured.
-  if (!feature('DEV_BRIDGE_OVERRIDES') || process.env.NODE_ENV === 'production') {
+  // The isDevBridgeOverridesEnabled() function checks globalThis.MACRO which
+  // is injected at compile time by the build script. In production builds,
+  // DEV_BRIDGE_OVERRIDES_ENABLED is always false. This is a compile-time
+  // constant, not a runtime check, so it cannot be bypassed by setting
+  // NODE_ENV or other environment variables.
+  if (!isDevBridgeOverridesEnabled()) {
     return undefined
   }
   return (
