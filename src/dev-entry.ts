@@ -69,44 +69,58 @@ async function getFileContent(filePath: string): Promise<string | null> {
 
 const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'])
 
+interface StackEntry {
+  dir: string
+  depth: number
+}
+
 export async function scanFiles(dir: string, out: string[], maxDepth = 100, currentDepth = 0): Promise<void> {
-  if (currentDepth > maxDepth) return
-  let dirHandle
-  try {
-    dirHandle = await readdir(dir, { withFileTypes: true })
-  } catch {
-    return
-  }
-  // Process entries with bounded concurrency to avoid excessive memory usage
-  // on large directory trees
-  const CONCURRENCY = 10
-  await pMap(
-    dirHandle,
-    async (entry) => {
-      try {
-        const fullPath = join(dir, entry.name)
-        // Check if entry is a symbolic link to avoid infinite recursion
-        let isSymlink = false
+  // Use an explicit stack to avoid stack overflow from deeply nested directories
+  const stack: StackEntry[] = [{ dir, depth: currentDepth }]
+
+  while (stack.length > 0) {
+    const { dir: currentDir, depth } = stack.pop()!
+
+    if (depth > maxDepth) continue
+
+    let dirHandle
+    try {
+      dirHandle = await readdir(currentDir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+
+    // Process entries with bounded concurrency to avoid excessive memory usage
+    // on large directory trees
+    const CONCURRENCY = 10
+    await pMap(
+      dirHandle,
+      async (entry) => {
         try {
-          const stats = lstatSync(fullPath)
-          isSymlink = stats.isSymbolicLink()
-        } catch {}
-        if (isSymlink) return
-        if (entry.isDirectory()) {
-          // Skip node_modules, .git, and other common large directories (but allow .github)
-          if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
-          await scanFiles(fullPath, out, maxDepth, currentDepth + 1)
-          return
+          const fullPath = join(currentDir, entry.name)
+          // Check if entry is a symbolic link to avoid infinite loops
+          let isSymlink = false
+          try {
+            const stats = lstatSync(fullPath)
+            isSymlink = stats.isSymbolicLink()
+          } catch {}
+          if (isSymlink) return
+          if (entry.isDirectory()) {
+            // Skip node_modules, .git, and other common large directories (but allow .github)
+            if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
+            stack.push({ dir: fullPath, depth: depth + 1 })
+            return
+          }
+          if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
+            out.push(fullPath)
+          }
+        } catch {
+          // Gracefully skip this entry (e.g., permission error, I/O failure)
         }
-        if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
-          out.push(fullPath)
-        }
-      } catch {
-        // Gracefully skip this entry (e.g., permission error, I/O failure)
-      }
-    },
-    { concurrency: CONCURRENCY }
-  )
+      },
+      { concurrency: CONCURRENCY }
+    )
+  }
 }
 
 export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
