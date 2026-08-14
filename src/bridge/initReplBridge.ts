@@ -362,7 +362,7 @@ export async function initReplBridge(
           patch(generated, bridgeSessionId, atCount)
         }
       },
-    )
+    ).catch(() => {})
   }
   const onUserMessage = (text: string, bridgeSessionId: string): boolean => {
     if (hasExplicitTitle || getCurrentSessionTitle(getSessionId())) {
