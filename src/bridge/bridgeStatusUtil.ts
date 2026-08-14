@@ -166,5 +166,12 @@ export function wrapWithOsc8Link(text: string, url: string): string {
   const sanitizedUrl = (typeof url === 'string' ? url : '').replace(/[\x00-\x1f\x7f;%\\]/g, (char) => {
     return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
   })
-  return `\x1b]8;;${sanitizedUrl}\x07${text}\x1b]8;;\x07`
+  // Sanitize the text as well to prevent OSC 8 escape sequence injection.
+  // The text appears between the opening OSC 8 sequence and the closing one,
+  // so control characters, backslashes, percent signs, and semicolons must
+  // be percent-encoded to prevent breaking the sequence.
+  const sanitizedText = (typeof text === 'string' ? text : '').replace(/[\x00-\x1f\x7f;%\\]/g, (char) => {
+    return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
+  })
+  return `\x1b]8;;${sanitizedUrl}\x07${sanitizedText}\x1b]8;;\x07`
 }
