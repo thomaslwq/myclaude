@@ -1,5 +1,14 @@
 # 🎭 myclaude
 
+> **⚠️ SECURITY NOTICE: This is an open-source fork/rebrand of Anthropic's Claude Code.**
+> This package is **NOT** the official Anthropic package. It is published by a third party
+> under the `@funnycode` organization. If you are looking for the official Anthropic
+> package, use `@anthropic-ai/claude-code` (if available) or visit https://claude.ai.
+>
+> This fork uses the official Anthropic SDK to communicate with the Anthropic API —
+> your API keys are sent directly to Anthropic's servers, not to this package's author.
+> However, as with any third-party fork, you should review the source code before use.
+
 > **Your AI coding sidekick in the terminal — write smarter, ship faster.**
 
 ```bash

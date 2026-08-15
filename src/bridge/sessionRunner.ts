@@ -306,14 +306,18 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
       // Start with the parent environment, but strip known sensitive variables
       // that could leak credentials to the child process (e.g., OAuth tokens,
       // session access tokens, API keys, etc.). The child should only receive
-      // the session-specific access token set below.
+      // the session-specific access token via stdin (not via environment),
+      // since environment variables are visible to all processes on the system
+      // via /proc/[pid]/environ (Linux) or Process Explorer (Windows).
       const env: NodeJS.ProcessEnv = {
         ...deps.env,
         // Strip the parent's CLAUDE_CODE env vars so the child CC process uses
         // only the session-specific values we set below.
         CLAUDE_CODE_ENVIRONMENT_KIND: 'bridge',
         ...(deps.sandbox && { CLAUDE_CODE_FORCE_SANDBOX: '1' }),
-        CLAUDE_CODE_SESSION_ACCESS_TOKEN: opts.accessToken,
+        // NOTE: CLAUDE_CODE_SESSION_ACCESS_TOKEN is deliberately NOT set in the
+        // environment. It is sent via stdin after spawn to prevent leaking the
+        // token to other processes on the system via /proc/[pid]/environ.
         // v1: HybridTransport (WS reads + POST writes) to Session-Ingress.
         // Harmless in v2 mode — transportUtils checks CLAUDE_CODE_USE_CCR_V2 first.
         CLAUDE_CODE_POST_FOR_SESSION_INGRESS_V2: '1',
@@ -334,7 +338,7 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
       // should only receive the session-specific CLAUDE_CODE_* values we set
       // above, not any inherited from the parent environment.
       for (const key of Object.keys(env)) {
-        if (key.startsWith('CLAUDE_CODE_') && key !== 'CLAUDE_CODE_SESSION_ACCESS_TOKEN' && key !== 'CLAUDE_CODE_ENVIRONMENT_KIND' && key !== 'CLAUDE_CODE_POST_FOR_SESSION_INGRESS_V2' && key !== 'CLAUDE_CODE_FORCE_SANDBOX' && key !== 'CLAUDE_CODE_USE_CCR_V2' && key !== 'CLAUDE_CODE_WORKER_EPOCH') {
+        if (key.startsWith('CLAUDE_CODE_') && key !== 'CLAUDE_CODE_ENVIRONMENT_KIND' && key !== 'CLAUDE_CODE_POST_FOR_SESSION_INGRESS_V2' && key !== 'CLAUDE_CODE_FORCE_SANDBOX' && key !== 'CLAUDE_CODE_USE_CCR_V2' && key !== 'CLAUDE_CODE_WORKER_EPOCH') {
           delete env[key]
         }
       }
@@ -359,6 +363,24 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
       deps.onDebug(
         `[bridge:session] sessionId=${opts.sessionId} pid=${child.pid}`,
       )
+
+      // Send the session access token via stdin rather than via environment
+      // to prevent leaking it to other processes on the system through
+      // /proc/[pid]/environ (Linux) or Process Explorer (Windows).
+      // The child's StructuredIO handles update_environment_variables messages
+      // by setting process.env directly, so getSessionIngressAuthToken() will
+      // pick up the token on the next refreshHeaders call.
+      if (child.stdin) {
+        child.stdin.write(
+          jsonStringify({
+            type: 'update_environment_variables',
+            variables: { CLAUDE_CODE_SESSION_ACCESS_TOKEN: opts.accessToken },
+          }) + '\n',
+        )
+        deps.onDebug(
+          `[bridge:session] Sent access token via stdin for sessionId=${opts.sessionId}`,
+        )
+      }
 
       const activities: SessionActivity[] = []
       let currentActivity: SessionActivity | null = null

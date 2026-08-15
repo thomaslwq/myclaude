@@ -27,7 +27,7 @@ const defaultMacro: MacroConfig = {
   NATIVE_PACKAGE_URL: pkg.name,
   VERSION_CHANGELOG: '',
   ISSUES_EXPLAINER:
-    'file an issue at https://github.com/anthropics/claude-code/issues',
+    'file an issue at https://github.com/thomaslwq/myclaude/issues',
   FEEDBACK_CHANNEL: 'github',
 }
 
