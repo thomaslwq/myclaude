@@ -138,4 +138,31 @@ describe('wrapWithOsc8Link text sanitization', () => {
     expect(result).toContain('\x1b]8;;')
     expect(result).toContain('\x07')
   })
+
+  it('should prevent OSC 8 breakout and arbitrary escape injection via ESC in text (issue #720)', () => {
+    const url = 'https://example.com'
+    const text = 'Link\x1b]8;;https://evil.com\x07clicked\x1b[31mred\x1b[0m'
+    const result = wrapWithOsc8Link(text, url)
+
+    // The malicious OSC 8 sequence must not survive in the text segment.
+    expect(result).not.toContain('\x1b]8;;https://evil.com')
+    // Raw ESC-based SGR sequences must be neutralized (ESC is percent-encoded to %1B).
+    expect(result).not.toContain('\x1b[31m')
+    // The only raw ESC/BEL sequences should be the legitimate OSC 8 delimiters.
+    expect(result).toContain('\x1b]8;;https://example.com\x07')
+    expect(result).toContain('Link%1B]8%3B%3Bhttps://evil.com%07clicked%1B[31mred%1B[0m')
+    expect(result).toContain('\x1b]8;;\x07')
+  })
+
+  it('should neutralize C1 control sequences (CSI 0x9b) in text', () => {
+    const url = 'https://example.com'
+    const text = 'Link\x9b[31mred\x9b[0m'
+    const result = wrapWithOsc8Link(text, url)
+
+    // C1 CSI (0x9b) can also inject terminal escape sequences and must be encoded.
+    expect(result).not.toContain('\x9b[31m')
+    expect(result).toContain('Link%9B[31mred%9B[0m')
+    expect(result).toContain('\x1b]8;;https://example.com\x07')
+    expect(result).toContain('\x1b]8;;\x07')
+  })
 })
