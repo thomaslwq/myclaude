@@ -4,6 +4,7 @@ import {
   getBridgeAccessToken,
   getBridgeBaseUrl,
   createBridgeOverrideResolver,
+  __resetBridgeConfig,
 } from '../bridge/bridgeConfig.js'
 
 // Mock the build-time MACRO constant
@@ -11,7 +12,9 @@ const originalMacro = (globalThis as any).MACRO
 
 describe('bridgeConfig security', () => {
   beforeEach(() => {
-    // Reset MACRO to default (DEV_BRIDGE_OVERRIDES_ENABLED = false)
+    // Always set MACRO to default (DEV_BRIDGE_OVERRIDES_ENABLED = false)
+    // This ensures tests don't leak state between them, even if a test
+    // previously deleted globalThis.MACRO.
     ;(globalThis as any).MACRO = {
       DEV_BRIDGE_OVERRIDES_ENABLED: false,
       BRIDGE_OVERRIDE_TOKEN: '',
@@ -23,6 +26,8 @@ describe('bridgeConfig security', () => {
     delete process.env.CLAUDE_BRIDGE_BASE_URL
     delete process.env.USER_TYPE
     delete process.env.NODE_ENV
+    // Reset cached resolver to ensure clean state
+    __resetBridgeConfig()
   })
 
   afterEach(() => {
@@ -87,6 +92,38 @@ describe('bridgeConfig security', () => {
   })
 
   describe('race condition — MACRO set after module load', () => {
+    it('should pick up overrides when getResolver is called before MACRO is set (the actual race condition)', () => {
+      // This reproduces the race condition exactly:
+      // 1. bridgeConfig is imported (module loaded)
+      // 2. getBridgeTokenOverride() is called BEFORE dev-entry.ts sets MACRO
+      // 3. Later, dev-entry.ts sets MACRO with dev overrides
+      // 4. Subsequent calls MUST pick up the overrides
+
+      // Simulate: MACRO is undefined (dev-entry.ts hasn't run yet)
+      const saved = (globalThis as any).MACRO
+      delete (globalThis as any).MACRO
+
+      // First call to exported getter — this triggers getResolver() when MACRO is undefined
+      const firstToken = getBridgeTokenOverride()
+      expect(firstToken).toBeUndefined()
+
+      // Now dev-entry.ts sets MACRO with dev overrides enabled
+      ;(globalThis as any).MACRO = {
+        DEV_BRIDGE_OVERRIDES_ENABLED: true,
+        BRIDGE_OVERRIDE_TOKEN: 'race-token',
+        BRIDGE_OVERRIDE_BASE_URL: 'https://race.test',
+      }
+
+      // The next call MUST pick up the overrides (not stuck with the cached undefined resolver)
+      const afterToken = getBridgeTokenOverride()
+      expect(afterToken).toBe('race-token')
+
+      const afterBaseUrl = getBridgeBaseUrlOverride()
+      expect(afterBaseUrl).toBe('https://race.test')
+
+      // Restore
+      ;(globalThis as any).MACRO = saved
+    })
     it('should capture MACRO lazily on first call, not at module load time', () => {
       // Simulate the race condition: bridgeConfig module is loaded before
       // dev-entry.ts sets globalThis.MACRO.  We blow away the cached resolver
@@ -157,8 +194,10 @@ describe('bridgeConfig security', () => {
     })
 
     it('should not be affected by runtime globalThis.MACRO replacement', () => {
-      // The module captured the original MACRO at load time.
-      // Replacing globalThis.MACRO at runtime must not enable the overrides.
+      // First trigger the resolver to capture the current MACRO (disabled)
+      expect(getBridgeTokenOverride()).toBeUndefined()
+
+      // Now replace MACRO with an evil override — must not affect the resolver
       ;(globalThis as any).MACRO = {
         DEV_BRIDGE_OVERRIDES_ENABLED: true,
         BRIDGE_OVERRIDE_TOKEN: 'evil-token',
@@ -171,6 +210,10 @@ describe('bridgeConfig security', () => {
     })
 
     it('should use production config for base URL when overrides disabled', () => {
+      // First trigger the resolver to capture the current MACRO (disabled)
+      expect(getBridgeTokenOverride()).toBeUndefined()
+
+      // Now replace MACRO with an evil override — must not affect the resolver
       ;(globalThis as any).MACRO = {
         DEV_BRIDGE_OVERRIDES_ENABLED: true,
         BRIDGE_OVERRIDE_TOKEN: 'evil-token',

@@ -52,13 +52,32 @@ export function createBridgeOverrideResolver(macro: any) {
 // avoiding a race condition where bridgeConfig.ts is imported before
 // dev-entry.ts executes.  After the first call the values are cached, so
 // later mutation of globalThis.MACRO has no effect (security invariant).
+//
+// To handle the race condition where getResolver() is called before
+// dev-entry.ts sets globalThis.MACRO, we also re-create the resolver if
+// the MACRO reference changes from undefined to a defined value.  This
+// preserves the security invariant: once MACRO is defined, replacing it
+// with a different object does NOT update the resolver.
 let _resolver: ReturnType<typeof createBridgeOverrideResolver> | undefined
+let _macroRef: any = undefined
 
 function getResolver() {
-  if (!_resolver) {
-    _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
+  const currentMacro = (globalThis as any).MACRO
+  if (!_resolver || (_macroRef === undefined && currentMacro !== undefined)) {
+    _resolver = createBridgeOverrideResolver(currentMacro)
+    _macroRef = currentMacro
   }
   return _resolver
+}
+
+/**
+ * Resets the cached resolver. Used only in tests to clear state between
+ * test cases. Not exported for production use.
+ * @internal
+ */
+export function __resetBridgeConfig(): void {
+  _resolver = undefined
+  _macroRef = undefined
 }
 
 /**
