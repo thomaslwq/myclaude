@@ -271,8 +271,6 @@ const SAFE_ENV_VARS = new Set([
   'EDITOR',
   'VISUAL',
   'PAGER',
-  'NODE_OPTIONS',
-  'NODE_PATH',
   'npm_config_user_agent',
   'npm_config_registry',
   'npm_package_name',

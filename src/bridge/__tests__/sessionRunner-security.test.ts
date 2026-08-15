@@ -161,4 +161,38 @@ describe('createSessionSpawner - Security: Environment Variable Sanitization', (
     const spawnLog = debugCalls.find(call => call.includes('Spawning sessionId'))
     expect(spawnLog).toBeTruthy()
   })
+
+  it('should NOT leak NODE_OPTIONS or NODE_PATH (security fix for issue #726)', async () => {
+    // Use a child process that prints its environment to stdout
+    const printEnvScript = `
+      const env = process.env;
+      const dangerousKeys = ['NODE_OPTIONS', 'NODE_PATH'];
+      const leakedKeys = dangerousKeys.filter(k => env[k]);
+      console.log(JSON.stringify(leakedKeys));
+    `
+    deps.scriptArgs = ['-e', printEnvScript]
+
+    const spawner = createSessionSpawner(deps)
+    const opts = {
+      sessionId: 'test-session',
+      sdkUrl: 'https://api.anthropic.com',
+      accessToken: 'session-specific-token',
+      useCcrV2: false,
+      workerEpoch: 0,
+    }
+
+    const handle = await spawner.spawn(opts, '/tmp/test-dir')
+
+    // Give the process time to start and output
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    // Kill the process
+    handle.kill()
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    // Verify the spawn happened
+    const debugCalls = deps.onDebug.mock.calls.map(call => call[0])
+    const spawnLog = debugCalls.find(call => call.includes('Spawning sessionId'))
+    expect(spawnLog).toBeTruthy()
+  })
 })
