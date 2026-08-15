@@ -48,7 +48,15 @@ export function countVisualLines(text: string): number {
   const { columns: cols } = terminalSize()
   let count = 0
   // Split on newlines to get logical lines
-  for (const logical of text.split('\n')) {
+  const lines = text.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const logical = lines[i]
+    // Skip the trailing empty element from split when text ends with \n.
+    // This element corresponds to the cursor position after the final newline,
+    // not an actual visual row.
+    if (i === lines.length - 1 && logical.length === 0) {
+      continue
+    }
     if (logical.length === 0) {
       // Empty segment between consecutive \n — counts as 1 row
       count++
@@ -56,11 +64,6 @@ export function countVisualLines(text: string): number {
     }
     const width = stringWidth(logical)
     count += Math.max(1, Math.ceil(width / cols))
-  }
-  // The trailing \n in "line\n" produces an empty last element — don't count it
-  // because the cursor sits at the start of the next line, not a new visual row.
-  if (text.endsWith('\n')) {
-    count--
   }
   return count
 }

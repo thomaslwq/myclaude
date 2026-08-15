@@ -58,6 +58,16 @@ describe('countVisualLines', () => {
     expect(result).toBe(1)
   })
 
+  it('should handle multiple trailing newlines', () => {
+    const result = countVisualLines('Line 1\n\n')
+    expect(result).toBe(2)
+  })
+
+  it('should handle text ending with multiple newlines', () => {
+    const result = countVisualLines('Line 1\nLine 2\n\n')
+    expect(result).toBe(3)
+  })
+
   it('should handle undefined stdout.columns (piped stdout)', () => {
     process.stdout.columns = undefined
     const result = countVisualLines('Line 1\nLine 2')

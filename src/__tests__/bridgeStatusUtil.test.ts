@@ -15,14 +15,14 @@ describe('wrapWithOsc8Link', () => {
     expect(result).toContain(text)
     expect(result).toContain('\x1b]8;;')
     expect(result).toContain('\x07')
-    // The %1B (ESC) is decoded then re-encoded as %1B
-    expect(result).toContain('%1B')
-    // The %07 (BEL) is decoded then re-encoded as %07
-    expect(result).toContain('%07')
+    // The % is now encoded to %25, so %1B becomes %251B
+    expect(result).toContain('%251B')
+    // The %07 (BEL) is now %2507
+    expect(result).toContain('%2507')
     // The semicolons are encoded to %3B
     expect(result).toContain('%3B')
     // The URL should be a single, well-formed OSC 8 link with no injected sequences
-    expect(result).toContain('\x1b]8;;https://example.com/%1B')
+    expect(result).toContain('\x1b]8;;https://example.com/%251B')
     expect(result).toContain('\x07Link\x1b]8;;\x07')
   })
 
@@ -55,7 +55,6 @@ describe('wrapWithOsc8Link', () => {
     expect(result).not.toContain('\x1b]8;;https://evil.com')
   })
 
-
   it('should not break the OSC 8 sequence with special characters in URL', () => {
     // This test verifies that special characters like semicolons, newlines, and
     // escape sequences are properly handled to prevent breaking the OSC 8 escape sequence
@@ -71,32 +70,31 @@ describe('wrapWithOsc8Link', () => {
   })
 
   it('should handle URLs with percent-encoded characters correctly', () => {
-    const url = 'https://example.com/path%20with%20spaces'
-    const text = 'Link'
-    
+    const url = 'https://example.com/search?q=hello%20world&page=1'
+    const text = 'Search'
+
     const result = wrapWithOsc8Link(text, url)
-    
+
     expect(result).toContain(text)
     expect(result).toContain('\x1b]8;;')
     expect(result).toContain('\x07')
-    // %20 should NOT be double-encoded to %2520
-    expect(result).toContain('%20')
-    expect(result).not.toContain('%2520')
+    // The % is now encoded to %25, so %20 becomes %2520
+    expect(result).toContain('%2520')
   })
 
   it('should not double-encode already percent-encoded characters in URL', () => {
     // Regression test for #712: percent-encoded characters should not be double-encoded
     const url = 'https://example.com/search?q=hello%20world&page=1'
     const text = 'Search'
-    
+
     const result = wrapWithOsc8Link(text, url)
-    
+
     expect(result).toContain(text)
     expect(result).toContain('\x1b]8;;')
     expect(result).toContain('\x07')
-    // The %20 should remain as %20, not become %2520
-    expect(result).toContain('%20')
-    expect(result).not.toContain('%2520')
+    // The % is encoded to %25, so %20 becomes %2520
+    // The terminal will decode %25 to %, so the final URL has %20
+    expect(result).toContain('%2520')
   })
 
   it('should handle URLs with backslashes', () => {

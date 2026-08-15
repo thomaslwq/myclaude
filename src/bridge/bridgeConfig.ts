@@ -47,10 +47,19 @@ export function createBridgeOverrideResolver(macro: any) {
   }
 }
 
-// Capture MACRO values at module load time — cannot be modified at runtime.
-// Any later mutation of globalThis.MACRO (e.g. by malicious code) has no
-// effect on the resolver used by the exported getters below.
-const _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
+// Lazily-initialised resolver that reads globalThis.MACRO on first use.
+// This defers capture until the entry point (dev-entry.ts) has set MACRO,
+// avoiding a race condition where bridgeConfig.ts is imported before
+// dev-entry.ts executes.  After the first call the values are cached, so
+// later mutation of globalThis.MACRO has no effect (security invariant).
+let _resolver: ReturnType<typeof createBridgeOverrideResolver> | undefined
+
+function getResolver() {
+  if (!_resolver) {
+    _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
+  }
+  return _resolver
+}
 
 /**
  * Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined.
@@ -61,7 +70,7 @@ const _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
  * environment variable at build time.
  */
 export function getBridgeTokenOverride(): string | undefined {
-  return _resolver.getBridgeTokenOverride()
+  return getResolver().getBridgeTokenOverride()
 }
 
 /**
@@ -73,7 +82,7 @@ export function getBridgeTokenOverride(): string | undefined {
  * environment variable at build time.
  */
 export function getBridgeBaseUrlOverride(): string | undefined {
-  return _resolver.getBridgeBaseUrlOverride()
+  return getResolver().getBridgeBaseUrlOverride()
 }
 
 /**

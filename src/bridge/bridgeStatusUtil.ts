@@ -136,10 +136,12 @@ export function wrapWithOsc8Link(text: string, url: string): string {
   // Sanitize the URL to prevent OSC 8 escape sequence injection.
   // Encode only characters that could break the OSC 8 sequence: control characters
   // (0x00-0x1f, 0x7f), C1 control characters (0x80-0x9f), semicolons, and backslashes.
-  // Percent signs (%) are deliberately NOT encoded to avoid double-encoding
-  // already percent-encoded URLs (e.g., %20 stays as %20, not %2520).
+  // Percent signs (%) are also encoded to prevent injection of percent-encoded
+  // escape sequences (e.g., %1B for ESC, %07 for BEL) that the terminal would
+  // decode and execute. Already percent-encoded sequences become %25XX (e.g., %20
+  // becomes %2520) which the terminal decodes back to the original %20.
   // If url is not a string (e.g., null, undefined), treat it as an empty string.
-  const sanitizedUrl = (typeof url === 'string' ? url : '').replace(/[\x00-\x1f\x7f\x80-\x9f;\\]/g, (char) => {
+  const sanitizedUrl = (typeof url === 'string' ? url : '').replace(/[\x00-\x1f\x7f\x80-\x9f;\\%]/g, (char) => {
     return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
   })
   // Sanitize the text as well to prevent OSC 8 escape sequence injection.

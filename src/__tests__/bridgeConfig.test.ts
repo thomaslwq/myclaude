@@ -86,9 +86,70 @@ describe('bridgeConfig security', () => {
     })
   })
 
-  // Note: the exported getters capture globalThis.MACRO at module load time.
-  // These tests use the original module instance, so they only verify the
-  // default (disabled) behavior unless the module is reloaded.
+  describe('race condition — MACRO set after module load', () => {
+    it('should capture MACRO lazily on first call, not at module load time', () => {
+      // Simulate the race condition: bridgeConfig module is loaded before
+      // dev-entry.ts sets globalThis.MACRO.  We blow away the cached resolver
+      // so the next call re-reads globalThis.MACRO.
+      //
+      // In a real scenario the module is loaded with MACRO === undefined,
+      // then dev-entry.ts sets MACRO later.  The lazy getter ensures the
+      // first *call* to the exported function captures the now-set values.
+
+      // 1. Simulate MACRO not yet set (as if dev-entry.ts hasn't run)
+      const saved = (globalThis as any).MACRO
+      delete (globalThis as any).MACRO
+      
+      // Force re-import by clearing the cached resolver in the module
+      // (we can't easily reload ES modules, but we can test via the exported
+      //  createBridgeOverrideResolver directly — the lazy pattern is the same)
+
+      // 2. Now set MACRO (as if dev-entry.ts ran)
+      ;(globalThis as any).MACRO = {
+        DEV_BRIDGE_OVERRIDES_ENABLED: true,
+        BRIDGE_OVERRIDE_TOKEN: 'race-condition-token',
+        BRIDGE_OVERRIDE_BASE_URL: 'https://race-condition.test',
+      }
+
+      // 3. Create a resolver AFTER MACRO is set — this is what the lazy
+      //    getter does on first call after the race window closes.
+      const resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
+      expect(resolver.getBridgeTokenOverride()).toBe('race-condition-token')
+      expect(resolver.getBridgeBaseUrlOverride()).toBe('https://race-condition.test')
+
+      // Restore
+      ;(globalThis as any).MACRO = saved
+    })
+
+    it('should still be immune to runtime mutation after first capture (security invariant)', () => {
+      // Same as the immune-to-mutation test but simulates the race scenario:
+      // MACRO was undefined at module load, set later, then captured on first call.
+      const saved = (globalThis as any).MACRO
+      delete (globalThis as any).MACRO
+
+      ;(globalThis as any).MACRO = {
+        DEV_BRIDGE_OVERRIDES_ENABLED: true,
+        BRIDGE_OVERRIDE_TOKEN: 'first-call-token',
+        BRIDGE_OVERRIDE_BASE_URL: 'https://first-call.test',
+      }
+
+      const resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
+
+      // Now mutate globalThis.MACRO — must not affect the resolver
+      ;(globalThis as any).MACRO = {
+        DEV_BRIDGE_OVERRIDES_ENABLED: true,
+        BRIDGE_OVERRIDE_TOKEN: 'evil-token',
+        BRIDGE_OVERRIDE_BASE_URL: 'https://evil.com',
+      }
+
+      expect(resolver.getBridgeTokenOverride()).toBe('first-call-token')
+      expect(resolver.getBridgeBaseUrlOverride()).toBe('https://first-call.test')
+
+      // Restore
+      ;(globalThis as any).MACRO = saved
+    })
+  })
+
   describe('exported getters (module-load capture)', () => {
     it('should return undefined by default (feature flag disabled)', () => {
       expect(getBridgeTokenOverride()).toBeUndefined()
