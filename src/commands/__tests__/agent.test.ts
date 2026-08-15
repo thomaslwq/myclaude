@@ -73,4 +73,49 @@ describe('Agent command', () => {
     // We can check by looking for it in the exported commands
     expect(commandsModule).toBeDefined()
   })
+
+  // New tests for agentic planning and self-correction features
+
+  it('should include self-correction instructions for step failures', async () => {
+    const result = await agent.getPromptForCommand('Build a feature', undefined)
+    const combinedText = result.map((b: any) => b.text).join(' ')
+    expect(combinedText).toContain('Self-Correction')
+    expect(combinedText).toContain('attempt')
+    expect(combinedText).toContain('Analyze the error')
+  })
+
+  it('should include user approval instructions before execution', async () => {
+    const result = await agent.getPromptForCommand('Refactor module', undefined)
+    const combinedText = result.map((b: any) => b.text).join(' ')
+    expect(combinedText).toContain('User Approval')
+    expect(combinedText).toContain('confirmation')
+    expect(combinedText).toContain('proceed')
+  })
+
+  it('should include step verification instructions', async () => {
+    const result = await agent.getPromptForCommand('Deploy API', undefined)
+    const combinedText = result.map((b: any) => b.text).join(' ')
+    expect(combinedText).toContain('verification')
+    expect(combinedText).toContain('Verify the step')
+    expect(combinedText).toContain('completed successfully')
+  })
+
+  it('should include retry limit information for self-correction', async () => {
+    const result = await agent.getPromptForCommand('Fix bug', undefined)
+    const combinedText = result.map((b: any) => b.text).join(' ')
+    expect(combinedText).toContain('3 attempts')
+  })
+
+  it('should include a summary with remaining issues on completion', async () => {
+    const result = await agent.getPromptForCommand('Complete task', undefined)
+    const combinedText = result.map((b: any) => b.text).join(' ')
+    expect(combinedText).toContain('summary')
+    expect(combinedText).toContain('progress')
+  })
+
+  it('should mention verification in the planning prompt', async () => {
+    const result = await agent.getPromptForCommand('Create API', undefined)
+    const combinedText = result.map((b: any) => b.text).join(' ')
+    expect(combinedText).toContain('verification')
+  })
 })
