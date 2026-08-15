@@ -17,9 +17,40 @@ import { getClaudeAIOAuthTokens } from '../utils/auth.js'
 // Use globalThis.MACRO injected by build script at compile time.
 // This is a build-time constant that cannot be changed at runtime.
 // In production builds, DEV_BRIDGE_OVERRIDES_ENABLED is always false.
-function isDevBridgeOverridesEnabled(): boolean {
-  return (globalThis as any).MACRO?.DEV_BRIDGE_OVERRIDES_ENABLED === true
+// The MACRO values are captured at module load time into a private resolver
+// to prevent security bypasses via runtime modification of globalThis.MACRO
+// (e.g., via prototype pollution or malicious dependency).
+
+/**
+ * Creates a bridge override resolver from a MACRO object.
+ * All values are captured eagerly at creation time, so later mutation
+ * of the source object cannot affect the resolver.
+ */
+export function createBridgeOverrideResolver(macro: any) {
+  const devEnabled = macro?.DEV_BRIDGE_OVERRIDES_ENABLED === true
+  const token = macro?.BRIDGE_OVERRIDE_TOKEN || ''
+  const baseUrl = macro?.BRIDGE_OVERRIDE_BASE_URL || ''
+
+  return {
+    getBridgeTokenOverride(): string | undefined {
+      if (!devEnabled) {
+        return undefined
+      }
+      return token || undefined
+    },
+    getBridgeBaseUrlOverride(): string | undefined {
+      if (!devEnabled) {
+        return undefined
+      }
+      return baseUrl || undefined
+    },
+  }
 }
+
+// Capture MACRO values at module load time — cannot be modified at runtime.
+// Any later mutation of globalThis.MACRO (e.g. by malicious code) has no
+// effect on the resolver used by the exported getters below.
+const _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
 
 /**
  * Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined.
@@ -30,18 +61,7 @@ function isDevBridgeOverridesEnabled(): boolean {
  * environment variable at build time.
  */
 export function getBridgeTokenOverride(): string | undefined {
-  // Gate dev overrides behind a build-time macro to prevent
-  // production builds from being vulnerable to environment variable attacks.
-  // The isDevBridgeOverridesEnabled() function checks globalThis.MACRO which
-  // is injected at compile time by the build script. In production builds,
-  // DEV_BRIDGE_OVERRIDES_ENABLED is always false. This is a compile-time
-  // constant, not a runtime check, so it cannot be bypassed by setting
-  // NODE_ENV or other environment variables.
-  if (!isDevBridgeOverridesEnabled()) {
-    return undefined
-  }
-  const macro = (globalThis as any).MACRO
-  return macro?.BRIDGE_OVERRIDE_TOKEN || undefined
+  return _resolver.getBridgeTokenOverride()
 }
 
 /**
@@ -53,18 +73,7 @@ export function getBridgeTokenOverride(): string | undefined {
  * environment variable at build time.
  */
 export function getBridgeBaseUrlOverride(): string | undefined {
-  // Gate dev overrides behind a build-time macro to prevent
-  // production builds from being vulnerable to environment variable attacks.
-  // The isDevBridgeOverridesEnabled() function checks globalThis.MACRO which
-  // is injected at compile time by the build script. In production builds,
-  // DEV_BRIDGE_OVERRIDES_ENABLED is always false. This is a compile-time
-  // constant, not a runtime check, so it cannot be bypassed by setting
-  // NODE_ENV or other environment variables.
-  if (!isDevBridgeOverridesEnabled()) {
-    return undefined
-  }
-  const macro = (globalThis as any).MACRO
-  return macro?.BRIDGE_OVERRIDE_BASE_URL || undefined
+  return _resolver.getBridgeBaseUrlOverride()
 }
 
 /**

@@ -234,6 +234,75 @@ function extractUserMessageText(
 }
 
 /** Build a short preview of tool input for debug logging. */
+/**
+ * Whitelist of environment variable names that are safe to pass from the
+ * parent to the child process. All other variables are excluded to prevent
+ * accidental credential leakage.
+ *
+ * These are standard system variables that the child needs to find
+ * executables (PATH), locate the user's home directory (HOME), and
+ * configure basic process behavior (LANG, LC_*, TERM, etc.).
+ */
+const SAFE_ENV_VARS = new Set([
+  'PATH',
+  'HOME',
+  'USER',
+  'USERNAME',
+  'LOGNAME',
+  'SHELL',
+  'TMPDIR',
+  'TMP',
+  'TEMP',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'LC_MESSAGES',
+  'LC_MONETARY',
+  'LC_NUMERIC',
+  'LC_TIME',
+  'TERM',
+  'TERM_PROGRAM',
+  'TERM_PROGRAM_VERSION',
+  'COLORTERM',
+  'FORCE_COLOR',
+  'NO_COLOR',
+  'CLICOLOR',
+  'CLICOLOR_FORCE',
+  'EDITOR',
+  'VISUAL',
+  'PAGER',
+  'NODE_OPTIONS',
+  'NODE_PATH',
+  'npm_config_user_agent',
+  'npm_config_registry',
+  'npm_package_name',
+  'npm_package_version',
+])
+
+/**
+ * Pick only whitelisted environment variables from the parent environment.
+ * This uses a whitelist approach (rather than a blacklist) to prevent
+ * accidental credential leakage. Only variables that are essential for the
+ * child process to function (e.g., PATH, HOME) are passed through.
+ *
+ * This also uses `hasOwnProperty` to avoid leaking inherited prototype
+ * properties, which `Object.keys` would miss.
+ */
+function pickWhitelistedEnv(
+  parentEnv: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = {}
+  for (const key of SAFE_ENV_VARS) {
+    if (
+      Object.prototype.hasOwnProperty.call(parentEnv, key) &&
+      parentEnv[key] !== undefined
+    ) {
+      result[key] = parentEnv[key]
+    }
+  }
+  return result
+}
+
 function inputPreview(input: Record<string, unknown>): string {
   const parts: string[] = []
   for (const [key, val] of Object.entries(input)) {
@@ -303,14 +372,22 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
           : []),
       ]
 
-      // Start with the parent environment, but strip known sensitive variables
-      // that could leak credentials to the child process (e.g., OAuth tokens,
-      // session access tokens, API keys, etc.). The child should only receive
-      // the session-specific access token via stdin (not via environment),
-      // since environment variables are visible to all processes on the system
-      // via /proc/[pid]/environ (Linux) or Process Explorer (Windows).
+      // Build the child process environment using a whitelist approach to
+      // prevent credential leakage. Only copy essential system environment
+      // variables (e.g., PATH, HOME) from the parent plus the explicitly set
+      // CLAUDE_CODE_* variables. This is more secure than starting from the
+      // parent's entire environment and trying to delete sensitive variables,
+      // because:
+      //   1. Non-CLAUDE_CODE_* sensitive variables (e.g., MYCLAUDE_*, SESSION_TOKEN)
+      //      are not accidentally leaked.
+      //   2. Inherited prototype properties (which are not visible via
+      //      Object.keys) are not included.
+      //   3. Future sensitive variables are automatically excluded.
       const env: NodeJS.ProcessEnv = {
-        ...deps.env,
+        // Only copy whitelisted system environment variables that are essential
+        // for the child process to function (e.g., finding executables, user
+        // home directory). All other variables from the parent are excluded.
+        ...pickWhitelistedEnv(deps.env),
         // Strip the parent's CLAUDE_CODE env vars so the child CC process uses
         // only the session-specific values we set below.
         CLAUDE_CODE_ENVIRONMENT_KIND: 'bridge',
@@ -327,20 +404,6 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
           CLAUDE_CODE_USE_CCR_V2: '1',
           CLAUDE_CODE_WORKER_EPOCH: String(opts.workerEpoch),
         }),
-      }
-      // Delete known sensitive variables that may have been inherited from the
-      // parent environment. This prevents leaking credentials (e.g., OAuth tokens,
-      // session access tokens, API keys) to the child process, which could write
-      // them to debug logs or transmit them over the network.
-      delete env.CLAUDE_CODE_OAUTH_TOKEN
-      // Remove any other CLAUDE_CODE_* variables that may have been set in the
-      // parent process to prevent credential leakage to the child. The child
-      // should only receive the session-specific CLAUDE_CODE_* values we set
-      // above, not any inherited from the parent environment.
-      for (const key of Object.keys(env)) {
-        if (key.startsWith('CLAUDE_CODE_') && key !== 'CLAUDE_CODE_ENVIRONMENT_KIND' && key !== 'CLAUDE_CODE_POST_FOR_SESSION_INGRESS_V2' && key !== 'CLAUDE_CODE_FORCE_SANDBOX' && key !== 'CLAUDE_CODE_USE_CCR_V2' && key !== 'CLAUDE_CODE_WORKER_EPOCH') {
-          delete env[key]
-        }
       }
 
       deps.onDebug(
