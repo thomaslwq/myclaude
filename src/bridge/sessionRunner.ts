@@ -303,10 +303,14 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
           : []),
       ]
 
+      // Start with the parent environment, but strip known sensitive variables
+      // that could leak credentials to the child process (e.g., OAuth tokens,
+      // session access tokens, API keys, etc.). The child should only receive
+      // the session-specific access token set below.
       const env: NodeJS.ProcessEnv = {
         ...deps.env,
-        // Strip the bridge's OAuth token so the child CC process uses
-        // the session access token for inference instead.
+        // Strip the parent's CLAUDE_CODE env vars so the child CC process uses
+        // only the session-specific values we set below.
         CLAUDE_CODE_ENVIRONMENT_KIND: 'bridge',
         ...(deps.sandbox && { CLAUDE_CODE_FORCE_SANDBOX: '1' }),
         CLAUDE_CODE_SESSION_ACCESS_TOKEN: opts.accessToken,
@@ -320,7 +324,20 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
           CLAUDE_CODE_WORKER_EPOCH: String(opts.workerEpoch),
         }),
       }
+      // Delete known sensitive variables that may have been inherited from the
+      // parent environment. This prevents leaking credentials (e.g., OAuth tokens,
+      // session access tokens, API keys) to the child process, which could write
+      // them to debug logs or transmit them over the network.
       delete env.CLAUDE_CODE_OAUTH_TOKEN
+      // Remove any other CLAUDE_CODE_* variables that may have been set in the
+      // parent process to prevent credential leakage to the child. The child
+      // should only receive the session-specific CLAUDE_CODE_* values we set
+      // above, not any inherited from the parent environment.
+      for (const key of Object.keys(env)) {
+        if (key.startsWith('CLAUDE_CODE_') && key !== 'CLAUDE_CODE_SESSION_ACCESS_TOKEN' && key !== 'CLAUDE_CODE_ENVIRONMENT_KIND' && key !== 'CLAUDE_CODE_POST_FOR_SESSION_INGRESS_V2' && key !== 'CLAUDE_CODE_FORCE_SANDBOX' && key !== 'CLAUDE_CODE_USE_CCR_V2' && key !== 'CLAUDE_CODE_WORKER_EPOCH') {
+          delete env[key]
+        }
+      }
 
       deps.onDebug(
         `[bridge:session] Spawning sessionId=${opts.sessionId} sdkUrl=${opts.sdkUrl} accessToken=${opts.accessToken ? 'present' : 'MISSING'}`,
