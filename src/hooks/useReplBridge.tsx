@@ -2,7 +2,7 @@ import { feature } from 'bun:bundle';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { setMainLoopModelOverride } from '../bootstrap/state.js';
 import { type BridgePermissionCallbacks, type BridgePermissionResponse, isBridgePermissionResponse } from '../bridge/bridgePermissionCallbacks.js';
-import { buildBridgeConnectUrl } from '../bridge/bridgeStatusUtil.js';
+import { buildBridgeConnectUrl } from '../bridge/bridgeUrlBuilder.js';
 import { extractInboundMessageFields } from '../bridge/inboundMessages.js';
 import type { BridgeState, ReplBridgeHandle } from '../bridge/replBridge.js';
 import { setReplBridgeHandle } from '../bridge/replBridgeHandle.js';

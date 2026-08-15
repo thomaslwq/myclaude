@@ -10,8 +10,6 @@ import { stringWidth } from '../ink/stringWidth.js'
 import { logForDebugging } from '../utils/debug.js'
 import {
   buildActiveFooterText,
-  buildBridgeConnectUrl,
-  buildBridgeSessionUrl,
   buildIdleFooterText,
   FAILED_FOOTER_TEXT,
   formatDuration,
@@ -21,6 +19,10 @@ import {
   truncatePrompt,
   wrapWithOsc8Link,
 } from './bridgeStatusUtil.js'
+import {
+  buildBridgeConnectUrl,
+  buildBridgeSessionUrl,
+} from './bridgeUrlBuilder.js'
 import type {
   BridgeConfig,
   BridgeLogger,
