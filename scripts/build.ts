@@ -56,6 +56,8 @@ globalThis.MACRO = {
   ISSUES_EXPLAINER: 'file an issue at ' + ${JSON.stringify(process.env.MYCLAUDE_REPOSITORY_URL || pkg.bugs?.url || pkg.repository?.url || '')},
   FEEDBACK_CHANNEL: 'github',
   DEV_BRIDGE_OVERRIDES_ENABLED: ${JSON.stringify(process.env.DEV_BRIDGE_OVERRIDES === 'true')},
+  BRIDGE_OVERRIDE_TOKEN: ${JSON.stringify(process.env.CLAUDE_BRIDGE_OAUTH_TOKEN || '')},
+  BRIDGE_OVERRIDE_BASE_URL: ${JSON.stringify(process.env.CLAUDE_BRIDGE_BASE_URL || '')},
 };
 // Polyfill for bun:bundle feature() — all features default to false
 // when running outside of Bun's compile-time macro system.

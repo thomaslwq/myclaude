@@ -21,7 +21,14 @@ function isDevBridgeOverridesEnabled(): boolean {
   return (globalThis as any).MACRO?.DEV_BRIDGE_OVERRIDES_ENABLED === true
 }
 
-/** Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined. */
+/**
+ * Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined.
+ *
+ * The override value is baked into the build-time MACRO so it cannot be
+ * changed at runtime by setting environment variables. Only the build
+ * script (scripts/build.ts) can set this value via the CLAUDE_BRIDGE_OAUTH_TOKEN
+ * environment variable at build time.
+ */
 export function getBridgeTokenOverride(): string | undefined {
   // Gate dev overrides behind a build-time macro to prevent
   // production builds from being vulnerable to environment variable attacks.
@@ -33,15 +40,18 @@ export function getBridgeTokenOverride(): string | undefined {
   if (!isDevBridgeOverridesEnabled()) {
     return undefined
   }
-  return (
-    (process.env.NODE_ENV === 'development' &&
-      process.env.USER_TYPE === 'ant' &&
-      process.env.CLAUDE_BRIDGE_OAUTH_TOKEN) ||
-    undefined
-  )
+  const macro = (globalThis as any).MACRO
+  return macro?.BRIDGE_OVERRIDE_TOKEN || undefined
 }
 
-/** Ant-only dev override: CLAUDE_BRIDGE_BASE_URL, else undefined. */
+/**
+ * Ant-only dev override: CLAUDE_BRIDGE_BASE_URL, else undefined.
+ *
+ * The override value is baked into the build-time MACRO so it cannot be
+ * changed at runtime by setting environment variables. Only the build
+ * script (scripts/build.ts) can set this value via the CLAUDE_BRIDGE_BASE_URL
+ * environment variable at build time.
+ */
 export function getBridgeBaseUrlOverride(): string | undefined {
   // Gate dev overrides behind a build-time macro to prevent
   // production builds from being vulnerable to environment variable attacks.
@@ -53,12 +63,8 @@ export function getBridgeBaseUrlOverride(): string | undefined {
   if (!isDevBridgeOverridesEnabled()) {
     return undefined
   }
-  return (
-    (process.env.NODE_ENV === 'development' &&
-      process.env.USER_TYPE === 'ant' &&
-      process.env.CLAUDE_BRIDGE_BASE_URL) ||
-    undefined
-  )
+  const macro = (globalThis as any).MACRO
+  return macro?.BRIDGE_OVERRIDE_BASE_URL || undefined
 }
 
 /**

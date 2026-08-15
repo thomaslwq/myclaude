@@ -120,6 +120,52 @@ describe('wrapWithOsc8Link', () => {
     expect(result).toContain('\x1b]8;;\x07')
   })
 
+  it('should prevent injection of OSC 8 escape sequence via text', () => {
+    // The text should be sanitized to prevent ESC and BEL characters from
+    // breaking the OSC 8 sequence. An attacker could try to inject a new
+    // OSC 8 link or prematurely close the current one via the text.
+    const url = 'https://example.com'
+    const text = 'clicked\x1b]8;;https://evil.com\x07clicked'
+
+    const result = wrapWithOsc8Link(text, url)
+
+    // The ESC character should be encoded to %1B
+    expect(result).toContain('%1B')
+    // The BEL character should be encoded to %07
+    expect(result).toContain('%07')
+    // The result should still be a single well-formed OSC 8 link
+    expect(result).toContain('\x1b]8;;https://example.com')
+    expect(result).toContain('\x07')
+    // The malicious URL should not appear as a separate OSC 8 sequence
+    expect(result).not.toContain('\x1b]8;;https://evil.com')
+  })
+
+  it('should prevent injection via text with bare ESC character', () => {
+    const url = 'https://example.com'
+    const text = 'hello\x1bworld'
+
+    const result = wrapWithOsc8Link(text, url)
+
+    // ESC should be encoded
+    expect(result).toContain('%1B')
+    // The result should be well-formed
+    expect(result).toContain('\x1b]8;;https://example.com\x07')
+    expect(result).toContain('\x1b]8;;\x07')
+  })
+
+  it('should prevent injection via text with bare BEL character', () => {
+    const url = 'https://example.com'
+    const text = 'hello\x07world'
+
+    const result = wrapWithOsc8Link(text, url)
+
+    // BEL should be encoded
+    expect(result).toContain('%07')
+    // The result should be well-formed
+    expect(result).toContain('\x1b]8;;https://example.com\x07')
+    expect(result).toContain('\x1b]8;;\x07')
+  })
+
   it('should handle URL with null character', () => {
     const url = 'https://example.com/path\x00null'
     const text = 'Link'
