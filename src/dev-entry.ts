@@ -174,7 +174,22 @@ export async function hasResolvableTarget(basePath: string): Promise<boolean> {
   try {
     const entries = await readdir(parentDir, { withFileTypes: true })
     const files = new Set(entries.filter(e => e.isFile()).map(e => e.name))
-    const dirs = new Set(entries.filter(e => e.isDirectory()).map(e => e.name))
+    // Use stat to check for directories (follows symlinks)
+    const dirs = new Set<string>()
+    for (const entry of entries) {
+      if (entry.isDirectory() || entry.isSymbolicLink()) {
+        try {
+          const { stat } = await import('fs/promises')
+          const fullPath = join(parentDir, entry.name)
+          const stats = await stat(fullPath)
+          if (stats.isDirectory()) {
+            dirs.add(entry.name)
+          }
+        } catch {
+          // Not accessible or not a directory
+        }
+      }
+    }
 
     // Check direct file candidates in preference order (.ts before .js to avoid build artifacts)
     if (files.has(baseName)) return true

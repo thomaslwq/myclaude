@@ -53,17 +53,26 @@ export function createBridgeOverrideResolver(macro: any) {
 // dev-entry.ts executes.  After the first call the values are cached, so
 // later mutation of globalThis.MACRO has no effect (security invariant).
 //
-// To handle the race condition where getResolver() is called before
-// dev-entry.ts sets globalThis.MACRO, we also re-create the resolver if
-// the MACRO reference changes from undefined to a defined value.  This
-// preserves the security invariant: once MACRO is defined, replacing it
-// with a different object does NOT update the resolver.
+// If getResolver() is called before MACRO is set, we return a throw-away
+// resolver with no overrides (i.e. devEnabled = false).  This resolver is
+// NOT cached, so the next call after MACRO is set will create the real
+// cached resolver.  This avoids the bug where the first call creates a
+// cached resolver with undefined MACRO, incorrectly disabling overrides
+// for subsequent callers.
 let _resolver: ReturnType<typeof createBridgeOverrideResolver> | undefined
 let _macroRef: any = undefined
 
 function getResolver() {
   const currentMacro = (globalThis as any).MACRO
-  if (!_resolver || (_macroRef === undefined && currentMacro !== undefined)) {
+  // If MACRO is not yet set (e.g. before dev-entry.ts runs), return a
+  // temporary resolver that has no overrides.  The resolver is NOT cached
+  // so the next call will try again.  This avoids capturing a resolver
+  // with undefined MACRO that would incorrectly disable overrides.
+  if (currentMacro === undefined) {
+    return createBridgeOverrideResolver(undefined)
+  }
+  // MACRO is defined — create or reuse the cached resolver.
+  if (!_resolver) {
     _resolver = createBridgeOverrideResolver(currentMacro)
     _macroRef = currentMacro
   }
