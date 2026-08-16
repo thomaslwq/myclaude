@@ -86,6 +86,12 @@ jobs:
           # frequently-updated packages like @anthropic-ai/claude-agent-sdk.
           npm install --no-audit --no-fund
 
+      - name: TODO/WORKAROUND debt gate
+        # Issue #370: keep accumulating technical debt bounded. Fails when the
+        # annotation count exceeds the allowed threshold.
+        run: |
+          bun run scripts/check-todos.mjs --max 120
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"

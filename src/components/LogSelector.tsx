@@ -275,7 +275,8 @@ export function LogSelector(t0) {
   const {
     query: searchQuery,
     setQuery: setSearchQuery,
-    cursorOffset: searchCursorOffset
+    cursorOffset: searchCursorOffset,
+    handleKeyDown: searchHandleKeyDown
   } = useSearchInput(t14);
   const deferredSearchQuery = React.useDeferredValue(searchQuery);
   const [debouncedDeepSearchQuery, setDebouncedDeepSearchQuery] = React.useState("");
@@ -1428,7 +1429,7 @@ export function LogSelector(t0) {
   }
   let t72;
   if ($[235] !== t57 || $[236] !== t60 || $[237] !== t62 || $[238] !== t63 || $[239] !== t65 || $[240] !== t66 || $[241] !== t67 || $[242] !== t68 || $[243] !== t69 || $[244] !== t70 || $[245] !== t71) {
-    t72 = <Box flexDirection="column" height={t57}>{t58}{t59}{t60}{t62}{t63}{t64}{t65}{t66}{t67}{t68}{t69}{t70}{t71}</Box>;
+    t72 = <Box flexDirection="column" height={t57} tabIndex={0} autoFocus onKeyDown={searchHandleKeyDown}>{t58}{t59}{t60}{t62}{t63}{t64}{t65}{t66}{t67}{t68}{t69}{t70}{t71}</Box>;
     $[235] = t57;
     $[236] = t60;
     $[237] = t62;

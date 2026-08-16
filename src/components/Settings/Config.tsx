@@ -178,7 +178,8 @@ export function Config({
   const {
     query: searchQuery,
     setQuery: setSearchQuery,
-    cursorOffset: searchCursorOffset
+    cursorOffset: searchCursorOffset,
+    handleKeyDown: searchHandleKeyDown
   } = useSearchInput({
     isActive: isSearchMode && showSubmenu === null && !headerFocused,
     onExit: () => setIsSearchMode(false),
@@ -1446,7 +1447,10 @@ export function Config({
       setSearchQuery(e.key);
     }
   }, [showSubmenu, headerFocused, isSearchMode, searchQuery, setSearchQuery, toggleSetting]);
-  return <Box flexDirection="column" width="100%" tabIndex={0} autoFocus onKeyDown={handleKeyDown}>
+  return <Box flexDirection="column" width="100%" tabIndex={0} autoFocus onKeyDown={(e) => {
+      searchHandleKeyDown(e);
+      handleKeyDown(e);
+    }}>
       {showSubmenu === 'Theme' ? <>
           <ThemePicker onThemeSelect={setting_1 => {
         isDirty.current = true;

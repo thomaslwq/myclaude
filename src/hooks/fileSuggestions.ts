@@ -1,4 +1,3 @@
-import { statSync } from 'fs'
 import ignore from 'ignore'
 import * as path from 'path'
 import {
@@ -68,6 +67,15 @@ let ignorePatternsCacheKey: string | null = null
 // which don't bump the index.
 let lastRefreshMs = 0
 let lastGitIndexMtime: number | null = null
+// TTL cache for the .git/index mtime stat. getGitIndexMtime() runs on every
+// keystroke (startBackgroundCacheRefresh is called from the debounced file
+// suggestion fetch); a synchronous statSync per keystroke blocks the event
+// loop and causes input lag on Windows Git Bash, where each stat can take
+// 1-50ms (antivirus/OneDrive/network mounts). Cache the mtime for 1s so fast
+// typing costs zero stats instead of ~20/s.
+const GIT_INDEX_MTIME_TTL_MS = 1000
+let lastGitIndexMtimeCheckMs = 0
+let cachedGitIndexMtime: number | null = null
 
 // Signatures of the path lists loaded into the Rust index. Two separate
 // signatures because the two loadFromFileList call sites use differently
@@ -94,6 +102,8 @@ export function clearFileSuggestionCaches(): void {
   ignorePatternsCacheKey = null
   lastRefreshMs = 0
   lastGitIndexMtime = null
+  lastGitIndexMtimeCheckMs = 0
+  cachedGitIndexMtime = null
   loadedTrackedSignature = null
   loadedMergedSignature = null
 }
@@ -135,13 +145,28 @@ export function pathListSignature(paths: string[]): string {
  * Returns null for worktrees (.git is a file → ENOTDIR), fresh repos with no
  * index yet (ENOENT), and non-git dirs — caller falls back to time throttle.
  */
-function getGitIndexMtime(): number | null {
+export function getGitIndexMtime(): number | null {
+  const now = Date.now()
+  // TTL cache: reuse the last observed mtime within the window so repeated
+  // keystroke-driven calls don't pay a synchronous statSync each time.
+  if (now - lastGitIndexMtimeCheckMs < GIT_INDEX_MTIME_TTL_MS) {
+    return cachedGitIndexMtime
+  }
+  lastGitIndexMtimeCheckMs = now
+
   const repoRoot = findGitRoot(getCwd())
-  if (!repoRoot) return null
+  if (!repoRoot) {
+    cachedGitIndexMtime = null
+    return null
+  }
   try {
-    // eslint-disable-next-line custom-rules/no-sync-fs -- mtimeMs is the operation here, not a pre-check. findGitRoot above already stat-walks synchronously; one more stat is marginal vs spawning git ls-files on every keystroke. Async would force startBackgroundCacheRefresh to become async, breaking the synchronous fileListRefreshPromise contract at the cold-start await site.
-    return statSync(path.join(repoRoot, '.git', 'index')).mtimeMs
+    // eslint-disable-next-line custom-rules/no-sync-fs -- mtimeMs is the operation here, not a pre-check. findGitRoot above already stat-walks synchronously; one more stat is marginal vs spawning git ls-files on every keystroke. Async would force startBackgroundCacheRefresh to become async, breaking the synchronous fileListRefreshPromise contract at the cold-start await site. TTL-cached to at most once per second.
+    cachedGitIndexMtime = getFsImplementation().statSync(
+      path.join(repoRoot, '.git', 'index'),
+    ).mtimeMs
+    return cachedGitIndexMtime
   } catch {
+    cachedGitIndexMtime = null
     return null
   }
 }

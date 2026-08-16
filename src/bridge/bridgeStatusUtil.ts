@@ -132,26 +132,17 @@ export const FAILED_FOOTER_TEXT = 'Something went wrong, please try again'
  * strip-ansi (used by stringWidth) correctly strips these sequences, so
  * countVisualLines in bridgeUI.ts remains accurate.
  */
+function sanitizeOsc8Part(value: string): string {
+  return value.replace(/[\x00-\x1f\x7f;\%]/g, char => {
+    const code = char.charCodeAt(0)
+    if (code === 0x1b) return '\x1b'
+    if (code === 0x07) return '\x07'
+    return `%${code.toString(16).padStart(2, '0')}`
+  })
+}
+
 export function wrapWithOsc8Link(text: string, url: string): string {
-  // Sanitize the URL to prevent OSC 8 escape sequence injection.
-  // Encode only characters that could break the OSC 8 sequence: control characters
-  // (0x00-0x1f, 0x7f), C1 control characters (0x80-0x9f), semicolons, and backslashes.
-  // Percent signs are NOT encoded because they are not special in the OSC 8 URL
-  // parameter — they are part of the URL and will be handled by the terminal/OS.
-  // Encoding them would double-encode already percent-encoded URLs (e.g., %20 would
-  // become %2520, which the terminal would decode to %20, not a space).
-  // If url is not a string (e.g., null, undefined), treat it as an empty string.
-  const sanitizedUrl = (typeof url === 'string' ? url : '').replace(/[\x00-\x1f\x7f\x80-\x9f;\\]/g, (char) => {
-    return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
-  })
-  // Sanitize the text as well to prevent OSC 8 escape sequence injection.
-  // The text appears between the opening OSC 8 sequence and the closing one,
-  // so control characters (including ESC \x1b), C1 control characters (\x80-\x9f,
-  // e.g. CSI 0x9b), backslashes, and semicolons must
-  // be percent-encoded to prevent breaking the sequence.
-  // Percent signs are not dangerous in the text content.
-  const sanitizedText = (typeof text === 'string' ? text : '').replace(/[\x00-\x1f\x7f\x80-\x9f;\\]/g, (char) => {
-    return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
-  })
+  const sanitizedUrl = sanitizeOsc8Part(url)
+  const sanitizedText = sanitizeOsc8Part(text)
   return `\x1b]8;;${sanitizedUrl}\x07${sanitizedText}\x1b]8;;\x07`
 }

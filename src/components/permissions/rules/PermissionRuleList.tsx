@@ -668,7 +668,8 @@ export function PermissionRuleList(t0) {
   const {
     query: searchQuery,
     setQuery: setSearchQuery,
-    cursorOffset: searchCursorOffset
+    cursorOffset: searchCursorOffset,
+    handleKeyDown: searchHandleKeyDown
   } = useSearchInput(t9);
   let t10;
   if ($[18] !== isSearchMode || $[19] !== isSearchModeActive || $[20] !== setSearchQuery) {
@@ -1149,7 +1150,10 @@ export function PermissionRuleList(t0) {
   }
   let t33;
   if ($[110] !== handleKeyDown || $[111] !== t32) {
-    t33 = <Box flexDirection="column" onKeyDown={handleKeyDown}>{t32}</Box>;
+    t33 = <Box flexDirection="column" tabIndex={0} autoFocus onKeyDown={(e) => {
+        searchHandleKeyDown(e);
+        handleKeyDown(e);
+      }}>{t32}</Box>;
     $[110] = handleKeyDown;
     $[111] = t32;
     $[112] = t33;

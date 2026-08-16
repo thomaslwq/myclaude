@@ -475,6 +475,9 @@ export type GlobalConfig = {
   // Sonnet 4.5 1m migration tracking
   sonnet1m45MigrationComplete?: boolean
 
+  // Fennec → Opus alias migration tracking (issue #299)
+  fennecToOpusMigrationComplete?: boolean
+
   // Opus 4.0/4.1 → current Opus migration (shows one-time notif)
   legacyOpusMigrationTimestamp?: number
 

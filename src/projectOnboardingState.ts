@@ -201,3 +201,10 @@ export function shouldShowProjectOnboarding(): boolean {
   }
   return !isProjectOnboardingComplete()
 }
+
+export function incrementProjectOnboardingSeenCount(): void {
+  saveCurrentProjectConfig(current => ({
+    ...current,
+    projectOnboardingSeenCount: current.projectOnboardingSeenCount + 1,
+  }))
+}

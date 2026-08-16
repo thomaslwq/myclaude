@@ -1,6 +1,5 @@
 import chalk from 'chalk'
 import { toString as qrToString } from 'qrcode'
-import terminalSize from 'terminal-size'
 import {
   BRIDGE_FAILED_INDICATOR,
   BRIDGE_READY_INDICATOR,
@@ -10,6 +9,8 @@ import { stringWidth } from '../ink/stringWidth.js'
 import { logForDebugging } from '../utils/debug.js'
 import {
   buildActiveFooterText,
+  buildBridgeConnectUrl,
+  buildBridgeSessionUrl,
   buildIdleFooterText,
   FAILED_FOOTER_TEXT,
   formatDuration,
@@ -19,17 +20,12 @@ import {
   truncatePrompt,
   wrapWithOsc8Link,
 } from './bridgeStatusUtil.js'
-import {
-  buildBridgeConnectUrl,
-  buildBridgeSessionUrl,
-} from './bridgeUrlBuilder.js'
 import type {
   BridgeConfig,
   BridgeLogger,
   SessionActivity,
   SpawnMode,
 } from './types.js'
-import pkg from '../../package.json'
 
 const QR_OPTIONS = {
   type: 'utf8' as const,
@@ -41,31 +37,6 @@ const QR_OPTIONS = {
 async function generateQr(url: string): Promise<string[]> {
   const qr = await qrToString(url, QR_OPTIONS)
   return qr.split('\n').filter((line: string) => line.length > 0)
-}
-
-export function countVisualLines(text: string): number {
-  if (text.length === 0) return 0
-  const { columns: cols } = terminalSize()
-  let count = 0
-  // Split on newlines to get logical lines
-  const lines = text.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const logical = lines[i]
-    // Skip the trailing empty element from split when text ends with \n.
-    // This element corresponds to the cursor position after the final newline,
-    // not an actual visual row.
-    if (i === lines.length - 1 && logical.length === 0) {
-      continue
-    }
-    if (logical.length === 0) {
-      // Empty segment between consecutive \n — counts as 1 row
-      count++
-      continue
-    }
-    const width = stringWidth(logical)
-    count += Math.max(1, Math.ceil(width / cols))
-  }
-  return count
 }
 
 export function createBridgeLogger(options: {
@@ -94,7 +65,6 @@ export function createBridgeLogger(options: {
   // QR code lines for the current URL
   let qrLines: string[] = []
   let qrVisible = false
-  let qrGenerationVersion = 0
 
   // Tool activity for the second status line
   let lastToolSummary: string | null = null
@@ -116,12 +86,33 @@ export function createBridgeLogger(options: {
   // Connecting spinner state
   let connectingTimer: ReturnType<typeof setInterval> | null = null
   let connectingTick = 0
-  let reconnectingTimer: ReturnType<typeof setInterval> | null = null
 
-  // Reconnecting/failed state data (stored so renderStatusLine can re-render them)
-  let reconnectingDelayStr = ''
-  let reconnectingElapsedStr = ''
-  let failedError = ''
+  /**
+   * Count how many visual terminal rows a string occupies, accounting for
+   * line wrapping. Each `\n` is one row, and content wider than the terminal
+   * wraps to additional rows.
+   */
+  function countVisualLines(text: string): number {
+    // eslint-disable-next-line custom-rules/prefer-use-terminal-size
+    const cols = process.stdout.columns || 80 // non-React CLI context
+    let count = 0
+    // Split on newlines to get logical lines
+    for (const logical of text.split('\n')) {
+      if (logical.length === 0) {
+        // Empty segment between consecutive \n — counts as 1 row
+        count++
+        continue
+      }
+      const width = stringWidth(logical)
+      count += Math.max(1, Math.ceil(width / cols))
+    }
+    // The trailing \n in "line\n" produces an empty last element — don't count it
+    // because the cursor sits at the start of the next line, not a new visual row.
+    if (text.endsWith('\n')) {
+      count--
+    }
+    return count
+  }
 
   /** Write a status line and track its visual line count. */
   function writeStatus(text: string): void {
@@ -143,18 +134,12 @@ export function createBridgeLogger(options: {
   function printLog(line: string): void {
     clearStatusLines()
     write(line)
-    renderStatusLine()
   }
 
   /** Regenerate the QR code with the given URL. */
   function regenerateQr(url: string): void {
-    const version = ++qrGenerationVersion
     generateQr(url)
       .then(lines => {
-        if (version !== qrGenerationVersion) {
-          // A newer QR generation was requested, discard this stale result
-          return
-        }
         qrLines = lines
         renderStatusLine()
       })
@@ -199,62 +184,12 @@ export function createBridgeLogger(options: {
     }
   }
 
-  /** Stop the reconnecting spinner timer. */
-  function stopReconnecting(): void {
-    if (reconnectingTimer) {
-      clearInterval(reconnectingTimer)
-      reconnectingTimer = null
-    }
-  }
-
   /** Render and write the current status lines based on state. */
   function renderStatusLine(): void {
-    if (currentState === 'reconnecting') {
-      // Re-render reconnecting status with current QR visibility
-      clearStatusLines()
-
-      // QR code above the status line
-      if (qrVisible) {
-        for (const line of qrLines) {
-          writeStatus(`${chalk.dim(line)}\n`)
-        }
-      }
-
-      const frame =
-        BRIDGE_SPINNER_FRAMES[connectingTick % BRIDGE_SPINNER_FRAMES.length]!
-      writeStatus(
-        `${chalk.yellow(frame)} ${chalk.yellow('Reconnecting')} ${chalk.dim('\u00b7')} ${chalk.dim(`retrying in ${reconnectingDelayStr}`)} ${chalk.dim('\u00b7')} ${chalk.dim(`disconnected ${reconnectingElapsedStr}`)}\n`,
-      )
-      return
-    }
-
-    if (currentState === 'failed') {
-      // Re-render failed status with current QR visibility
-      clearStatusLines()
-
-      // QR code above the status line
-      if (qrVisible) {
-        for (const line of qrLines) {
-          writeStatus(`${chalk.dim(line)}\n`)
-        }
-      }
-
-      let suffix = ''
-      if (repoName) {
-        suffix += chalk.dim(' \u00b7 ') + chalk.dim(repoName)
-      }
-      if (branch) {
-        suffix += chalk.dim(' \u00b7 ') + chalk.dim(branch)
-      }
-
-      writeStatus(
-        `${chalk.red(BRIDGE_FAILED_INDICATOR)} ${chalk.red('Remote Control Failed')}${suffix}\n`,
-      )
-      writeStatus(`${chalk.dim(FAILED_FOOTER_TEXT)}\n`)
-
-      if (failedError) {
-        writeStatus(`${chalk.red(failedError)}\n`)
-      }
+    if (currentState === 'reconnecting' || currentState === 'failed') {
+      // These states are handled separately (updateReconnectingStatus /
+      // updateFailedStatus). Return before clearing so callers like toggleQr
+      // and setSpawnModeDisplay don't blank the display during these states.
       return
     }
 
@@ -364,7 +299,13 @@ export function createBridgeLogger(options: {
       regenerateQr(connectUrl)
 
       if (verbose) {
-        write(chalk.dim(`Remote Control`) + ` v${(globalThis as any).MACRO?.VERSION ?? pkg.version}\n`)
+        // MACRO is only assigned to globalThis by dev-entry.ts; fall back to
+        // an empty string so importing this module elsewhere doesn't throw
+        // ReferenceError (issue #650).
+        const version =
+          (globalThis as typeof globalThis & { MACRO?: { VERSION?: string } })
+            .MACRO?.VERSION ?? ''
+        write(chalk.dim(`Remote Control`) + ` v${version}\n`)
       }
       if (verbose) {
         if (config.spawnMode !== 'single-session') {
@@ -440,7 +381,6 @@ export function createBridgeLogger(options: {
 
     updateIdleStatus(): void {
       stopConnecting()
-      stopReconnecting()
 
       currentState = 'idle'
       currentStateText = 'Ready'
@@ -453,7 +393,6 @@ export function createBridgeLogger(options: {
 
     setAttached(sessionId: string): void {
       stopConnecting()
-      stopReconnecting()
       currentState = 'attached'
       currentStateText = 'Connected'
       lastToolSummary = null
@@ -473,11 +412,8 @@ export function createBridgeLogger(options: {
 
     updateReconnectingStatus(delayStr: string, elapsedStr: string): void {
       stopConnecting()
-      stopReconnecting()
       clearStatusLines()
       currentState = 'reconnecting'
-      reconnectingDelayStr = delayStr
-      reconnectingElapsedStr = elapsedStr
 
       // QR code above the status line
       if (qrVisible) {
@@ -492,20 +428,12 @@ export function createBridgeLogger(options: {
       writeStatus(
         `${chalk.yellow(frame)} ${chalk.yellow('Reconnecting')} ${chalk.dim('\u00b7')} ${chalk.dim(`retrying in ${delayStr}`)} ${chalk.dim('\u00b7')} ${chalk.dim(`disconnected ${elapsedStr}`)}\n`,
       )
-
-      // Start the reconnecting spinner timer
-      reconnectingTimer = setInterval(() => {
-        connectingTick++
-        renderStatusLine()
-      }, 150)
     },
 
     updateFailedStatus(error: string): void {
       stopConnecting()
-      stopReconnecting()
       clearStatusLines()
       currentState = 'failed'
-      failedError = error
 
       let suffix = ''
       if (repoName) {
@@ -541,7 +469,6 @@ export function createBridgeLogger(options: {
 
     clearStatus(): void {
       stopConnecting()
-      stopReconnecting()
       clearStatusLines()
     },
 
@@ -600,6 +527,9 @@ export function createBridgeLogger(options: {
     },
 
     refreshDisplay(): void {
+      // Skip during reconnecting/failed — renderStatusLine clears then returns
+      // early for those states, which would erase the spinner/error.
+      if (currentState === 'reconnecting' || currentState === 'failed') return
       renderStatusLine()
     },
   }

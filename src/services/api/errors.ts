@@ -7,7 +7,7 @@ import type {
   BetaMessage,
   BetaStopReason,
 } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
-import { AFK_MODE_BETA_HEADER } from '../../constants/betas.js'
+import { getAfkModeBetaHeader } from '../../constants/betas.js'
 import type { SDKAssistantMessageError } from '../../entrypoints/agentSdkTypes.js'
 import type {
   AssistantMessage,
@@ -639,13 +639,14 @@ export function getAssistantMessageFromError(
   }
 
   // Server rejected the afk-mode beta header (plan does not include auto
-  // mode). AFK_MODE_BETA_HEADER is '' in non-TRANSCRIPT_CLASSIFIER builds,
+  // mode). The header is '' when the TRANSCRIPT_CLASSIFIER feature is off,
   // so the truthy guard keeps this inert there.
+  const afkModeBetaHeader = getAfkModeBetaHeader()
   if (
-    AFK_MODE_BETA_HEADER &&
+    afkModeBetaHeader &&
     error instanceof APIError &&
     error.status === 400 &&
-    error.message.includes(AFK_MODE_BETA_HEADER) &&
+    error.message.includes(afkModeBetaHeader) &&
     error.message.includes('anthropic-beta')
   ) {
     return createAssistantAPIErrorMessage({

@@ -15,11 +15,11 @@ import {
   PROMPT_CACHING_SCOPE_BETA_HEADER,
   REDACT_THINKING_BETA_HEADER,
   STRUCTURED_OUTPUTS_BETA_HEADER,
-  SUMMARIZE_CONNECTOR_TEXT_BETA_HEADER,
   TOKEN_EFFICIENT_TOOLS_BETA_HEADER,
   TOOL_SEARCH_BETA_HEADER_1P,
   TOOL_SEARCH_BETA_HEADER_3P,
   WEB_SEARCH_BETA_HEADER,
+  getSummarizeConnectorTextBetaHeader,
 } from '../constants/betas.js'
 import { OAUTH_BETA_HEADER } from '../constants/oauth.js'
 import { isClaudeAISubscriber } from './auth.js'
@@ -286,15 +286,17 @@ export const getAllModelBetas = memoize((model: string): string[] => {
   // USE_CONNECTOR_TEXT_SUMMARIZATION is tri-state: =1 forces on (opt-in even
   // if GB is off), =0 forces off (opt-out of a GB rollout you were bucketed
   // into), unset defers to GB.
+  const summarizeConnectorTextBetaHeader =
+    getSummarizeConnectorTextBetaHeader()
   if (
-    SUMMARIZE_CONNECTOR_TEXT_BETA_HEADER &&
+    summarizeConnectorTextBetaHeader &&
     process.env.USER_TYPE === 'ant' &&
     includeFirstPartyOnlyBetas &&
     !isEnvDefinedFalsy(process.env.USE_CONNECTOR_TEXT_SUMMARIZATION) &&
     (isEnvTruthy(process.env.USE_CONNECTOR_TEXT_SUMMARIZATION) ||
       getFeatureValue_CACHED_MAY_BE_STALE('tengu_slate_prism', false))
   ) {
-    betaHeaders.push(SUMMARIZE_CONNECTOR_TEXT_BETA_HEADER)
+    betaHeaders.push(summarizeConnectorTextBetaHeader)
   }
 
   // Add context management beta for tool clearing (ant opt-in) or thinking preservation

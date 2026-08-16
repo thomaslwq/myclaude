@@ -13,8 +13,8 @@
  * (SDK -p mode via query.enableRemoteControl).
  */
 
-// Use globalThis.feature injected by build script, or fallback to false
-const feature = (globalThis as any).feature || function (name: string) { return false; };
+import { feature } from 'bun:bundle'
+import { createRequire } from 'node:module'
 import { hostname } from 'os'
 import { getOriginalCwd, getSessionId } from '../bootstrap/state.js'
 import type { SDKMessage } from '../entrypoints/agentSdkTypes.js'
@@ -31,7 +31,6 @@ import {
   getClaudeAIOAuthTokens,
   handleOAuth401Error,
 } from '../utils/auth.js'
-import { combineAbortSignals } from '../utils/abortController.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { logForDebugging } from '../utils/debug.js'
 import { stripDisplayTagsAllowEmpty } from '../utils/displayTags.js'
@@ -44,6 +43,7 @@ import {
   isSyntheticMessage,
 } from '../utils/messages.js'
 import type { PermissionMode } from '../utils/permissions/PermissionMode.js'
+import { getCurrentSessionTitle } from '../utils/sessionStorage.js'
 import {
   extractConversationText,
   generateSessionTitle,
@@ -111,12 +111,6 @@ export type InitBridgeOptions = {
 export async function initReplBridge(
   options?: InitBridgeOptions,
 ): Promise<ReplBridgeHandle | null> {
-  // Dynamically import getCurrentSessionTitle to avoid statically pulling in
-  // src/utils/sessionStorage.ts → src/commands.ts → the entire slash command
-  // + React component tree (~1300 modules) via the static import chain.
-  // The heavy module is only loaded when initReplBridge is actually called.
-  const { getCurrentSessionTitle } = await import('../utils/sessionStorage.js')
-
   const {
     onInboundMessage,
     onPermissionResponse,
@@ -318,10 +312,6 @@ export async function initReplBridge(
   let userMessageCount = 0
   let lastBridgeSessionId: string | undefined
   let genSeq = 0
-  // AbortController for cancelling the previous title generation call when a
-  // new one is made. Prevents wasted API calls when the user sends messages
-  // quickly (e.g. pasting multiple lines).
-  let titleController = new AbortController()
   const patch = (
     derived: string,
     bridgeSessionId: string,
@@ -340,19 +330,11 @@ export async function initReplBridge(
   // Fire-and-forget Haiku generation with post-await guards. Re-checks /rename
   // (sessionStorage), v1 env-lost (lastBridgeSessionId), and same-session
   // out-of-order resolution (genSeq — count-1's Haiku resolving after count-3
-  // would clobber the richer title). Aborts the previous title generation call
-  // when a new one is made to avoid wasting API quota and CPU on stale requests.
-  // generateSessionTitle never rejects.
+  // would clobber the richer title). generateSessionTitle never rejects.
   const generateAndPatch = (input: string, bridgeSessionId: string): void => {
-    // Abort any previous title generation call that is still in-flight
-    titleController.abort()
-    titleController = new AbortController()
     const gen = ++genSeq
     const atCount = userMessageCount
-    // Combine the 15-second timeout with the abort controller so we can cancel
-    // the previous call when a new user message arrives
-    const signal = combineAbortSignals([titleController.signal, AbortSignal.timeout(15_000)])
-    void generateSessionTitle(input, signal).then(
+    void generateSessionTitle(input, AbortSignal.timeout(15_000)).then(
       generated => {
         if (
           generated &&
@@ -363,7 +345,7 @@ export async function initReplBridge(
           patch(generated, bridgeSessionId, atCount)
         }
       },
-    ).catch(() => {})
+    )
   }
   const onUserMessage = (text: string, bridgeSessionId: string): boolean => {
     if (hasExplicitTitle || getCurrentSessionTitle(getSessionId())) {
@@ -373,10 +355,10 @@ export async function initReplBridge(
     // the new session gets its own count-3 derivation; hasTitle stays true
     // (new session was created via getCurrentTitle(), which reads the count-1
     // title from this closure), so count-1 of the fresh cycle correctly skips.
-    // Also reset when transitioning from no session (undefined) to a real
-    // session ID, so a stale count from pre-session messages doesn't leak
-    // into the first real session's count-3 derivation.
-    if (lastBridgeSessionId !== bridgeSessionId) {
+    if (
+      lastBridgeSessionId !== undefined &&
+      lastBridgeSessionId !== bridgeSessionId
+    ) {
       userMessageCount = 0
     }
     lastBridgeSessionId = bridgeSessionId
@@ -494,10 +476,11 @@ export async function initReplBridge(
   // assistant module out of external builds entirely.
   let workerType: BridgeWorkerType = 'claude_code'
   if (feature('KAIROS')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
+    // ESM source: bare require() is undefined under Node. Use createRequire
+    // so this branch still works when run with the Node runtime (issue #647).
+    const req = createRequire(import.meta.url)
     const { isAssistantMode } =
-      require('../assistant/index.js') as typeof import('../assistant/index.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
+      req('../assistant/index.js') as typeof import('../assistant/index.js')
     if (isAssistantMode()) {
       workerType = 'claude_code_assistant'
     }
