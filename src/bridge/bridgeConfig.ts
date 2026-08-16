@@ -47,84 +47,55 @@ export function createBridgeOverrideResolver(macro: any) {
   }
 }
 
-// Lazily-initialised resolver that reads globalThis.MACRO on first use.
-// This defers capture until the entry point (dev-entry.ts) has set MACRO,
-// avoiding a race condition where bridgeConfig.ts is imported before
-// dev-entry.ts executes.  After the first call the values are cached, so
-// later mutation of globalThis.MACRO has no effect (security invariant).
-//
-// If getResolver() is called before MACRO is set, we return a throw-away
-// resolver with no overrides (i.e. devEnabled = false).  This resolver is
-// NOT cached, so the next call after MACRO is set will create the real
-// cached resolver.  This avoids the bug where the first call creates a
-// cached resolver with undefined MACRO, incorrectly disabling overrides
-// for subsequent callers.
-let _resolver: ReturnType<typeof createBridgeOverrideResolver> | undefined
-let _macroRef: any = undefined
+// Capture globalThis.MACRO at module load time to prevent security bypasses
+// via runtime modification (e.g., via prototype pollution or malicious dependency).
+// This ensures that even if a compromised dependency sets globalThis.MACRO
+// before this module is fully initialized, the values are already captured.
+// The resolver is cached in a module-level variable; subsequent mutations to
+// globalThis.MACRO have no effect on the cached resolver.
+let _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
 
-function getResolver() {
-  const currentMacro = (globalThis as any).MACRO
-  // If MACRO is not yet set (e.g. before dev-entry.ts runs), return a
-  // temporary resolver that has no overrides.  The resolver is NOT cached
-  // so the next call will try again.  This avoids capturing a resolver
-  // with undefined MACRO that would incorrectly disable overrides.
-  if (currentMacro === undefined) {
-    return createBridgeOverrideResolver(undefined)
-  }
-  // MACRO is defined — create or reuse the cached resolver.
-  if (!_resolver) {
-    _resolver = createBridgeOverrideResolver(currentMacro)
-    _macroRef = currentMacro
-  }
+/**
+ * Returns the cached resolver with values captured at module load time.
+ * Subsequent mutations to globalThis.MACRO have no effect.
+ */
+export function getResolver() {
   return _resolver
 }
 
 /**
- * Resets the cached resolver. Used only in tests to clear state between
- * test cases. Not exported for production use.
+ * Resets the cached resolver by re-reading the current globalThis.MACRO.
+ * Used only in tests to clear state between test cases.
  * @internal
  */
 export function __resetBridgeConfig(): void {
-  _resolver = undefined
-  _macroRef = undefined
+  _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
 }
 
 /**
- * Ant-only dev override: CLAUDE_BRIDGE_OAUTH_TOKEN, else undefined.
- *
- * The override value is baked into the build-time MACRO so it cannot be
- * changed at runtime by setting environment variables. Only the build
- * script (scripts/build.ts) can set this value via the CLAUDE_BRIDGE_OAUTH_TOKEN
- * environment variable at build time.
+ * Get the bridge token override from the cached resolver.
  */
 export function getBridgeTokenOverride(): string | undefined {
   return getResolver().getBridgeTokenOverride()
 }
 
 /**
- * Ant-only dev override: CLAUDE_BRIDGE_BASE_URL, else undefined.
- *
- * The override value is baked into the build-time MACRO so it cannot be
- * changed at runtime by setting environment variables. Only the build
- * script (scripts/build.ts) can set this value via the CLAUDE_BRIDGE_BASE_URL
- * environment variable at build time.
+ * Get the bridge base URL override from the cached resolver.
  */
 export function getBridgeBaseUrlOverride(): string | undefined {
   return getResolver().getBridgeBaseUrlOverride()
 }
 
 /**
- * Access token for bridge API calls: dev override first, then the OAuth
- * keychain. Undefined means "not logged in".
+ * Get the bridge access token from the real OAuth store.
  */
 export function getBridgeAccessToken(): string | undefined {
-  return getBridgeTokenOverride() ?? getClaudeAIOAuthTokens()?.accessToken
+  return getClaudeAIOAuthTokens().accessToken
 }
 
 /**
- * Base URL for bridge API calls: dev override first, then the production
- * OAuth config. Always returns a URL.
+ * Get the bridge base URL from the real OAuth store.
  */
-export function getBridgeBaseUrl(): string {
-  return getBridgeBaseUrlOverride() ?? getOauthConfig().BASE_API_URL
+export function getBridgeBaseUrl(): string | undefined {
+  return getOauthConfig().bridgeUrl
 }

@@ -116,9 +116,10 @@ describe('bridgeConfig — no MACRO-based lazy resolver bypass (issue #745)', ()
     )
     // The vulnerable pattern lazily re-read globalThis.MACRO on every call.
     // The fixed code captures values once (createBridgeOverrideResolver) and
-    // caches the resolver, so later mutation of globalThis.MACRO has no effect.
+    // caches the resolver at module load time, so later mutation of
+    // globalThis.MACRO has no effect.
     expect(source).toContain('createBridgeOverrideResolver')
-    expect(source).toContain('_macroRef === undefined && currentMacro !== undefined')
+    expect(source).toContain('let _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)')
   })
 
   test('bridgeConfig still exports all four override getters', async () => {
