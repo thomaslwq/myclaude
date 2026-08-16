@@ -4,7 +4,6 @@ import {
   getBridgeAccessToken,
   getBridgeBaseUrl,
   createBridgeOverrideResolver,
-  __resetBridgeConfig,
   getResolver,
 } from '../bridge/bridgeConfig.js'
 
@@ -27,8 +26,6 @@ describe('bridgeConfig security', () => {
     delete process.env.CLAUDE_BRIDGE_BASE_URL
     delete process.env.USER_TYPE
     delete process.env.NODE_ENV
-    // Reset cached resolver to ensure clean state
-    __resetBridgeConfig()
   })
 
   afterEach(() => {
@@ -121,35 +118,9 @@ describe('bridgeConfig security', () => {
       expect(getResolver().getBridgeBaseUrlOverride()).toBeUndefined()
     })
 
-    it('should NOT pick up MACRO changes made after reset', () => {
-      // __resetBridgeConfig re-reads the CURRENT globalThis.MACRO
-      // and creates a new resolver. This is a test-only function.
-
-      // Set a new MACRO value
-      ;(globalThis as any).MACRO = {
-        DEV_BRIDGE_OVERRIDES_ENABLED: true,
-        BRIDGE_OVERRIDE_TOKEN: 'reset-token',
-        BRIDGE_OVERRIDE_BASE_URL: 'https://reset.example',
-      }
-
-      // Reset the resolver to capture the new MACRO value
-      __resetBridgeConfig()
-
-      // Now the resolver should reflect the new MACRO
-      expect(getBridgeTokenOverride()).toBe('reset-token')
-      expect(getBridgeBaseUrlOverride()).toBe('https://reset.example')
-
-      // But if we modify MACRO again without reset, the resolver should NOT change
-      ;(globalThis as any).MACRO = {
-        DEV_BRIDGE_OVERRIDES_ENABLED: false,
-        BRIDGE_OVERRIDE_TOKEN: 'evil-token',
-        BRIDGE_OVERRIDE_BASE_URL: 'https://evil.example',
-      }
-
-      // Resolver still has the values from the last reset
-      expect(getBridgeTokenOverride()).toBe('reset-token')
-      expect(getBridgeBaseUrlOverride()).toBe('https://reset.example')
-    })
+    // __resetBridgeConfig has been removed to prevent security bypass.
+    // The resolver captures globalThis.MACRO only at module load time.
+    // See test 'should be immune to runtime modification of globalThis.MACRO after module load' above.
   })
 
   describe('getBridgeTokenOverride and getBridgeBaseUrlOverride', () => {

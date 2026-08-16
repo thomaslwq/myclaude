@@ -68,9 +68,7 @@ export function getResolver() {
  * Used only in tests to clear state between test cases.
  * @internal
  */
-export function __resetBridgeConfig(): void {
-  _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
-}
+
 
 /**
  * Get the bridge token override from the cached resolver.
