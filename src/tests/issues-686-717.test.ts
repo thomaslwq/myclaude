@@ -87,3 +87,50 @@ describe('wrapWithOsc8Link — injection resistance (issue #716)', () => {
     expect(out).toBe('\x1b]8;;https://safe.example\x07label\x1b]8;;\x07')
   })
 })
+
+
+describe('wrapWithOsc8Link — percent encoding (issue #744)', () => {
+  test('percent signs in url are percent-encoded', async () => {
+    const { wrapWithOsc8Link } = await import('../bridge/bridgeStatusUtil.js')
+    const out = wrapWithOsc8Link('label', 'http://example.com?foo%bar')
+    // A literal % must become %25 so it cannot break the OSC8 envelope
+    expect(out).toContain('%25')
+    expect(out.indexOf('?foo%25bar')).not.toBe(-1)
+  })
+
+  test('percent signs in text are percent-encoded', async () => {
+    const { wrapWithOsc8Link } = await import('../bridge/bridgeStatusUtil.js')
+    const out = wrapWithOsc8Link('100% done', 'https://safe.example')
+    expect(out).toContain('100%25 done')
+  })
+})
+
+describe('bridgeConfig — no MACRO-based lazy resolver bypass (issue #745)', () => {
+  test('bridgeConfig exposes only static override getters, no globalThis.MACRO resolver', async () => {
+    const fs = await import('fs')
+    const source = fs.readFileSync(
+      new URL('../bridge/bridgeConfig.ts', import.meta.url),
+      'utf-8',
+    )
+    // The vulnerable getResolver() pattern re-read globalThis.MACRO to rebuild
+    // the override resolver; the fixed code has no MACRO access at all.
+    expect(source).not.toContain('globalThis.MACRO')
+    expect(source).not.toContain('MACRO')
+  })
+
+  test('bridgeConfig still exports all four override getters', async () => {
+    // Source-level assertion: importing bridgeConfig pulls in oauth.js and
+    // auth.js, which other test files mock with partial exports and break
+    // the module graph in the full suite (same pattern as migrate tests).
+    // Assert the export declarations exist in the source instead.
+    const fs = await import('fs')
+    const source = fs.readFileSync(
+      new URL('../bridge/bridgeConfig.ts', import.meta.url),
+      'utf-8',
+    )
+    expect(source).toContain('export function getBridgeTokenOverride')
+    expect(source).toContain('export function getBridgeBaseUrlOverride')
+    expect(source).toContain('export function getBridgeAccessToken')
+    expect(source).toContain('export function getBridgeBaseUrl')
+  })
+})
