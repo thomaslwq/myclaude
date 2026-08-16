@@ -84,26 +84,21 @@ export async function executeFlow(
   return state
 }
 
-async function executeCommand(command: string, context: any): Promise<void> {
+export async function executeCommand(command: string, context: any): Promise<void> {
   // This is a simplified version. In a real implementation,
   // you would use the bridge API to execute commands
   console.log(`Executing command: ${command}`)
-  // await context.bridge.runCommand(command)
+  throw new Error('executeCommand is not implemented yet. Please connect it to the bridge API.')
 }
 
-async function executeFileOperation(file: string, context: any): Promise<void> {
+export async function executeFileOperation(file: string, context: any): Promise<void> {
   // This is a simplified version. In a real implementation,
   // you would use the bridge API to edit files
   console.log(`Executing file operation: ${file}`)
-  // await context.bridge.editFile(file)
+  throw new Error('executeFileOperation is not implemented yet. Please connect it to the bridge API.')
 }
 
-async function shouldContinueOnError(error: Error, step: FlowStep): Promise<boolean> {
-  // Check if the error is recoverable
-  const errorMessages = [
-    'EACCES',
-    'ENOENT',
-    'ETIMEDOUT',
-  ]
-  return !errorMessages.some(msg => error.message.includes(msg))
+export async function shouldContinueOnError(error: Error, step: any): Promise<boolean> {
+  // For now, all errors are considered non-recoverable to fail loudly
+  return false
 }
