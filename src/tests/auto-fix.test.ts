@@ -17,12 +17,23 @@ import { execSync } from 'child_process'
 const TEST_TMP = join(import.meta.dir, '..', '..', '.test-tmp', 'auto-fix')
 const SCRIPT = join(import.meta.dir, '..', '..', '.github', 'scripts', 'auto-fix.mjs')
 
-// Helper to run the auto-fix script with specific env vars
+// Helper to run the auto-fix script with specific env vars.
+// The GitHub Actions workflow injects API keys/tokens as environment
+// variables. runScript must NOT inherit them, otherwise a "missing key"
+// validation test would see the CI-injected key, the script would proceed,
+// and exit 0 instead of 1 — which made the auto-fix agent's own `bun test`
+// verification always fail (the auto-fix action kept failing).
 function runScript(env: Record<string, string>): { exitCode: number; stdout: string; stderr: string } {
   try {
+    const childEnv: Record<string, string | undefined> = { ...process.env }
+    for (const key of Object.keys(childEnv)) {
+      if (/_API_KEY|AUTH_TOKEN|GITHUB_REPOSITORY|^GH_|^LLM_/.test(key)) {
+        delete childEnv[key]
+      }
+    }
     const stdout = execSync(`node "${SCRIPT}"`, {
       cwd: join(import.meta.dir, '..', '..'),
-      env: { ...process.env, ...env },
+      env: { ...childEnv, ...env } as Record<string, string>,
       encoding: 'utf-8',
       timeout: 30000,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -66,6 +77,29 @@ describe('Auto-Fix Agent', () => {
     })
     expect(result.exitCode).toBe(1)
     expect(result.stdout).toContain('GITHUB_REPOSITORY')
+  })
+
+  test('config validation is not fooled by CI-injected secrets', () => {
+    // Regression: the GitHub Actions workflow injects API keys as env vars.
+    // runScript must strip them so a "missing key" test stays deterministic
+    // (the injected secret made the auto-fix agent's own bun test fail).
+    const keyName = 'SENSENOVA' + '_API_KEY'
+    const prev = process.env[keyName]
+    process.env[keyName] = 'ci-injected-secret'
+    try {
+      const result = runScript({
+        GITHUB_REPOSITORY: 'test/test',
+        GH_TOKEN: 'test-token',
+      })
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toContain('SENSENOVA')
+    } finally {
+      if (prev === undefined) {
+        delete process.env[keyName]
+      } else {
+        process.env[keyName] = prev
+      }
+    }
   })
 
   // ── Issue lifecycle ──

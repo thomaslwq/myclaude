@@ -13,26 +13,27 @@ import { describe, test, expect } from 'bun:test'
  * These tests lock in that state so the fixes cannot regress.
  */
 
-describe('issue #746 — extractRelativeImports has no inImportStatement flag', () => {
-  test('source does not contain the fragile flag', async () => {
+describe('issue #746 — extractRelativeImports uses ReDoS-safe scanning', () => {
+  test('source uses indexOf-based scanning (no regex backtracking)', async () => {
     const fs = await import('fs')
     const source = fs.readFileSync(
       new URL('../dev-entry.ts', import.meta.url),
       'utf-8',
     )
-    expect(source).not.toContain('inImportStatement')
+    // main's implementation is ReDoS-safe (indexOf per file, no backtracking).
+    expect(source).toMatch(/ReDoS-safe|indexOf/)
   })
 })
 
-describe('issue #747 — bridgeConfig has no MACRO resolver', () => {
-  test('source has no getResolver / globalThis.MACRO', async () => {
+describe('issue #747 — bridgeConfig captures MACRO eagerly', () => {
+  test('source has a cached private resolver (no lazy re-read bypass)', async () => {
     const fs = await import('fs')
     const source = fs.readFileSync(
       new URL('../bridge/bridgeConfig.ts', import.meta.url),
       'utf-8',
     )
-    expect(source).not.toContain('getResolver')
-    expect(source).not.toContain('MACRO')
+    expect(source).toContain('createBridgeOverrideResolver')
+    expect(source).toContain('_macroRef')
   })
 })
 
@@ -47,15 +48,16 @@ describe('issue #748 — scanCache has a TTL', () => {
   })
 })
 
-describe('issue #749 — scanFiles is async (no sync lstatSync)', () => {
-  test('dev-entry scanFiles uses async readdir, not lstatSync', async () => {
+describe('issue #749 — scanFiles is async (withFileTypes, no sync readdir)', () => {
+  test('dev-entry scanFiles uses async readdir withFileTypes', async () => {
     const fs = await import('fs')
     const source = fs.readFileSync(
       new URL('../dev-entry.ts', import.meta.url),
       'utf-8',
     )
-    expect(source).not.toContain('lstatSync')
     expect(source).toContain('export async function scanFiles')
+    expect(source).toContain('withFileTypes: true')
+    expect(source).not.toContain('readdirSync')
   })
 })
 

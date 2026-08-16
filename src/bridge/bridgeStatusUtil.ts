@@ -133,11 +133,13 @@ export const FAILED_FOOTER_TEXT = 'Something went wrong, please try again'
  * countVisualLines in bridgeUI.ts remains accurate.
  */
 function sanitizeOsc8Part(value: string): string {
-  return value.replace(/[\x00-\x1f\x7f;\%]/g, char => {
-    const code = char.charCodeAt(0)
-    if (code === 0x1b) return '\x1b'
-    if (code === 0x07) return '\x07'
-    return `%${code.toString(16).padStart(2, '0')}`
+  const input = typeof value === 'string' ? value : ''
+  // Encode control characters (0x00-0x1f, 0x7f), C1 controls (0x80-0x9f),
+  // semicolons and backslashes as %XX. Percent signs are intentionally NOT
+  // encoded so legitimate %20-style sequences are not double-encoded, and a
+  // non-string URL (null/undefined) is treated as an empty string.
+  return input.replace(/[\x00-\x1f\x7f\x80-\x9f;\\]/g, char => {
+    return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
   })
 }
 

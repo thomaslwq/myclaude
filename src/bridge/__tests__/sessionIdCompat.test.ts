@@ -46,9 +46,13 @@ describe('sessionIdCompat — gate lifecycle (issue #705)', () => {
     expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
   })
 
-  test('toInfraSessionId is the inverse and unaffected by the gate', () => {
-    setCseShimGate(() => false)
+  test('toInfraSessionId is the inverse and respects the gate', () => {
+    setCseShimGate(() => true)
     expect(toInfraSessionId('session_abc123')).toBe('cse_abc123')
     expect(toInfraSessionId('cse_abc123')).toBe('cse_abc123') // no-op
+    // When the shim is disabled, neither direction translates.
+    resetCseShimGateForTesting()
+    setCseShimGate(() => false)
+    expect(toInfraSessionId('session_abc123')).toBe('session_abc123')
   })
 })

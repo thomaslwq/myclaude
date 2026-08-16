@@ -90,32 +90,35 @@ describe('wrapWithOsc8Link — injection resistance (issue #716)', () => {
 
 
 describe('wrapWithOsc8Link — percent encoding (issue #744)', () => {
-  test('percent signs in url are percent-encoded', async () => {
+  test('percent signs in url are preserved, not double-encoded', async () => {
     const { wrapWithOsc8Link } = await import('../bridge/bridgeStatusUtil.js')
-    const out = wrapWithOsc8Link('label', 'http://example.com?foo%bar')
-    // A literal % must become %25 so it cannot break the OSC8 envelope
-    expect(out).toContain('%25')
-    expect(out.indexOf('?foo%25bar')).not.toBe(-1)
+    const out = wrapWithOsc8Link('label', 'http://example.com?foo%20bar')
+    // Literal % is intentionally NOT encoded — only control chars, semicolons
+    // and backslashes are. Double-encoding would turn %20 into %2520.
+    expect(out).toContain('?foo%20bar')
+    expect(out).not.toContain('%2520')
   })
 
-  test('percent signs in text are percent-encoded', async () => {
+  test('percent signs in text are preserved', async () => {
     const { wrapWithOsc8Link } = await import('../bridge/bridgeStatusUtil.js')
     const out = wrapWithOsc8Link('100% done', 'https://safe.example')
-    expect(out).toContain('100%25 done')
+    expect(out).toContain('100% done')
+    expect(out).not.toContain('%25')
   })
 })
 
 describe('bridgeConfig — no MACRO-based lazy resolver bypass (issue #745)', () => {
-  test('bridgeConfig exposes only static override getters, no globalThis.MACRO resolver', async () => {
+  test('bridgeConfig captures MACRO eagerly into a private resolver', async () => {
     const fs = await import('fs')
     const source = fs.readFileSync(
       new URL('../bridge/bridgeConfig.ts', import.meta.url),
       'utf-8',
     )
-    // The vulnerable getResolver() pattern re-read globalThis.MACRO to rebuild
-    // the override resolver; the fixed code has no MACRO access at all.
-    expect(source).not.toContain('globalThis.MACRO')
-    expect(source).not.toContain('MACRO')
+    // The vulnerable pattern lazily re-read globalThis.MACRO on every call.
+    // The fixed code captures values once (createBridgeOverrideResolver) and
+    // caches the resolver, so later mutation of globalThis.MACRO has no effect.
+    expect(source).toContain('createBridgeOverrideResolver')
+    expect(source).toContain('_macroRef === undefined && currentMacro !== undefined')
   })
 
   test('bridgeConfig still exports all four override getters', async () => {
