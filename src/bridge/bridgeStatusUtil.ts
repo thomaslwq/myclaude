@@ -135,10 +135,11 @@ export const FAILED_FOOTER_TEXT = 'Something went wrong, please try again'
 function sanitizeOsc8Part(value: string): string {
   const input = typeof value === 'string' ? value : ''
   // Encode control characters (0x00-0x1f, 0x7f), C1 controls (0x80-0x9f),
-  // semicolons and backslashes as %XX. Percent signs are intentionally NOT
+  // semicolons, backslashes, Unicode line/paragraph separator (U+2028/U+2029)
+  // and zero-width characters as %XX. Percent signs are intentionally NOT
   // encoded so legitimate %20-style sequences are not double-encoded, and a
   // non-string URL (null/undefined) is treated as an empty string.
-  return input.replace(/[\x00-\x1f\x7f\x80-\x9f;\\]/g, char => {
+  return input.replace(/[\x00-\x1f\x7f\x80-\x9f;\\\u2028\u2029\u200b\u200c\u200d\ufeff]/g, char => {
     return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
   })
 }

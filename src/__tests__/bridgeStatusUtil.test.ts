@@ -137,4 +137,36 @@ describe('wrapWithOsc8Link', () => {
     expect(result).toContain('%20')
     expect(result).toContain('%2F')
   })
+
+  it('should sanitize Unicode line/paragraph separators in URL', () => {
+    // U+2028/U+2029 are line break controls in many terminals and could let an
+    // attacker break out of the OSC 8 hyperlink to inject fake output.
+    const url = 'https://example.com/\u2028evil\u2029'
+    const text = 'Link'
+
+    const result = wrapWithOsc8Link(text, url)
+
+    expect(result).toContain(text)
+    expect(result).toContain('\x1b]8;;')
+    expect(result).toContain('\x07')
+    expect(result).toContain('%2028evil%2029')
+    // No raw Unicode line separator should survive in the URL portion
+    expect(result).not.toContain('\u2028')
+    expect(result).not.toContain('\u2029')
+  })
+
+  it('should sanitize zero-width characters in URL', () => {
+    // Zero-width characters can be used for terminal spoofing/obfuscation.
+    const url = 'https://example.com/\u200bevil\ufeff'
+    const text = 'Link'
+
+    const result = wrapWithOsc8Link(text, url)
+
+    expect(result).toContain(text)
+    expect(result).toContain('\x1b]8;;')
+    expect(result).toContain('\x07')
+    expect(result).toContain('%200Bevil%FEFF')
+    expect(result).not.toContain('\u200b')
+    expect(result).not.toContain('\ufeff')
+  })
 })

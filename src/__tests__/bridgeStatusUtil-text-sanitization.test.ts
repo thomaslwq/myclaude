@@ -108,4 +108,36 @@ describe('wrapWithOsc8Link text sanitization', () => {
     // The percent sign should NOT be encoded
     expect(result).toContain('%20')
   })
+
+  it('should sanitize Unicode line/paragraph separators in text', () => {
+    // U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are treated as
+    // line breaks by many terminals and could be used to inject fake output.
+    const text = 'Link\u2028line2\u2029line3'
+    const url = 'https://example.com'
+    const result = wrapWithOsc8Link(text, url)
+    
+    expect(result).toContain('Link%2028line2%2029line3')
+    expect(result).toContain('\x1b]8;;')
+    expect(result).toContain('\x07')
+    // No raw Unicode line separator should survive in the output
+    expect(result).not.toContain('\u2028')
+    expect(result).not.toContain('\u2029')
+  })
+
+  it('should sanitize zero-width characters in text', () => {
+    // Zero-width space (U+200B), zero-width non-joiner (U+200C), zero-width
+    // joiner (U+200D) and BOM (U+FEFF) can be used for terminal spoofing.
+    const text = 'Link\u200bzero\u200cnon-joiner\u200djoiner\ufeffbom'
+    const url = 'https://example.com'
+    const result = wrapWithOsc8Link(text, url)
+    
+    expect(result).toContain('Link%200Bzero%200Cnon-joiner%200Djoiner%FEFFbom')
+    expect(result).toContain('\x1b]8;;')
+    expect(result).toContain('\x07')
+    // No raw zero-width character should survive in the output
+    expect(result).not.toContain('\u200b')
+    expect(result).not.toContain('\u200c')
+    expect(result).not.toContain('\u200d')
+    expect(result).not.toContain('\ufeff')
+  })
 })
