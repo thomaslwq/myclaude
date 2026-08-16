@@ -62,7 +62,12 @@ export async function executeFlow(
       state.completedSteps.push(step.id)
 
       if (onStepComplete) {
-        await onStepComplete(step, state)
+        try {
+          await onStepComplete(step, state)
+        } catch (callbackError) {
+          // Callback errors should not mark the step as failed or stop the flow.
+          console.error(`onStepComplete callback failed for step "${step.id}":`, callbackError)
+        }
       }
     } catch (error) {
       state.failedSteps.push(step.id)
