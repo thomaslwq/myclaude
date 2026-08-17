@@ -68,6 +68,37 @@ describe('executeFlow failure handling (issue #774)', () => {
   })
 })
 
+describe('onStepFail callback error handling (issue #823)', () => {
+  test('onStepFail throwing does not reject executeFlow and onComplete still fires', async () => {
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: 'a', description: 'a', command: 'mkdir /x' },
+        { id: 'b', description: 'b', command: 'touch /y' },
+      ],
+    }
+    let onCompleteCalled = false
+    const state = await executeFlow(
+      flow,
+      { bridge: { runCommand: async () => {}, editFile: async () => {} } },
+      async (step) => {
+        if (step.id === 'a') throw new Error('ENOENT: no such file')
+      },
+      undefined,
+      async () => {
+        throw new Error('callback boom')
+      },
+      async () => {
+        onCompleteCalled = true
+      },
+    )
+    expect(state.failedSteps).toContain('a')
+    expect(state.completedSteps).toContain('b')
+    expect(onCompleteCalled).toBe(true)
+  })
+})
+
 describe('missing bridge configuration (issue #808)', () => {
   test('shouldContinueOnError returns true for missing bridge errors', async () => {
     expect(await shouldContinueOnError(new Error('No bridge.runCommand available to execute: mkdir'), {} as never)).toBe(true)
