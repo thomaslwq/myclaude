@@ -67,3 +67,42 @@ describe('executeFlow failure handling (issue #774)', () => {
     expect(state.failedSteps).toEqual(['a'])
   })
 })
+
+describe('missing bridge configuration (issue #808)', () => {
+  test('shouldContinueOnError returns true for missing bridge errors', async () => {
+    expect(await shouldContinueOnError(new Error('No bridge.runCommand available to execute: mkdir'), {} as never)).toBe(true)
+    expect(await shouldContinueOnError(new Error('No bridge.editFile available to edit: foo'), {} as never)).toBe(true)
+  })
+
+  test('flow continues gracefully when bridge is missing (no context)', async () => {
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: 'a', description: 'a', command: 'mkdir /x' },
+        { id: 'b', description: 'b', command: 'touch /y' },
+      ],
+    }
+    // No bridge context provided - missing bridge is a recoverable error
+    const state = await executeFlow(flow, {})
+    expect(state.failedSteps).toContain('a')
+    expect(state.failedSteps).toContain('b')
+    expect(state.failedSteps.length).toBe(2)
+  })
+
+  test('flow continues gracefully when bridge has no runCommand', async () => {
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: 'a', description: 'a', command: 'mkdir /x' },
+        { id: 'b', description: 'b', command: 'touch /y' },
+      ],
+    }
+    // Bridge object exists but has no runCommand method
+    const state = await executeFlow(flow, { bridge: { editFile: async () => {} } })
+    expect(state.failedSteps).toContain('a')
+    expect(state.failedSteps).toContain('b')
+    expect(state.failedSteps.length).toBe(2)
+  })
+})

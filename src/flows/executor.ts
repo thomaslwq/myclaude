@@ -111,12 +111,15 @@ export async function executeFileOperation(file: string, context: any): Promise<
 
 export async function shouldContinueOnError(error: Error, step: FlowStep): Promise<boolean> {
   // Transient FS/network errors (EACCES/ENOENT/ETIMEDOUT) are recoverable:
-  // the flow should continue with the remaining steps. Any other error is
-  // fatal and aborts the flow (issue #774 — the old code inverted this).
+  // the flow should continue with the remaining steps. Missing bridge
+  // configuration is also a recoverable error — the step fails but the
+  // flow should continue so the remaining steps can still be attempted
+  // (issue #808). Any other error is fatal and aborts the flow.
   const errorMessages = [
     'EACCES',
     'ENOENT',
     'ETIMEDOUT',
+    'No bridge',
   ]
   return errorMessages.some(msg => error.message.includes(msg))
 }
