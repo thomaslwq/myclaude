@@ -1,6 +1,6 @@
 import pkg from '../package.json'
 import { realpathSync } from 'fs'
-import { readFile, readdir } from 'fs/promises'
+import { readFile, readdir, stat } from 'fs/promises'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import pMap from 'p-map'
@@ -74,7 +74,6 @@ export function isScanCacheEntryFresh(
 
 async function getFileContent(filePath: string): Promise<string | null> {
   try {
-    const { stat } = await import('fs/promises')
     const stats = await stat(filePath).catch(() => null)
     if (!stats) return null
     const cached = fileContentCache.get(filePath)
@@ -209,7 +208,6 @@ export async function hasResolvableTarget(basePath: string): Promise<boolean> {
     for (const entry of entries) {
       if (entry.isDirectory() || entry.isSymbolicLink()) {
         try {
-          const { stat } = await import('fs/promises')
           const fullPath = join(parentDir, entry.name)
           const stats = await stat(fullPath)
           if (stats.isDirectory()) {
@@ -476,7 +474,6 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
   // — the importer of the deleted module must be re-scanned.  When any
   // changed file no longer exists on disk, fall back to a full directory
   // scan so that all potential importers are checked.
-  const { stat } = await import('fs/promises')
   const hasDeleted = changedFiles.length > 0 && (
     await Promise.all(
       changedFiles.map(f => stat(f).then(() => false).catch(() => true)),
@@ -504,7 +501,6 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
     const srcDir = resolve('src')
     // Use the directory mtime to invalidate the cache when files are added or
     // deleted within the TTL window (issue #824).
-    const { stat } = await import('fs/promises')
     const dirStats = await stat(srcDir).catch(() => null)
     const currentMtime = dirStats ? dirStats.mtimeMs : undefined
     const cached = scanCache.get(srcDir)

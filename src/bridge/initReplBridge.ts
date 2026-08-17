@@ -343,12 +343,15 @@ export async function initReplBridge(
   // Fire-and-forget Haiku generation with post-await guards. Re-checks /rename
   // (sessionStorage), v1 env-lost (lastBridgeSessionId), and same-session
   // out-of-order resolution (genSeq — count-1's Haiku resolving after count-3
-  // would clobber the richer title). generateSessionTitle never rejects.
+  // would clobber the richer title). generateSessionTitle is expected to never
+  // reject, but AbortSignal.timeout can still surface as a rejection if the
+  // underlying implementation doesn't swallow the abort — guard with .catch()
+  // to avoid an unhandled promise rejection.
   const generateAndPatch = (input: string, bridgeSessionId: string): void => {
     const gen = ++genSeq
     const atCount = userMessageCount
-    void generateSessionTitle(input, AbortSignal.timeout(15_000)).then(
-      generated => {
+    void generateSessionTitle(input, AbortSignal.timeout(15_000))
+      .then(generated => {
         if (
           generated &&
           gen === genSeq &&
@@ -357,8 +360,8 @@ export async function initReplBridge(
         ) {
           patch(generated, bridgeSessionId, atCount)
         }
-      },
-    )
+      })
+      .catch(() => {})
   }
   const onUserMessage = (text: string, bridgeSessionId: string): boolean => {
     if (hasExplicitTitle || getCurrentSessionTitle(getSessionId())) {
