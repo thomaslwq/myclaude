@@ -48,20 +48,28 @@ export const fileContentCache = new LRUCache<string, { content: string; mtime: n
 
 // Cache for directory scan results to avoid full re-scan on every call
 // Used in the fallback path when git diff is not available
-// Note: Uses isScanCacheEntryFresh with SCAN_CACHE_TTL_MS (60s) to ensure fresh results
-export const scanCache = new LRUCache<string, { files: string[]; timestamp: number }>({ max: 1000 })
+// Note: Uses isScanCacheEntryFresh with SCAN_CACHE_TTL_MS (60s) plus mtime
+// invalidation (issue #824) to ensure fresh results after filesystem changes
+export const scanCache = new LRUCache<string, { files: string[]; timestamp: number; mtime?: number }>({ max: 1000 })
 
 /**
- * Whether a scanCache entry is still fresh (issue #755).
- * Entries older than SCAN_CACHE_TTL_MS must be treated as stale and the
- * directory re-scanned, otherwise the cache claims fresh results forever.
+ * Whether a scanCache entry is still fresh (issues #755 and #824).
+ *
+ * Two conditions must hold for an entry to be considered fresh:
+ * 1. The entry is within SCAN_CACHE_TTL_MS (issue #755).
+ * 2. If the entry records a directory mtime and a current mtime is provided,
+ *    they must match — otherwise files were added/deleted and the cache is
+ *    stale even within the TTL window (issue #824).
  */
 export function isScanCacheEntryFresh(
-  entry: { files: string[]; timestamp: number } | undefined,
+  entry: { files: string[]; timestamp: number; mtime?: number } | undefined,
   now: number = Date.now(),
+  currentMtime?: number,
 ): boolean {
   if (!entry) return false
-  return now - entry.timestamp <= SCAN_CACHE_TTL_MS
+  if (now - entry.timestamp > SCAN_CACHE_TTL_MS) return false
+  if (entry.mtime !== undefined && currentMtime !== undefined && entry.mtime !== currentMtime) return false
+  return true
 }
 
 async function getFileContent(filePath: string): Promise<string | null> {
@@ -464,12 +472,17 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
   } else {
     // Fall back to full directory scan with depth limit, using cache
     const srcDir = resolve('src')
+    // Use the directory mtime to invalidate the cache when files are added or
+    // deleted within the TTL window (issue #824).
+    const { stat } = await import('fs/promises')
+    const dirStats = await stat(srcDir).catch(() => null)
+    const currentMtime = dirStats ? dirStats.mtimeMs : undefined
     const cached = scanCache.get(srcDir)
-    if (isScanCacheEntryFresh(cached)) {
+    if (isScanCacheEntryFresh(cached, Date.now(), currentMtime)) {
       files.push(...cached!.files)
     } else {
       await scanFiles(srcDir, files)
-      scanCache.set(srcDir, { files: [...files], timestamp: Date.now() })
+      scanCache.set(srcDir, { files: [...files], timestamp: Date.now(), mtime: currentMtime })
     }
   }
   
