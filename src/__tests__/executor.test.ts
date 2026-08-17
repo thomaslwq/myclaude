@@ -100,6 +100,92 @@ describe('executeFlow', () => {
     expect(state.failedSteps).toEqual(['1'])
   })
 
+  it('should continue to next steps when executeCommand throws transient error with error.code', async () => {
+    const transientBridge = {
+      runCommand: jest.fn()
+        .mockRejectedValueOnce(Object.assign(new Error('Permission denied'), { code: 'EACCES' }))
+        .mockResolvedValueOnce(undefined),
+      editFile: jest.fn().mockResolvedValue(undefined),
+    }
+
+    const flow: FlowDefinition = {
+      name: 'test-flow',
+      description: 'Test flow',
+      steps: [
+        {
+          id: '1',
+          description: 'Test step 1',
+          command: 'echo hello',
+        },
+        {
+          id: '2',
+          description: 'Test step 2',
+          command: 'echo world',
+        },
+      ],
+    }
+
+    const failedSteps: string[] = []
+    const completedSteps: string[] = []
+    const onStepComplete = async (step: any, state: any) => {
+      completedSteps.push(step.id)
+    }
+    const onStepFail = async (step: any, state: any, error: Error) => {
+      failedSteps.push(step.id)
+    }
+
+    const state = await executeFlow(flow, { bridge: transientBridge }, undefined, onStepComplete, onStepFail)
+
+    // Step 1 failed but flow continued to step 2
+    expect(failedSteps).toEqual(['1'])
+    expect(completedSteps).toContain('2')
+    expect(state.failedSteps).toContain('1')
+    expect(state.completedSteps).toContain('2')
+  })
+
+  it('should continue to next steps when executeFileOperation throws transient error with error.code', async () => {
+    const transientBridge = {
+      runCommand: jest.fn().mockResolvedValue(undefined),
+      editFile: jest.fn()
+        .mockRejectedValueOnce(Object.assign(new Error('No such file'), { code: 'ENOENT' }))
+        .mockResolvedValueOnce(undefined),
+    }
+
+    const flow: FlowDefinition = {
+      name: 'test-flow',
+      description: 'Test flow',
+      steps: [
+        {
+          id: '1',
+          description: 'Test step 1',
+          files: ['Dockerfile'],
+        },
+        {
+          id: '2',
+          description: 'Test step 2',
+          files: ['README.md'],
+        },
+      ],
+    }
+
+    const failedSteps: string[] = []
+    const completedSteps: string[] = []
+    const onStepComplete = async (step: any, state: any) => {
+      completedSteps.push(step.id)
+    }
+    const onStepFail = async (step: any, state: any, error: Error) => {
+      failedSteps.push(step.id)
+    }
+
+    const state = await executeFlow(flow, { bridge: transientBridge }, undefined, onStepComplete, onStepFail)
+
+    // Step 1 failed but flow continued to step 2
+    expect(failedSteps).toEqual(['1'])
+    expect(completedSteps).toContain('2')
+    expect(state.failedSteps).toContain('1')
+    expect(state.completedSteps).toContain('2')
+  })
+
   it('should NOT mark steps as complete when executeCommand stub throws error', async () => {
     const flow: FlowDefinition = {
       name: 'test-flow',
