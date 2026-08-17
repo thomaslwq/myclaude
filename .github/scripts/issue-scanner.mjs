@@ -52,7 +52,8 @@ const CONFIG = {
 
   // SenseTime (商汤日日新) — primary model
   sensenovaApiKey: process.env.SENSENOVA_API_KEY || '',
-  sensenovaModel:  'deepseek-v4-flash',
+  sensenovaModel:  'glm-5.2',
+  sensenovaMaxTokens: 1000000, // glm-5.2 支持 1M 上下文
   sensenovaApiBase: 'https://token.sensenova.cn/v1',
 
   ghToken:      process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
@@ -289,7 +290,7 @@ function getRecentActivity() {
 async function callLLM(messages, options = {}) {
   const { maxTokens = 128000, temperature = 0.3 } = options;
 
-  // ── Primary: SenseTime DeepSeek-v4-flash (1M context) ──
+  // ── Primary: SenseTime glm-5.2 (1M context) ──
   if (CONFIG.sensenovaApiKey) {
     try {
       return await _callSingleLLM({
@@ -297,10 +298,10 @@ async function callLLM(messages, options = {}) {
         apiBase: CONFIG.sensenovaApiBase,
         model: CONFIG.sensenovaModel,
         messages,
-        maxTokens: 384000,
+        maxTokens: CONFIG.sensenovaMaxTokens,
         temperature,
         timeout: 120000,
-        label: 'SenseTime DeepSeek-v4-flash',
+        label: 'SenseTime glm-5.2',
       });
     } catch (err) {
       log.warn(`SenseTime model failed: ${err.message}`);

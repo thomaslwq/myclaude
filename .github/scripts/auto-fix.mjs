@@ -46,9 +46,10 @@ const CONFIG = {
   llmModelName:     process.env.LLM_MODEL_NAME || 'openai/glm-4.5',
   llmApiBase:       process.env.LLM_API_BASE || 'https://open.bigmodel.cn/api/paas/v4/',
 
-  // Primary: SenseTime 商汤日日新 DeepSeek-v4-flash (1M context)
+  // Primary: SenseTime 商汤日日新 glm-5.2 (1M context)
   sensenovaApiKey:  process.env.SENSENOVA_API_KEY || '',
-  sensenovaModel:   'deepseek-v4-flash',
+  sensenovaModel:   'glm-5.2',
+  sensenovaMaxTokens: 1000000, // glm-5.2 支持 1M 上下文
   sensenovaApiBase: 'https://token.sensenova.cn/v1',
 
   ghToken:          process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
@@ -282,13 +283,13 @@ async function _callFallbackLLM({ apiKey, apiBase, model, messages, maxTokens, t
 /**
  * Call the LLM with automatic fallback.
  *
- * Primary:   SenseTime 商汤日日新 DeepSeek-v4-flash (1M context)
+ * Primary:   SenseTime 商汤日日新 glm-5.2 (1M context)
  * Fallback:  智谱 GLM-4.5 (Zhipu, old switch-based 方式)
  */
 async function callLLM(messages, options = {}) {
   const { maxTokens = 64000, temperature = 0.3 } = options;
 
-  // ── Primary: SenseTime DeepSeek-v4-flash (1M context) ──
+  // ── Primary: SenseTime glm-5.2 (1M context) ──
   if (CONFIG.sensenovaApiKey) {
     try {
       return await _callSingleLLM({
@@ -296,10 +297,10 @@ async function callLLM(messages, options = {}) {
         apiBase: CONFIG.sensenovaApiBase,
         model: CONFIG.sensenovaModel,
         messages,
-        maxTokens: 384000,
+        maxTokens: CONFIG.sensenovaMaxTokens,
         temperature,
         timeout: 120000,
-        label: 'SenseTime DeepSeek-v4-flash',
+        label: 'SenseTime glm-5.2',
       });
     } catch (err) {
       log.warn(`SenseTime model failed: ${err.message}`);
@@ -633,7 +634,8 @@ async function main() {
   log.raw(' Auto-Fix Agent — Autonomous Issue Resolution');
   log.raw('==============================================');
   log.raw(`Repository:  ${CONFIG.repository}`);
-  log.raw(`Model:       ${CONFIG.sensenovaApiKey ? 'sensenova/deepseek-v4-flash (primary) → 智谱 ' + CONFIG.llmModelName + ' (fallback)' : CONFIG.llmModelName}`);
+  log.raw(`Model:       ${CONFIG.sensenovaApiKey ? 'sensenova/glm-5.2 (primary) → 智谱 ' + CONFIG.llmModelName + ' (fallback)' : CONFIG.llmModelName}`);
+  log.raw(`Max tokens:  ${CONFIG.sensenovaApiKey ? CONFIG.sensenovaMaxTokens : '64000 (fallback)'}`);
   log.raw(`Max issues:  ${CONFIG.maxIssues}`);
   log.raw(`Cost limit:  $${CONFIG.costLimit}`);
   log.raw(`Dry run:     ${CONFIG.dryRun}`);

@@ -91,7 +91,7 @@ jobs:
       - name: Run issue scanner
         id: scan
         env:
-          # Primary LLM: 商汤日日新 DeepSeek-v4-flash
+          # Primary LLM: 商汤日日新 glm-5.2 (1M context)
           SENSENOVA_API_KEY: ${{ secrets.SENSENOVA_API_KEY }}
 
           # Fallback LLM configuration

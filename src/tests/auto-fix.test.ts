@@ -146,6 +146,30 @@ describe('Auto-Fix Agent', () => {
     expect(result.exitCode).toBeOneOf([0, 1])
   })
 
+  test('uses glm-5.2 as the primary SenseTime model', () => {
+    // Sensenova now serves glm-5.2; the banner must advertise the new model.
+    const result = runScript({
+      SENSENOVA_API_KEY: 'test-key',
+      GH_TOKEN: 'test-token',
+      GITHUB_REPOSITORY: 'test/test',
+      DRY_RUN: 'true',
+    })
+    expect(result.stdout).toContain('sensenova/glm-5.2')
+    expect(result.stdout).not.toContain('deepseek-v4-flash')
+  })
+
+  test('sensenova primary call uses 1M-context max_tokens', () => {
+    // glm-5.2 supports a 1M context window; the action banner must advertise
+    // the full budget so runs surface the model's actual context support.
+    const result = runScript({
+      SENSENOVA_API_KEY: 'test-key',
+      GH_TOKEN: 'test-token',
+      GITHUB_REPOSITORY: 'test/test',
+      DRY_RUN: 'true',
+    })
+    expect(result.stdout).toContain('Max tokens:  1000000')
+  })
+
   // ── Dry run mode ──
 
   test('dry run mode skips commit and publish', () => {
