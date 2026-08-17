@@ -103,7 +103,14 @@ export async function executeFileOperation(file: string, context: any): Promise<
   throw new Error('executeFileOperation is not implemented yet. Please connect it to the bridge API.')
 }
 
-export async function shouldContinueOnError(error: Error, step: any): Promise<boolean> {
-  // For now, all errors are considered non-recoverable to fail loudly
-  return false
+export async function shouldContinueOnError(error: Error, step: FlowStep): Promise<boolean> {
+  // Transient FS/network errors (EACCES/ENOENT/ETIMEDOUT) are recoverable:
+  // the flow should continue with the remaining steps. Any other error is
+  // fatal and aborts the flow (issue #774 — the old code inverted this).
+  const errorMessages = [
+    'EACCES',
+    'ENOENT',
+    'ETIMEDOUT',
+  ]
+  return errorMessages.some(msg => error.message.includes(msg))
 }
