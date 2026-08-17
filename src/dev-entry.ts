@@ -1,6 +1,5 @@
 import pkg from '../package.json'
 import { realpathSync } from 'fs'
-import { lstat } from 'fs/promises'
 import { readFile, readdir } from 'fs/promises'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
@@ -113,13 +112,10 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 100, curr
       async (entry) => {
         try {
           const fullPath = join(currentDir, entry.name)
-          // Check if entry is a symbolic link to avoid infinite loops
-          let isSymlink = false
-          try {
-            const stats = await lstat(fullPath)
-            isSymlink = stats.isSymbolicLink()
-          } catch {}
-          if (isSymlink) return
+          // Check if entry is a symbolic link to avoid infinite loops.
+          // `readdir` was called with `withFileTypes: true`, so the Dirent
+          // already exposes `isSymbolicLink()` — no extra `lstat` syscall needed.
+          if (entry.isSymbolicLink()) return
           if (entry.isDirectory()) {
             // Skip node_modules, .git, and other common large directories (but allow .github)
             if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
