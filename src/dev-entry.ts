@@ -89,44 +89,51 @@ interface StackEntry {
 }
 
 export async function scanFiles(dir: string, out: string[], maxDepth = 100, currentDepth = 0): Promise<void> {
-  // Use an explicit stack to avoid stack overflow from deeply nested directories
+  // Use an explicit stack to avoid stack overflow from deeply nested directories.
+  // Directories are processed with bounded concurrency so that sibling
+  // subdirectories are read in parallel (the real I/O bottleneck), rather than
+  // one at a time.
   const stack: StackEntry[] = [{ dir, depth: currentDepth }]
+  const CONCURRENCY = 10
 
   while (stack.length > 0) {
-    const { dir: currentDir, depth } = stack.pop()!
-
-    if (depth > maxDepth) continue
-
-    let dirHandle
-    try {
-      dirHandle = await readdir(currentDir, { withFileTypes: true })
-    } catch {
-      continue
+    // Pop up to CONCURRENCY directories to process them in parallel
+    const batch: StackEntry[] = []
+    while (stack.length > 0 && batch.length < CONCURRENCY) {
+      batch.push(stack.pop()!)
     }
 
-    // Process entries with bounded concurrency to avoid excessive memory usage
-    // on large directory trees
-    const CONCURRENCY = 10
     await pMap(
-      dirHandle,
-      async (entry) => {
+      batch,
+      async ({ dir: currentDir, depth }) => {
+        if (depth > maxDepth) return
+
+        let dirHandle
         try {
-          const fullPath = join(currentDir, entry.name)
-          // Check if entry is a symbolic link to avoid infinite loops.
-          // `readdir` was called with `withFileTypes: true`, so the Dirent
-          // already exposes `isSymbolicLink()` — no extra `lstat` syscall needed.
-          if (entry.isSymbolicLink()) return
-          if (entry.isDirectory()) {
-            // Skip node_modules, .git, and other common large directories (but allow .github)
-            if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) return
-            stack.push({ dir: fullPath, depth: depth + 1 })
-            return
-          }
-          if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
-            out.push(fullPath)
-          }
+          dirHandle = await readdir(currentDir, { withFileTypes: true })
         } catch {
-          // Gracefully skip this entry (e.g., permission error, I/O failure)
+          return
+        }
+
+        for (const entry of dirHandle) {
+          try {
+            const fullPath = join(currentDir, entry.name)
+            // Check if entry is a symbolic link to avoid infinite loops.
+            // `readdir` was called with `withFileTypes: true`, so the Dirent
+            // already exposes `isSymbolicLink()` — no extra `lstat` syscall needed.
+            if (entry.isSymbolicLink()) continue
+            if (entry.isDirectory()) {
+              // Skip node_modules, .git, and other common large directories (but allow .github)
+              if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) continue
+              stack.push({ dir: fullPath, depth: depth + 1 })
+              continue
+            }
+            if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
+              out.push(fullPath)
+            }
+          } catch {
+            // Gracefully skip this entry (e.g., permission error, I/O failure)
+          }
         }
       },
       { concurrency: CONCURRENCY }
