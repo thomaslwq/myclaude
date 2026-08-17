@@ -13,6 +13,7 @@
  */
 
 let _isCseShimEnabled: (() => boolean) | undefined
+let _gateLocked = false
 
 /**
  * Register the GrowthBook gate for the cse_ shim. Called from bridge
@@ -21,16 +22,21 @@ let _isCseShimEnabled: (() => boolean) | undefined
  * Locked after the first registration: a second call (e.g. from a different
  * init path) is ignored so the translation behavior cannot change
  * mid-execution after the first toCompatSessionId call (issue #705).
+ *
+ * Uses a mutex-like lock to prevent race conditions where concurrent
+ * calls could both pass the undefined check and register different gates.
  */
 export function setCseShimGate(gate: () => boolean): void {
-  if (_isCseShimEnabled === undefined) {
+  if (!_gateLocked) {
     _isCseShimEnabled = gate
+    _gateLocked = true
   }
 }
 
 /** Test-only: clear the gate so a fresh test can register its own. */
 export function resetCseShimGateForTesting(): void {
   _isCseShimEnabled = undefined
+  _gateLocked = false
 }
 
 /**
