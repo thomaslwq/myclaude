@@ -41,6 +41,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { resolve } from 'path';
+import { fetchWithRetry } from './llm-retry.mjs';
 
 // ── Configuration ────────────────────────────────────────────────────────────
 const ROOT = resolve(import.meta.dirname, '..', '..');
@@ -359,16 +360,15 @@ async function _callSingleLLM({ apiKey, apiBase, model, messages, maxTokens, tem
   const payload = { model: modelName, messages, max_tokens: maxTokens, temperature };
   log.info(`Calling LLM: ${label} (${messages.length} messages, ${maxTokens} max tokens)`);
   log.info(`  Endpoint: ${endpoint}`);
-  const response = await fetch(endpoint, {
+  const response = await fetchWithRetry(endpoint, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(timeout || 120000),
+  }, {
+    onRetry: ({ attempt, delayMs, error }) =>
+      log.warn(`  ${label}: ${error.message.slice(0, 120)} — retrying in ${Math.round(delayMs / 1000)}s (attempt ${attempt})`),
   });
-  if (!response.ok) {
-    const errText = await response.text().catch(() => 'unknown error');
-    throw new Error(`LLM API error (${response.status}): ${errText.slice(0, 500)}`);
-  }
   const data = await response.json();
   const choice = data?.choices?.[0];
   const message = choice?.message || {};
