@@ -158,16 +158,17 @@ describe('Auto-Fix Agent', () => {
     expect(result.stdout).not.toContain('deepseek-v4-flash')
   })
 
-  test('sensenova primary call uses 1M-context max_tokens', () => {
-    // glm-5.2 supports a 1M context window; the action banner must advertise
-    // the full budget so runs surface the model's actual context support.
+  test('sensenova primary call uses API-valid max_tokens (131072)', () => {
+    // glm-5.2 on sensenova has a 1M context window but caps max_tokens at
+    // 131072 per request — the banner must advertise the valid budget, not
+    // 1000000 which the API rejects with 400 "field MaxTokens invalid".
     const result = runScript({
       SENSENOVA_API_KEY: 'test-key',
       GH_TOKEN: 'test-token',
       GITHUB_REPOSITORY: 'test/test',
       DRY_RUN: 'true',
     })
-    expect(result.stdout).toContain('Max tokens:  1000000')
+    expect(result.stdout).toContain('Max tokens:  131072')
   })
 
   // ── Dry run mode ──

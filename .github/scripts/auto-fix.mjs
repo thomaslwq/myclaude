@@ -49,7 +49,7 @@ const CONFIG = {
   // Primary: SenseTime 商汤日日新 glm-5.2 (1M context)
   sensenovaApiKey:  process.env.SENSENOVA_API_KEY || '',
   sensenovaModel:   'glm-5.2',
-  sensenovaMaxTokens: 1000000, // glm-5.2 支持 1M 上下文
+  sensenovaMaxTokens: 131072, // glm-5.2 上下文 1M，但单请求 max_tokens 上限 131072
   sensenovaApiBase: 'https://token.sensenova.cn/v1',
 
   ghToken:          process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
