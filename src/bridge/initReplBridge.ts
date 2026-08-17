@@ -199,7 +199,16 @@ export async function initReplBridge(
     // touches the keychain (refresh success, lockfile race, throw), so no
     // explicit clearOAuthTokenCache() here — that would force a blocking
     // keychain spawn on the 91%+ fresh-token path.
-    await checkAndRefreshOAuthTokenIfNeeded()
+    try {
+      await checkAndRefreshOAuthTokenIfNeeded()
+    } catch (error) {
+      logBridgeSkip(
+        'oauth_refresh_failed',
+        `[bridge:repl] Skipping: OAuth token refresh failed - ${errorMessage(error)}`,
+      )
+      onStateChange?.('failed', errorMessage(error))
+      return null
+    }
 
     // 2c. Skip if token is still expired post-refresh-attempt. Env-var / FD
     // tokens (auth.ts:894-917) have expiresAt=null → never trip this. But a
@@ -388,7 +397,17 @@ export async function initReplBridge(
   // environment registration; v2 for archive (which lives at the compat
   // /v1/sessions/{id}/archive, not /v1/code/sessions). Without it, v2
   // archive 404s and sessions stay alive in CCR after /exit.
-  const orgUUID = await getOrganizationUUID()
+  let orgUUID: string | undefined
+  try {
+    orgUUID = await getOrganizationUUID()
+  } catch (error) {
+    logBridgeSkip(
+      'get_org_uuid_failed',
+      `[bridge:repl] Skipping: failed to get organization UUID - ${errorMessage(error)}`,
+    )
+    onStateChange?.('failed', errorMessage(error))
+    return null
+  }
   if (!orgUUID) {
     logBridgeSkip('no_org_uuid', '[bridge:repl] Skipping: no org UUID')
     onStateChange?.('failed', '/login')
