@@ -166,9 +166,14 @@ export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
       return []
     }
 
-    // Get files changed in the working tree (unstaged + staged)
+    // Get files changed in the working tree (unstaged + staged).
+    // Include Deleted (D) files (issue #822): when a source file is deleted
+    // but still imported elsewhere, the importer must be re-scanned so the
+    // broken import is detected. The caller (collectMissingRelativeImports)
+    // checks for deleted files and falls back to a full scan when any are
+    // present, ensuring importers of the deleted module are re-scanned.
     const [diffResult, untrackedResult] = await Promise.all([
-      exec('git diff --name-only HEAD --diff-filter=ACMR', {
+      exec('git diff --name-only HEAD --diff-filter=ACDMR', {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'ignore'],
       }),
@@ -466,9 +471,34 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
   // Try to use git to detect changed files first (much faster)
   const changedFiles = await getChangedFilesSinceLastCommit()
   
-  if (changedFiles.length > 0) {
+  // Detect deleted files (issue #822): when a source file is deleted but
+  // still imported elsewhere, scanning only the changed files is not enough
+  // — the importer of the deleted module must be re-scanned.  When any
+  // changed file no longer exists on disk, fall back to a full directory
+  // scan so that all potential importers are checked.
+  const { stat } = await import('fs/promises')
+  const hasDeleted = changedFiles.length > 0 && (
+    await Promise.all(
+      changedFiles.map(f => stat(f).then(() => false).catch(() => true)),
+    )
+  ).some(Boolean)
+
+  if (changedFiles.length > 0 && !hasDeleted) {
     // Only scan changed files and their import dependencies
     files.push(...changedFiles)
+  } else if (hasDeleted) {
+    // A source file was deleted — scan everything so importers of the
+    // deleted module are re-scanned and broken imports detected.
+    const srcDir = resolve('src')
+    const dirStats = await stat(srcDir).catch(() => null)
+    const currentMtime = dirStats ? dirStats.mtimeMs : undefined
+    const cached = scanCache.get(srcDir)
+    if (isScanCacheEntryFresh(cached, Date.now(), currentMtime)) {
+      files.push(...cached!.files)
+    } else {
+      await scanFiles(srcDir, files)
+      scanCache.set(srcDir, { files: [...files], timestamp: Date.now(), mtime: currentMtime })
+    }
   } else {
     // Fall back to full directory scan with depth limit, using cache
     const srcDir = resolve('src')
