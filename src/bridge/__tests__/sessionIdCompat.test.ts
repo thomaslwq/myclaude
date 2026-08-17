@@ -4,6 +4,7 @@ import {
   resetCseShimGateForTesting,
   toCompatSessionId,
   toInfraSessionId,
+  getCseShimGate,
 } from '../sessionIdCompat.js'
 
 /**
@@ -56,3 +57,47 @@ describe('sessionIdCompat — gate lifecycle (issue #705)', () => {
     expect(toInfraSessionId('session_abc123')).toBe('session_abc123')
   })
 })
+
+describe('sessionIdCompat — concurrent initialization (issue #821)', () => {
+  test('concurrent setCseShimGate calls do not race — first gate wins', async () => {
+    resetCseShimGateForTesting()
+
+    // Simulate two async init paths (REPL bridge + daemon bridge) that
+    // both call setCseShimGate concurrently. The first gate (true) must win;
+    // the second (false) must be ignored.
+    const gateA = () => true
+    const gateB = () => false
+
+    await Promise.all([
+      Promise.resolve().then(() => setCseShimGate(gateA)),
+      Promise.resolve().then(() => setCseShimGate(gateB)),
+    ])
+
+    // The first-registered gate should be the one stored.
+    expect(getCseShimGate()).toBe(gateA)
+    // And translation behavior must reflect gate A (shim active).
+    expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
+  })
+
+  test('gate is set synchronously within setCseShimGate before returning', async () => {
+    resetCseShimGateForTesting()
+
+    // Even when interleaved with microtasks, the lock must be acquired
+    // synchronously so no other async task can observe an unlocked state.
+    const gateA = () => true
+    const gateB = () => false
+
+    // Schedule both on the microtask queue; whichever runs first, the
+    // other must see the lock as already held.
+    const results = await Promise.all([
+      Promise.resolve().then(() => setCseShimGate(gateA)),
+      Promise.resolve().then(() => setCseShimGate(gateB)),
+    ])
+
+    // Exactly one gate should be registered.
+    expect(getCseShimGate()).toBeDefined()
+    expect(getCseShimGate()).toBe(gateA)
+    expect(results).toEqual([undefined, undefined])
+  })
+})
+

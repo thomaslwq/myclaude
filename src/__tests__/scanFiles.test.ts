@@ -43,6 +43,12 @@ describe('scanFiles', () => {
     mkdirSync(join(tmpDir, '.github'));
     writeFileSync(join(tmpDir, '.github', 'workflows.yml'), 'name: ci');
     
+    // Include legitimate dot-prefixed source directories (issue #820)
+    mkdirSync(join(tmpDir, '.storybook'));
+    writeFileSync(join(tmpDir, '.storybook', 'main.ts'), 'export const story = 1;');
+    mkdirSync(join(tmpDir, '.vscode'));
+    writeFileSync(join(tmpDir, '.vscode', 'tasks.js'), 'module.exports = {};');
+    
     // Non-source file
     writeFileSync(join(tmpDir, 'readme.md'), '# readme');
   });
@@ -115,6 +121,15 @@ describe('scanFiles', () => {
     
     const normalized = files.map(f => f.replace(tmpDir, '').replace(/\\/g, '/'));
     expect(normalized).not.toContain('/.git/config');
+  });
+
+  it('should include legitimate dot-prefixed source directories (issue #820)', async () => {
+    const files: string[] = [];
+    await scanFiles(tmpDir, files);
+    
+    const normalized = files.map(f => f.replace(tmpDir, '').replace(/\\/g, '/'));
+    expect(normalized).toContain('/.storybook/main.ts');
+    expect(normalized).toContain('/.vscode/tasks.js');
   });
 
   it('should only include files with supported extensions', async () => {

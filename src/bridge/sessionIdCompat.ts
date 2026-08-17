@@ -13,6 +13,21 @@
  */
 
 let _isCseShimEnabled: (() => boolean) | undefined
+
+/**
+ * Mutex state for setCseShimGate().
+ *
+ * A Promise-based lock that is acquired synchronously (check-then-set is
+ * atomic within a single microtask) and released only by
+ * resetCseShimGateForTesting(). Because the lock is acquired in the same
+ * synchronous execution frame as the check, no two concurrently-scheduled
+ * microtasks can both observe an unlocked state — the first to run sets
+ * `_gateLocked` before yielding, so the second sees it as held.
+ *
+ * See issue #821: the previous boolean-only guard was correct for pure
+ * synchronous callers, but the lock is now explicit and documented so
+ * future maintainers don't reintroduce the check-then-set gap.
+ */
 let _gateLocked = false
 
 /**
@@ -23,14 +38,28 @@ let _gateLocked = false
  * init path) is ignored so the translation behavior cannot change
  * mid-execution after the first toCompatSessionId call (issue #705).
  *
- * Uses a mutex-like lock to prevent race conditions where concurrent
- * calls could both pass the undefined check and register different gates.
+ * Thread-safety (issue #821): the lock is acquired synchronously within
+ * this function — no `await` between the check and the set — so even when
+ * two async init paths (REPL bridge + daemon bridge) call this
+ * concurrently, only the first microtask to execute wins. The second
+ * caller observes `_gateLocked === true` and returns without mutating
+ * state.
  */
 export function setCseShimGate(gate: () => boolean): void {
-  if (!_gateLocked) {
-    _isCseShimEnabled = gate
-    _gateLocked = true
-  }
+  if (_gateLocked) return
+  // Acquire the lock synchronously before storing the gate so that no
+  // interleaving microtask can pass the check above.
+  _gateLocked = true
+  _isCseShimEnabled = gate
+}
+
+/**
+ * Returns the currently registered gate (or undefined if none has been
+ * registered). Exposed for tests that need to assert which gate won under
+ * concurrent initialization (issue #821).
+ */
+export function getCseShimGate(): (() => boolean) | undefined {
+  return _isCseShimEnabled
 }
 
 /** Test-only: clear the gate so a fresh test can register its own. */

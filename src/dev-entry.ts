@@ -130,8 +130,10 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 100, curr
             // already exposes `isSymbolicLink()` — no extra `lstat` syscall needed.
             if (entry.isSymbolicLink()) continue
             if (entry.isDirectory()) {
-              // Skip node_modules, .git, and other common large directories (but allow .github)
-              if (entry.name === 'node_modules' || entry.name === '.git' || (entry.name.startsWith('.') && entry.name !== '.github')) continue
+              // Skip node_modules and .git to avoid scanning large/generated directories.
+              // Other dot-prefixed directories (e.g. .github, .storybook, .vscode) may
+              // contain legitimate source files and should not be skipped (issue #820).
+              if (entry.name === 'node_modules' || entry.name === '.git') continue
               stack.push({ dir: fullPath, depth: depth + 1 })
               continue
             }
