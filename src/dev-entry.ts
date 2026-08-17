@@ -49,7 +49,7 @@ export const fileContentCache = new LRUCache<string, { content: string; mtime: n
 
 // Cache for directory scan results to avoid full re-scan on every call
 // Used in the fallback path when git diff is not available
-// Note: No TTL to ensure fresh results on every run
+// Note: Uses isScanCacheEntryFresh with SCAN_CACHE_TTL_MS (60s) to ensure fresh results
 export const scanCache = new LRUCache<string, { files: string[]; timestamp: number }>({ max: 1000 })
 
 /**
