@@ -52,6 +52,19 @@ export const fileContentCache = new LRUCache<string, { content: string; mtime: n
 // Note: No TTL to ensure fresh results on every run
 export const scanCache = new LRUCache<string, { files: string[]; timestamp: number }>({ max: 1000 })
 
+/**
+ * Whether a scanCache entry is still fresh (issue #755).
+ * Entries older than SCAN_CACHE_TTL_MS must be treated as stale and the
+ * directory re-scanned, otherwise the cache claims fresh results forever.
+ */
+export function isScanCacheEntryFresh(
+  entry: { files: string[]; timestamp: number } | undefined,
+  now: number = Date.now(),
+): boolean {
+  if (!entry) return false
+  return now - entry.timestamp <= SCAN_CACHE_TTL_MS
+}
+
 async function getFileContent(filePath: string): Promise<string | null> {
   try {
     const { stat } = await import('fs/promises')
@@ -449,8 +462,8 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
     // Fall back to full directory scan with depth limit, using cache
     const srcDir = resolve('src')
     const cached = scanCache.get(srcDir)
-    if (cached) {
-      files.push(...cached.files)
+    if (isScanCacheEntryFresh(cached)) {
+      files.push(...cached!.files)
     } else {
       await scanFiles(srcDir, files)
       scanCache.set(srcDir, { files: [...files], timestamp: Date.now() })

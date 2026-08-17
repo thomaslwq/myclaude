@@ -34,7 +34,7 @@ describe('executeFlow failure handling (issue #774)', () => {
     }
     const state = await executeFlow(
       flow,
-      {},
+      { bridge: { runCommand: async () => {}, editFile: async () => {} } },
       async (step) => {
         if (step.id === 'a') throw new Error('ENOENT: no such file')
       },
@@ -56,7 +56,7 @@ describe('executeFlow failure handling (issue #774)', () => {
     }
     const state = await executeFlow(
       flow,
-      {},
+      { bridge: { runCommand: async () => {}, editFile: async () => {} } },
       async (step) => {
         if (step.id === 'a') throw new Error('SyntaxError: bad')
       },

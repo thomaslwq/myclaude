@@ -119,7 +119,7 @@ describe('bridgeConfig — no MACRO-based lazy resolver bypass (issue #745)', ()
     // caches the resolver at module load time, so later mutation of
     // globalThis.MACRO has no effect.
     expect(source).toContain('createBridgeOverrideResolver')
-    expect(source).toContain('_macroRef')
+    expect(source).toContain('let _resolver = createBridgeOverrideResolver')
   })
 
   test('bridgeConfig still exports all four override getters', async () => {

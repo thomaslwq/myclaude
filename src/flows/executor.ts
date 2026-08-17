@@ -90,17 +90,23 @@ export async function executeFlow(
 }
 
 export async function executeCommand(command: string, context: any): Promise<void> {
-  // This is a simplified version. In a real implementation,
-  // you would use the bridge API to execute commands
-  console.log(`Executing command: ${command}`)
-  throw new Error('executeCommand is not implemented yet. Please connect it to the bridge API.')
+  // Issue #773: the stub never executed anything. Route through the bridge
+  // API when available so flows can actually run commands.
+  if (context?.bridge?.runCommand) {
+    await context.bridge.runCommand(command)
+    return
+  }
+  throw new Error('No bridge.runCommand available to execute: ' + command)
 }
 
 export async function executeFileOperation(file: string, context: any): Promise<void> {
-  // This is a simplified version. In a real implementation,
-  // you would use the bridge API to edit files
-  console.log(`Executing file operation: ${file}`)
-  throw new Error('executeFileOperation is not implemented yet. Please connect it to the bridge API.')
+  // Issue #773: the stub never executed anything. Route through the bridge
+  // API when available so flows can actually edit files.
+  if (context?.bridge?.editFile) {
+    await context.bridge.editFile(file)
+    return
+  }
+  throw new Error('No bridge.editFile available to edit: ' + file)
 }
 
 export async function shouldContinueOnError(error: Error, step: FlowStep): Promise<boolean> {

@@ -33,7 +33,7 @@ describe('issue #747 — bridgeConfig captures MACRO eagerly', () => {
       'utf-8',
     )
     expect(source).toContain('createBridgeOverrideResolver')
-    expect(source).toContain('_macroRef')
+    expect(source).toContain('let _resolver = createBridgeOverrideResolver')
   })
 })
 

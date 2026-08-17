@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { executeFlow } from '../flows/executor'
 import type { FlowDefinition } from '../flows/executor'
 
-// Mock bridge object
+// Mock bridge object: commands/file ops fail by default so the flow marks
+// the step failed (issue #773 — executeCommand now routes through bridge).
 const mockBridge = {
-  runCommand: jest.fn(),
-  editFile: jest.fn(),
+  runCommand: jest.fn().mockRejectedValue(new Error('executeCommand failed')),
+  editFile: jest.fn().mockRejectedValue(new Error('executeFileOperation failed')),
 }
 
 const mockContext = {
