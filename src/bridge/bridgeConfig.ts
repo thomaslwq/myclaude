@@ -88,7 +88,7 @@ export function getBridgeBaseUrlOverride(): string | undefined {
  * Get the bridge access token from the real OAuth store.
  */
 export function getBridgeAccessToken(): string | undefined {
-  return getClaudeAIOAuthTokens().accessToken
+  return getClaudeAIOAuthTokens()?.accessToken
 }
 
 /**

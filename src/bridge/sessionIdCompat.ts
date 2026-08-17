@@ -48,7 +48,7 @@ export function resetCseShimGateForTesting(): void {
  */
 export function toCompatSessionId(id: string): string {
   if (!id.startsWith('cse_')) return id
-  if (_isCseShimEnabled && !_isCseShimEnabled()) return id
+  if (_isCseShimEnabled !== undefined && !_isCseShimEnabled()) return id
   return 'session_' + id.slice('cse_'.length)
 }
 
