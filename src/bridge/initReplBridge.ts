@@ -19,18 +19,7 @@ import { hostname } from 'os'
 import { getOriginalCwd, getSessionId } from '../bootstrap/state.js'
 import type { SDKMessage } from '../entrypoints/agentSdkTypes.js'
 import type { SDKControlResponse } from '../entrypoints/sdk/controlTypes.js'
-import { getFeatureValue_CACHED_WITH_REFRESH } from '../services/analytics/growthbook.js'
-import { getOrganizationUUID } from '../services/oauth/client.js'
-import {
-  isPolicyAllowed,
-  waitForPolicyLimitsToLoad,
-} from '../services/policyLimits/index.js'
 import type { Message } from '../types/message.js'
-import {
-  checkAndRefreshOAuthTokenIfNeeded,
-  getClaudeAIOAuthTokens,
-  handleOAuth401Error,
-} from '../utils/auth.js'
 import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import { logForDebugging } from '../utils/debug.js'
 import { stripDisplayTagsAllowEmpty } from '../utils/displayTags.js'
@@ -131,6 +120,21 @@ export async function initReplBridge(
   // Wire the cse_ shim kill switch so toCompatSessionId respects the
   // GrowthBook gate. Daemon/SDK paths skip this — shim defaults to active.
   setCseShimGate(isCseShimEnabled)
+
+  // Issue #759: heavy modules (growthbook / oauth client / policyLimits /
+  // auth) are dynamically imported at init time instead of statically at
+  // module load, so merely importing initReplBridge does not pull them in.
+  const [
+    { getFeatureValue_CACHED_WITH_REFRESH },
+    { getOrganizationUUID },
+    { isPolicyAllowed, waitForPolicyLimitsToLoad },
+    { checkAndRefreshOAuthTokenIfNeeded, getClaudeAIOAuthTokens, handleOAuth401Error },
+  ] = await Promise.all([
+    import('../services/analytics/growthbook.js'),
+    import('../services/oauth/client.js'),
+    import('../services/policyLimits/index.js'),
+    import('../utils/auth.js'),
+  ])
 
   // 1. Runtime gate
   if (!(await isBridgeEnabledBlocking())) {
