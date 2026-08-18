@@ -1,6 +1,6 @@
 {
   "name": "@funnycode/myclaude",
-  "version": "0.1.275",
+  "version": "0.1.276",
   "private": false,
   "description": "An open-source AI coding assistant in your terminal - powered by Claude",
   "license": "MIT",
@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@alcalzone/ansi-tokenize": "0.3.0",
-    "@anthropic-ai/claude-agent-sdk": "^0.3.207",
+    "@anthropic-ai/claude-agent-sdk": "0.3.207",
     "@anthropic-ai/mcpb": "2.1.2",
     "@anthropic-ai/sandbox-runtime": "0.0.44",
     "@anthropic-ai/sdk": "0.111.0",
@@ -65,9 +65,9 @@
     "@opentelemetry/semantic-conventions": "1.43.0",
     "ajv": "8.18.0",
     "asciichart": "1.5.25",
-    "async-mutex": "^0.5.0",
+    "async-mutex": "0.5.0",
     "auto-bind": "5.0.1",
-    "axios": "^1.19.0",
+    "axios": "1.19.0",
     "bidi-js": "1.0.3",
     "chalk": "5.6.2",
     "chokidar": "5.0.0",
@@ -94,9 +94,9 @@
     "picomatch": "4.0.4",
     "proper-lockfile": "4.1.2",
     "qrcode": "1.5.4",
-    "react": "^19.2.8",
+    "react": "19.2.8",
     "react-reconciler": "0.33.0",
-    "semver": "^7.8.5",
+    "semver": "7.8.5",
     "shell-quote": "1.8.3",
     "signal-exit": "4.1.0",
     "stack-utils": "2.0.6",
@@ -113,7 +113,7 @@
     "ws": "8.20.0",
     "xss": "1.0.15",
     "yaml": "2.8.3",
-    "zod": "^4.4.3"
+    "zod": "4.4.3"
   },
   "optionalDependencies": {
     "@ant/claude-for-chrome-mcp": "file:./shims/ant-claude-for-chrome-mcp",

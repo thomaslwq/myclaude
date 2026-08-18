@@ -88,7 +88,7 @@ describe('onStepFail callback error handling (issue #823)', () => {
       flow,
       { bridge: { runCommand: async () => {}, editFile: async () => {} } },
       async (step) => {
-        if (step.id === 'a') throw new Error('ENOENT: no such file')
+        if (step.id === 'a') throw new Error('ETIMEDOUT: operation timed out')
       },
       undefined,
       async () => {
