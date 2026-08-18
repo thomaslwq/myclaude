@@ -1,5 +1,91 @@
 import type { Command } from '../commands.js'
 import type { TaskStep } from '../commands/agent.js'
+import { parse } from 'shell-quote'
+
+/**
+ * Allowlist of executable program names that flow steps are permitted to
+ * invoke. Flow definitions are trusted, but the `executeFlow` API accepts
+ * arbitrary `FlowDefinition`s (potentially derived from user input or an
+ * LLM-generated plan), so we restrict the program that may be run to a
+ * known-safe set. Issue #841.
+ */
+const ALLOWED_COMMANDS = new Set<string>([
+  'npm',
+  'npx',
+  'node',
+  'bun',
+  'yarn',
+  'pnpm',
+  'mkdir',
+  'touch',
+  'cp',
+  'mv',
+  'echo',
+  'git',
+  'tsc',
+  'vitest',
+])
+
+/**
+ * Parse a shell command string into a safe argv array and validate it
+ * against an allowlist. Rejects any command that contains shell control
+ * constructs (operators, substitutions, redirects, globs, etc.) or whose
+ * program is not on the allowlist. This prevents command injection when a
+ * flow step's `command` is derived from untrusted input. Issue #841.
+ *
+ * @returns a validated argv array (program + args) with no shell metacharacters.
+ */
+export function sanitizeCommand(command: string): string[] {
+  if (typeof command !== 'string' || command.trim().length === 0) {
+    throw new Error('Invalid command: empty or non-string command')
+  }
+
+  const parsed = parse(command)
+
+  const argv: string[] = []
+  for (const node of parsed) {
+    if (typeof node === 'string') {
+      // Even though shell-quote parses operators into object nodes, some
+      // shell metacharacters (e.g. backticks in older versions) may survive
+      // inside string tokens. Reject any token that contains characters
+      // that could enable command substitution or injection. Issue #841.
+      if (/[`$<>|;&\\\n\r]/.test(node)) {
+        throw new Error(
+          `Invalid command: shell metacharacter in token "${node}" is not allowed: "${command}"`,
+        )
+      }
+      argv.push(node)
+      continue
+    }
+
+    // shell-quote represents operators (`&&`, `;`, `|`, `>`), command
+    // substitutions (`$()`, backticks), globs, etc. as object nodes. Any
+    // such node means the input is not a simple argv command and could
+    // enable command injection — reject it.
+    if (node && typeof node === 'object') {
+      const kind = (node as any).op || (node as any).pattern || 'shell metacharacter'
+      throw new Error(
+        `Invalid command: shell metacharacter/operator (${kind}) is not allowed: "${command}"`,
+      )
+    }
+
+    // Any non-string, non-object entry is unexpected; reject defensively.
+    throw new Error(`Invalid command: unexpected token in command: "${command}"`)
+  }
+
+  if (argv.length === 0) {
+    throw new Error('Invalid command: no program specified')
+  }
+
+  const program = argv[0]
+  if (!ALLOWED_COMMANDS.has(program)) {
+    throw new Error(
+      `Invalid command: program "${program}" is not on the allowlist of permitted commands`,
+    )
+  }
+
+  return argv
+}
 
 export interface FlowStep {
   id: string
@@ -95,10 +181,18 @@ export async function executeFlow(
 }
 
 export async function executeCommand(command: string, context: any): Promise<void> {
+  // Issue #841: parse the command with a safe shell parser and validate it
+  // against an allowlist before handing it to the bridge. This prevents
+  // command injection when a flow step's `command` is derived from user
+  // input or an LLM-generated plan. The bridge receives a structured argv
+  // array rather than a raw shell string so it cannot be re-interpreted by
+  // a shell.
+  const argv = sanitizeCommand(command)
+
   // Issue #773: the stub never executed anything. Route through the bridge
   // API when available so flows can actually run commands.
   if (context?.bridge?.runCommand) {
-    await context.bridge.runCommand(command)
+    await context.bridge.runCommand(argv)
     return
   }
   throw new Error('No bridge.runCommand available to execute: ' + command)

