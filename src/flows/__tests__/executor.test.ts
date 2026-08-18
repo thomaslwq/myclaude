@@ -417,6 +417,36 @@ describe('executeCommand sanitization (issue #841)', () => {
     expect(sanitizeCommand('mkdir -p src/foo')).toEqual(['mkdir', '-p', 'src/foo'])
     expect(sanitizeCommand('touch file.txt')).toEqual(['touch', 'file.txt'])
   })
+
+  // Issue #875: interpreters like node/npx/bun/yarn/pnpm can execute
+  // arbitrary code or packages, completely defeating the allowlist.
+  test('sanitizeCommand rejects interpreters that can execute arbitrary code (issue #875)', () => {
+    // node -e can eval arbitrary JS
+    expect(() => sanitizeCommand('node -e "require(\'child_process\').execSync(\'rm -rf /\')"')).toThrow()
+    expect(() => sanitizeCommand('node --eval "require(\'child_process\').execSync(\'rm -rf /\')"')).toThrow()
+    expect(() => sanitizeCommand('node -p "process.mainModule"')).toThrow()
+    // npx can run arbitrary packages
+    expect(() => sanitizeCommand('npx malicious-package')).toThrow()
+    // bun -e can eval arbitrary JS
+    expect(() => sanitizeCommand('bun -e "require(\'child_process\').execSync(\'rm -rf /\')"')).toThrow()
+    expect(() => sanitizeCommand('bun --eval "require(\'child_process\').execSync(\'rm -rf /\')"')).toThrow()
+    // yarn can run arbitrary packages
+    expect(() => sanitizeCommand('yarn create malicious-package')).toThrow()
+    expect(() => sanitizeCommand('yarn dlx malicious-package')).toThrow()
+    // pnpm can run arbitrary packages
+    expect(() => sanitizeCommand('pnpm create malicious-package')).toThrow()
+    expect(() => sanitizeCommand('pnpm dlx malicious-package')).toThrow()
+  })
+
+  test('sanitizeCommand rejects node/npx/bun/yarn/pnpm even without dangerous flags (issue #875)', () => {
+    // These interpreters are removed from the allowlist entirely because
+    // they can execute arbitrary code or packages.
+    expect(() => sanitizeCommand('node script.js')).toThrow()
+    expect(() => sanitizeCommand('npx some-package')).toThrow()
+    expect(() => sanitizeCommand('bun run script.js')).toThrow()
+    expect(() => sanitizeCommand('yarn install')).toThrow()
+    expect(() => sanitizeCommand('pnpm install')).toThrow()
+  })
 })
 
 describe('onComplete callback error handling (issue #837)', () => {

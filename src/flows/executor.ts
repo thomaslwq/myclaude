@@ -8,14 +8,14 @@ import { parse } from 'shell-quote'
  * arbitrary `FlowDefinition`s (potentially derived from user input or an
  * LLM-generated plan), so we restrict the program that may be run to a
  * known-safe set. Issue #841.
+ *
+ * Issue #875: interpreters (`npx`, `node`, `bun`, `yarn`, `pnpm`) are
+ * intentionally excluded because they can execute arbitrary code or
+ * packages (e.g. `node -e`, `npx malicious-package`), completely defeating
+ * the purpose of the allowlist.
  */
 const ALLOWED_COMMANDS = new Set<string>([
   'npm',
-  'npx',
-  'node',
-  'bun',
-  'yarn',
-  'pnpm',
   'mkdir',
   'touch',
   'cp',
