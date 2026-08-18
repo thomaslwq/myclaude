@@ -462,14 +462,12 @@ describe('generateDiffPreview', () => {
 
     const preview = generateDiffPreview(flow)
 
-    // The backticks in the command should be escaped, so the inline code
-    // span should contain the entire command verbatim.
-    expect(preview).toContain('\\`malicious\\`')
-    // There should be exactly two backticks that are part of the Markdown
-    // inline-code delimiters (the ones wrapping the command), plus the
-    // escaped backticks inside.
+    // Per CommonMark, backslash escapes do not work inside code spans.
+    // Instead, the content is wrapped in a longer backtick delimiter so
+    // the inner backticks cannot terminate the span. The content ends
+    // with a backtick, so it is padded with a space inside the delimiters.
     const commandLine = preview.split('\n').find(l => l.includes('**Command**'))!
-    expect(commandLine).toBe('- **Command**: `echo \\`malicious\\``')
+    expect(commandLine).toBe('- **Command**: `` echo `malicious` ``')
   })
 
   it('should escape Markdown special characters in step.description', () => {
@@ -528,8 +526,10 @@ describe('generateDiffPreview', () => {
     const preview = generateDiffPreview(flow)
 
     const filesLine = preview.split('\n').find(l => l.includes('**Files**'))!
-    // Backtick inside filename should be escaped with a backslash
-    expect(filesLine).toBe('- **Files**: `file\\`name.txt`')
+    // Per CommonMark, backslash escapes do not work inside code spans.
+    // The filename contains a single backtick, so the delimiter is two
+    // backticks. Content does not start/end with a backtick, so no padding.
+    expect(filesLine).toBe('- **Files**: ``file`name.txt``')
   })
 
   it('should escape Markdown special characters in flow.name and flow.description', () => {

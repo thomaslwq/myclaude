@@ -324,6 +324,72 @@ describe('duplicate step ID validation (issue #874)', () => {
   })
 })
 
+describe('escapeCodeSpan / generateDiffPreview Markdown injection (issue #873)', () => {
+  test('backticks in command are contained within a longer code span delimiter', async () => {
+    const { generateDiffPreview } = await import('../executor.js')
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: '1', description: 'run echo', command: 'echo `whoami`' },
+      ],
+    }
+    const preview = generateDiffPreview(flow)
+    // The command should be wrapped in a code span that uses more backticks
+    // than the longest run in the content, so the inner backticks cannot
+    // terminate the span. Content ends with a backtick, so it is padded
+    // with a space inside the delimiters.
+    // Expected: `` echo `whoami` `` (double-backtick delimiters with padding)
+    expect(preview).toContain('`` echo `whoami` ``')
+    // The old backslash-escaping approach would produce `echo \`whoami\``
+    // which is invalid inside code spans.
+    expect(preview).not.toContain('\\`whoami\\`')
+  })
+
+  test('longer backtick runs use an even longer delimiter', async () => {
+    const { generateDiffPreview } = await import('../executor.js')
+    const flow: FlowDefinition = {
+      name: 't',
+ description: 'test',
+      steps: [
+        { id: '1', description: 'run', command: 'a `` b' },
+      ],
+    }
+    const preview = generateDiffPreview(flow)
+    // Longest run is 2 backticks, so delimiter must be 3 backticks.
+    // Content starts/ends with non-backtick, so no padding needed.
+    expect(preview).toContain('```a `` b```')
+  })
+
+  test('content starting or ending with a backtick is padded with spaces', async () => {
+    const { generateDiffPreview } = await import('../executor.js')
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: '1', description: 'run', command: '`whoami`' },
+      ],
+    }
+    const preview = generateDiffPreview(flow)
+    // Longest run is 1 backtick -> delimiter is 2 backticks.
+    // Content starts AND ends with a backtick, so pad with spaces.
+    expect(preview).toContain('`` `whoami` ``')
+  })
+
+  test('no backticks in content uses a single-backtick delimiter', async () => {
+    const { generateDiffPreview } = await import('../executor.js')
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: '1', description: 'run', command: 'npm install express' },
+      ],
+    }
+    const preview = generateDiffPreview(flow)
+    expect(preview).toContain('`npm install express`')
+  })
+})
+
 describe('executeCommand sanitization (issue #841)', () => {
   test('sanitizeCommand parses a simple command into argv', () => {
     const parsed = sanitizeCommand('npm install express jsonwebtoken bcrypt')

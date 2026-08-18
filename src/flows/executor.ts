@@ -96,12 +96,21 @@ export interface FlowStep {
 }
 
 /**
- * Escape backslashes and backticks in a string so it can be safely
- * placed inside a Markdown inline code span without breaking out.
- * Issue #869.
+ * Wrap a string in a Markdown inline code span that safely contains any
+ * backticks present in the content. Per the CommonMark spec, backslash
+ * escapes do NOT work inside code spans — a backtick terminates the span.
+ * The correct approach is to use a backtick delimiter string that is
+ * longer than the longest run of backticks in the content, and pad with
+ * spaces when the content starts or ends with a backtick so the delimiters
+ * are unambiguous. Issue #869, #873.
  */
 function escapeCodeSpan(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/`/g, '\\`')
+  // Find the longest run of backticks and use one more backtick as delimiter
+  const maxRun = (text.match(/`+/g) || []).reduce((m, s) => Math.max(m, s.length), 0)
+  const delim = '`'.repeat(maxRun + 1)
+  // Add spaces inside delimiters if content starts/ends with backtick
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : ''
+  return `${delim}${pad}${text}${pad}${delim}`
 }
 
 /**
@@ -149,10 +158,10 @@ export function generateDiffPreview(flow: FlowDefinition): string {
       lines.push(`- **Reasoning**: ${escapeMarkdown(step.reasoning)}`)
     }
     if (step.command) {
-      lines.push(`- **Command**: \`${escapeCodeSpan(step.command)}\``)
+      lines.push(`- **Command**: ${escapeCodeSpan(step.command)}`)
     }
     if (step.files && step.files.length > 0) {
-      lines.push(`- **Files**: ${step.files.map(f => `\`${escapeCodeSpan(f)}\``).join(', ')}`)
+      lines.push(`- **Files**: ${step.files.map(f => escapeCodeSpan(f)).join(', ')}`)
     }
     lines.push(``)
   }
