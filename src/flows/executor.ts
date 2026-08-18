@@ -216,10 +216,11 @@ export async function executeFileOperation(file: string, context: any): Promise<
 }
 
 export async function shouldContinueOnError(error: Error, step: FlowStep): Promise<boolean> {
-  // Check for transient FS/network error codes on the error object itself
-  // (Node.js system errors expose these via error.code, e.g. EACCES, ENOENT,
-  // ETIMEDOUT). Also check the error message as a fallback for wrapped errors.
-  const transientCodes = ['EACCES', 'ENOENT', 'ETIMEDOUT']
+  // Only genuinely transient errors are recoverable. EACCES (permission
+  // denied) and ENOENT (file not found) are permanent — retrying the same
+  // operation produces the same failure — so only ETIMEDOUT counts as
+  // transient here (issues #774/#850: transient-continue, permanent-abort).
+  const transientCodes = ['ETIMEDOUT']
   const err = error as any
   if (err.code && transientCodes.includes(err.code)) {
     return true

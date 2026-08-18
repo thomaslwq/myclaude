@@ -4,16 +4,21 @@ import { executeFlow, executeCommand, shouldContinueOnError, sanitizeCommand, ty
 /**
  * Regression tests for flow executor (issue #774).
  *
- * shouldContinueOnError: transient FS/network errors (EACCES/ENOENT/ETIMEDOUT)
+ * shouldContinueOnError: only ETIMEDOUT is transient; EACCES/ENOENT abort (#850)
  * are RECOVERABLE and the flow should CONTINUE (true); anything else is
  * fatal and should ABORT (false). The old code inverted this.
  */
 
 describe('shouldContinueOnError (issue #774)', () => {
-  test('transient FS errors are recoverable -> continue (true)', async () => {
-    expect(await shouldContinueOnError(new Error('EACCES: permission denied'), {} as never)).toBe(true)
-    expect(await shouldContinueOnError(new Error('ENOENT: no such file'), {} as never)).toBe(true)
+  test('ETIMEDOUT is transient -> continue (true)', async () => {
     expect(await shouldContinueOnError(new Error('ETIMEDOUT: operation timed out'), {} as never)).toBe(true)
+  })
+
+  test('EACCES/ENOENT are permanent -> abort (false)', async () => {
+    // issue #850: permission-denied and missing-file errors do not resolve on
+    // retry; retrying the same operation will always fail, so abort.
+    expect(await shouldContinueOnError(new Error('EACCES: permission denied'), {} as never)).toBe(false)
+    expect(await shouldContinueOnError(new Error('ENOENT: no such file'), {} as never)).toBe(false)
   })
 
   test('other errors are fatal -> abort (false)', async () => {
@@ -36,7 +41,7 @@ describe('executeFlow failure handling (issue #774)', () => {
       flow,
       { bridge: { runCommand: async () => {}, editFile: async () => {} } },
       async (step) => {
-        if (step.id === 'a') throw new Error('ENOENT: no such file')
+        if (step.id === 'a') throw new Error('ETIMEDOUT: operation timed out')
       },
       undefined,
       undefined,

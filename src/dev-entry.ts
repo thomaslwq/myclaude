@@ -265,6 +265,9 @@ export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
       await exec('git rev-parse --verify HEAD', {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'ignore'],
+        // issue #849: bounded exec so a hung git (credential prompt,
+        // corrupted .git/index.lock) cannot block indefinitely.
+        timeout: 10_000,
       })
     } catch {
       // No HEAD reference - this is a fresh repo or shallow clone
@@ -282,10 +285,12 @@ export async function getChangedFilesSinceLastCommit(): Promise<string[]> {
       exec('git diff --name-only HEAD --diff-filter=ACDMR', {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'ignore'],
+        timeout: 10_000,
       }),
       exec('git ls-files --others --exclude-standard', {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'ignore'],
+        timeout: 10_000,
       }),
     ])
     const changed = diffResult.stdout.trim().split('\n').filter(Boolean)

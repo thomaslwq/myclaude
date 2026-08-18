@@ -103,7 +103,7 @@ describe('executeFlow', () => {
   it('should continue to next steps when executeCommand throws transient error with error.code', async () => {
     const transientBridge = {
       runCommand: jest.fn()
-        .mockRejectedValueOnce(Object.assign(new Error('Permission denied'), { code: 'EACCES' }))
+        .mockRejectedValueOnce(Object.assign(new Error('Operation timed out'), { code: 'ETIMEDOUT' }))
         .mockResolvedValueOnce(undefined),
       editFile: jest.fn().mockResolvedValue(undefined),
     }
@@ -147,7 +147,7 @@ describe('executeFlow', () => {
     const transientBridge = {
       runCommand: jest.fn().mockResolvedValue(undefined),
       editFile: jest.fn()
-        .mockRejectedValueOnce(Object.assign(new Error('No such file'), { code: 'ENOENT' }))
+        .mockRejectedValueOnce(Object.assign(new Error('Operation timed out'), { code: 'ETIMEDOUT' }))
         .mockResolvedValueOnce(undefined),
     }
 
