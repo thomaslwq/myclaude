@@ -126,4 +126,11 @@ describe('extractRelativeImports', () => {
     const code = `export { foo } from /* comment */ './utils/helper';`;
     expect(extractRelativeImports(code)).toEqual(['./utils/helper']);
   });
+
+  it('should not lose imports when an unterminated multi-line comment appears at end of file', () => {
+    const code = `import { real } from './real/import';
+/* this comment is never closed`;
+    // The unterminated comment at EOF should not cause overshoot; prior imports remain
+    expect(extractRelativeImports(code)).toEqual(['./real/import']);
+  });
 });

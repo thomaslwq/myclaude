@@ -75,27 +75,81 @@ export const fileContentCache = new LRUCache<string, { content: string; mtime: n
 
 // Cache for directory scan results to avoid full re-scan on every call
 // Used in the fallback path when git diff is not available
-// Note: Uses isScanCacheEntryFresh with SCAN_CACHE_TTL_MS (60s) plus mtime
-// invalidation (issue #824) to ensure fresh results after filesystem changes
-export const scanCache = new LRUCache<string, { files: string[]; timestamp: number; mtime?: number }>({ max: 1000 })
+// Note: Uses isScanCacheEntryFresh with SCAN_CACHE_TTL_MS (60s) plus a recursive
+// mtime signature (issue #852) to ensure fresh results after filesystem changes
+// in any subdirectory, not just the top-level directory.
+export const scanCache = new LRUCache<string, { files: string[]; timestamp: number; mtimeSignature?: string }>({ max: 1000 })
 
 /**
- * Whether a scanCache entry is still fresh (issues #755 and #824).
+ * Compute a recursive mtime signature for a directory tree.
+ *
+ * A directory's own mtime only changes when entries are directly added or
+ * removed in that directory — not when files in subdirectories are modified,
+ * added, or deleted (issue #852). Since scanFiles recurses into
+ * subdirectories, checking only the top-level directory's mtime misses
+ * changes in nested subdirectories.
+ *
+ * This function walks the directory tree (skipping node_modules and .git)
+ * and builds a deterministic signature from the mtimes of every directory
+ * and file it encounters. Any change to any file or directory mtime in the
+ * tree produces a different signature, ensuring cache invalidation.
+ *
+ * Returns `undefined` if the directory cannot be read.
+ */
+export async function computeDirMtimeSignature(dir: string): Promise<string | undefined> {
+  const parts: string[] = []
+  const queue: string[] = [dir]
+
+  while (queue.length > 0) {
+    const currentDir = queue.shift()!
+    let entries
+    try {
+      entries = await readdir(currentDir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    // Sort for deterministic ordering
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+
+    for (const entry of entries) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue
+      const fullPath = join(currentDir, entry.name)
+      try {
+        const s = await stat(fullPath)
+        // Include the relative path (from root dir) and mtime in the signature
+        const relPath = fullPath.slice(dir.length)
+        parts.push(`${relPath}:${s.mtimeMs}`)
+        if (entry.isDirectory() && !entry.isSymbolicLink()) {
+          queue.push(fullPath)
+        }
+      } catch {
+        // Skip entries we can't stat
+      }
+    }
+  }
+
+  if (parts.length === 0) return undefined
+  return parts.join('|')
+}
+
+/**
+ * Whether a scanCache entry is still fresh (issues #755, #824, and #852).
  *
  * Two conditions must hold for an entry to be considered fresh:
  * 1. The entry is within SCAN_CACHE_TTL_MS (issue #755).
- * 2. If the entry records a directory mtime and a current mtime is provided,
- *    they must match — otherwise files were added/deleted and the cache is
- *    stale even within the TTL window (issue #824).
+ * 2. If the entry records an mtime signature and a current signature is
+ *    provided, they must match — otherwise files were added/deleted/modified
+ *    in the directory tree and the cache is stale even within the TTL window
+ *    (issues #824 and #852).
  */
 export function isScanCacheEntryFresh(
-  entry: { files: string[]; timestamp: number; mtime?: number } | undefined,
+  entry: { files: string[]; timestamp: number; mtimeSignature?: string } | undefined,
   now: number = Date.now(),
-  currentMtime?: number,
+  currentMtimeSignature?: string,
 ): boolean {
   if (!entry) return false
   if (now - entry.timestamp > SCAN_CACHE_TTL_MS) return false
-  if (entry.mtime !== undefined && currentMtime !== undefined && entry.mtime !== currentMtime) return false
+  if (entry.mtimeSignature !== undefined && currentMtimeSignature !== undefined && entry.mtimeSignature !== currentMtimeSignature) return false
   return true
 }
 
@@ -334,7 +388,8 @@ export function extractRelativeImports(text: string): string[] {
       if (text[i] === '/' && text[i + 1] === '*') {
         let j = i + 2
         while (j < len - 1 && !(text[j] === '*' && text[j + 1] === '/')) j++
-        i = j + 2
+        // Clamp to len so unterminated comments don't overshoot the buffer
+        i = Math.min(j + 2, len)
         continue
       }
       break
@@ -357,7 +412,8 @@ export function extractRelativeImports(text: string): string[] {
       if (text[i] === '/' && text[i + 1] === '*') {
         let j = i + 2
         while (j < len - 1 && !(text[j] === '*' && text[j + 1] === '/')) j++
-        i = j + 2
+        // Clamp to len so unterminated comments don't overshoot the buffer
+        i = Math.min(j + 2, len)
         continue
       }
       break
@@ -540,28 +596,30 @@ export async function collectMissingRelativeImports(): Promise<MissingImport[]> 
     // A source file was deleted — scan everything so importers of the
     // deleted module are re-scanned and broken imports detected.
     const srcDir = resolve('src')
-    const dirStats = await stat(srcDir).catch(() => null)
-    const currentMtime = dirStats ? dirStats.mtimeMs : undefined
+    // Use a recursive mtime signature so changes in any subdirectory
+    // invalidate the cache (issue #852). A directory's own mtime only
+    // changes for direct entries, missing changes in nested subdirectories.
+    const currentMtimeSignature = await computeDirMtimeSignature(srcDir)
     const cached = scanCache.get(srcDir)
-    if (isScanCacheEntryFresh(cached, Date.now(), currentMtime)) {
+    if (isScanCacheEntryFresh(cached, Date.now(), currentMtimeSignature)) {
       files.push(...cached!.files)
     } else {
       await scanFiles(srcDir, files)
-      scanCache.set(srcDir, { files: [...files], timestamp: Date.now(), mtime: currentMtime })
+      scanCache.set(srcDir, { files: [...files], timestamp: Date.now(), mtimeSignature: currentMtimeSignature })
     }
   } else {
     // Fall back to full directory scan with depth limit, using cache
     const srcDir = resolve('src')
-    // Use the directory mtime to invalidate the cache when files are added or
-    // deleted within the TTL window (issue #824).
-    const dirStats = await stat(srcDir).catch(() => null)
-    const currentMtime = dirStats ? dirStats.mtimeMs : undefined
+    // Use a recursive mtime signature to invalidate the cache when files are
+    // added, deleted, or modified in any subdirectory within the TTL window
+    // (issues #824 and #852).
+    const currentMtimeSignature = await computeDirMtimeSignature(srcDir)
     const cached = scanCache.get(srcDir)
-    if (isScanCacheEntryFresh(cached, Date.now(), currentMtime)) {
+    if (isScanCacheEntryFresh(cached, Date.now(), currentMtimeSignature)) {
       files.push(...cached!.files)
     } else {
       await scanFiles(srcDir, files)
-      scanCache.set(srcDir, { files: [...files], timestamp: Date.now(), mtime: currentMtime })
+      scanCache.set(srcDir, { files: [...files], timestamp: Date.now(), mtimeSignature: currentMtimeSignature })
     }
   }
   
