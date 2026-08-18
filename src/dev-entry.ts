@@ -20,7 +20,7 @@ type MacroConfig = {
   FEEDBACK_CHANNEL: string
 }
 
-const defaultMacro: MacroConfig = {
+const defaultMacro: MacroConfig = Object.freeze({
   VERSION: pkg.version,
   BUILD_TIME: '',
   PACKAGE_URL: pkg.name,
@@ -29,12 +29,39 @@ const defaultMacro: MacroConfig = {
   ISSUES_EXPLAINER:
     'file an issue at https://github.com/thomaslwq/myclaude/issues',
   FEEDBACK_CHANNEL: 'github',
+})
+
+/**
+ * Module-level singleton for the MACRO config (issue #843).
+ *
+ * The previous implementation used a check-then-set pattern
+ * (`if (!('MACRO' in globalThis)) globalThis.MACRO = defaultMacro`),
+ * which is a race condition across async boundaries: two concurrent
+ * initializers can both observe the absence and both assign, and the shared
+ * mutable `defaultMacro` reference could be mutated by any consumer
+ * (e.g. `globalThis.MACRO.VERSION = 'x'`), affecting all consumers.
+ *
+ * This implementation:
+ * - Freezes `defaultMacro` so consumers cannot mutate shared state.
+ * - Uses a module-level singleton (`macroSingleton`) that is assigned exactly
+ *   once at module load time. Module evaluation is single-threaded in JS, so
+ *   the assignment is atomic with respect to async boundaries.
+ * - Exposes `MACRO` as a stable export backed by the singleton, and mirrors it
+ *   onto `globalThis` (also frozen) for legacy consumers that read the global.
+ */
+const macroSingleton: MacroConfig = defaultMacro
+
+// Mirror onto globalThis for legacy consumers, but only if not already set.
+// The singleton above is the source of truth; this is a best-effort fallback.
+// The property remains writable/configurable so tests can swap in mock
+// MACRO objects, but the default value itself is frozen, preventing
+// accidental mutation of shared state by consumers.
+if (!(globalThis as typeof globalThis & { MACRO?: MacroConfig }).MACRO) {
+  ;(globalThis as typeof globalThis & { MACRO: MacroConfig }).MACRO =
+    macroSingleton
 }
 
-if (!('MACRO' in globalThis)) {
-  ;(globalThis as typeof globalThis & { MACRO: MacroConfig }).MACRO =
-    defaultMacro
-}
+export const MACRO: MacroConfig = macroSingleton
 
 export type MissingImport = {
   importer: string
@@ -90,37 +117,53 @@ async function getFileContent(filePath: string): Promise<string | null> {
 
 const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'])
 
-interface StackEntry {
+interface QueueEntry {
   dir: string
   depth: number
 }
 
 export async function scanFiles(dir: string, out: string[], maxDepth = 100, currentDepth = 0): Promise<void> {
-  // Use an explicit stack to avoid stack overflow from deeply nested directories.
+  // Use an explicit queue (FIFO) to avoid stack overflow from deeply nested
+  // directories while producing a deterministic, breadth-first traversal order.
   // Directories are processed with bounded concurrency so that sibling
   // subdirectories are read in parallel (the real I/O bottleneck), rather than
   // one at a time.
-  const stack: StackEntry[] = [{ dir, depth: currentDepth }]
+  //
+  // Entries within each directory are sorted by name before processing so that
+  // the resulting `out` array order is stable and independent of the underlying
+  // filesystem's readdir iteration order (issue #842).
+  const queue: QueueEntry[] = [{ dir, depth: currentDepth }]
   const CONCURRENCY = 10
 
-  while (stack.length > 0) {
-    // Pop up to CONCURRENCY directories to process them in parallel
-    const batch: StackEntry[] = []
-    while (stack.length > 0 && batch.length < CONCURRENCY) {
-      batch.push(stack.pop()!)
+  while (queue.length > 0) {
+    // Dequeue up to CONCURRENCY directories to process them in parallel
+    const batch: QueueEntry[] = []
+    while (queue.length > 0 && batch.length < CONCURRENCY) {
+      batch.push(queue.shift()!)
     }
 
-    await pMap(
+    // Each worker returns the files it discovered (in sorted order) plus the
+    // subdirectories to enqueue. We merge results in batch order so that the
+    // final `out` array is deterministic regardless of which concurrent
+    // worker finishes first (issue #842).
+    const batchResults = await pMap(
       batch,
       async ({ dir: currentDir, depth }) => {
-        if (depth > maxDepth) return
+        const files: string[] = []
+        const subdirs: QueueEntry[] = []
+
+        if (depth > maxDepth) return { files, subdirs }
 
         let dirHandle
         try {
           dirHandle = await readdir(currentDir, { withFileTypes: true })
         } catch {
-          return
+          return { files, subdirs }
         }
+
+        // Sort entries by name for deterministic traversal order regardless
+        // of the underlying filesystem's readdir iteration order.
+        dirHandle.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 
         for (const entry of dirHandle) {
           try {
@@ -134,19 +177,27 @@ export async function scanFiles(dir: string, out: string[], maxDepth = 100, curr
               // Other dot-prefixed directories (e.g. .github, .storybook, .vscode) may
               // contain legitimate source files and should not be skipped (issue #820).
               if (entry.name === 'node_modules' || entry.name === '.git') continue
-              stack.push({ dir: fullPath, depth: depth + 1 })
+              subdirs.push({ dir: fullPath, depth: depth + 1 })
               continue
             }
             if (SUPPORTED_EXTENSIONS.has(extname(entry.name))) {
-              out.push(fullPath)
+              files.push(fullPath)
             }
           } catch {
             // Gracefully skip this entry (e.g., permission error, I/O failure)
           }
         }
+
+        return { files, subdirs }
       },
       { concurrency: CONCURRENCY }
     )
+
+    // Merge results in batch order (FIFO) for deterministic output.
+    for (const { files, subdirs } of batchResults) {
+      out.push(...files)
+      queue.push(...subdirs)
+    }
   }
 }
 
