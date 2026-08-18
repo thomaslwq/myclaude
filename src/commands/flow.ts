@@ -1,7 +1,7 @@
 import type { Command } from '../commands.js'
 import { getAttributionTexts } from '../utils/attribution.js'
 import { getAllFlows, getFlowByName } from '../flows/definitions.js'
-import { executeFlow, type FlowExecutionState } from '../flows/executor.js'
+import { executeFlow, type FlowExecutionState, generateDiffPreview } from '../flows/executor.js'
 
 const ALLOWED_TOOLS = [
   'Bash(*)',
@@ -77,6 +77,25 @@ const command = {
     const flow = getFlowByName(args.trim())
     if (!flow) {
       throw new Error(`Flow not found: ${args}`)
+    }
+
+    // Issue #864: Diff Preview Before Auto-Apply. Show a diff preview and
+    // ask the user to approve before executing any step.
+    if (context?.preview !== false) {
+      const preview = generateDiffPreview(flow)
+      console.log(preview)
+      const approved = context?.onPreview ? await context.onPreview(preview) : true
+      if (!approved) {
+        console.log('Flow execution aborted by user.')
+        return {
+          currentStepIndex: 0,
+          completedSteps: [],
+          failedSteps: [],
+          totalSteps: flow.steps.length,
+          startTime: Date.now(),
+          aborted: true,
+        } as FlowExecutionState
+      }
     }
 
     const state = await executeFlow(

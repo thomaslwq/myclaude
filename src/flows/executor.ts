@@ -95,6 +95,38 @@ export interface FlowStep {
   reasoning?: string
 }
 
+/**
+ * Generate a human-readable diff preview of a flow's steps before they are
+ * auto-applied. This allows users to review the exact changes before the
+ * Buddy pet executes them (issue #864).
+ */
+export function generateDiffPreview(flow: FlowDefinition): string {
+  const lines: string[] = []
+  lines.push(`## Diff Preview: ${flow.name}`)
+  lines.push(``)
+  lines.push(`**Description**: ${flow.description}`)
+  lines.push(``)
+  lines.push(`**Steps (${flow.steps.length}):**`)
+  lines.push(``)
+  for (let i = 0; i < flow.steps.length; i++) {
+    const step = flow.steps[i]
+    lines.push(`### Step ${i + 1}: ${step.description}`)
+    if (step.reasoning) {
+      lines.push(`- **Reasoning**: ${step.reasoning}`)
+    }
+    if (step.command) {
+      lines.push(`- **Command**: \`${step.command}\``)
+    }
+    if (step.files && step.files.length > 0) {
+      lines.push(`- **Files**: ${step.files.map(f => `\`${f}\``).join(', ')}`)
+    }
+    lines.push(``)
+  }
+  lines.push(`---`)
+  lines.push(`Review the above changes carefully before approving.`)
+  return lines.join('\n')
+}
+
 export interface FlowDefinition {
   name: string
   description: string
@@ -107,6 +139,21 @@ export interface FlowExecutionState {
   failedSteps: string[]
   totalSteps: number
   startTime: number
+  aborted: boolean
+}
+
+export interface FlowExecutionOptions {
+  /**
+   * When true, generate a diff preview and call onPreview before executing
+   * any step. If onPreview returns false (or rejects), the flow is aborted
+   * before any changes are made (issue #864).
+   */
+  preview?: boolean
+  /**
+   * Callback invoked with the generated diff preview text. Return true to
+   * approve execution, false to abort (issue #864).
+   */
+  onPreview?: (preview: string) => Promise<boolean>
 }
 
 export async function executeFlow(
@@ -115,7 +162,8 @@ export async function executeFlow(
   onStepStart?: (step: FlowStep, state: FlowExecutionState) => Promise<void>,
   onStepComplete?: (step: FlowStep, state: FlowExecutionState) => Promise<void>,
   onStepFail?: (step: FlowStep, state: FlowExecutionState, error: Error) => Promise<void>,
-  onComplete?: (state: FlowExecutionState) => Promise<void>
+  onComplete?: (state: FlowExecutionState) => Promise<void>,
+  options?: FlowExecutionOptions,
 ): Promise<FlowExecutionState> {
   const state: FlowExecutionState = {
     currentStepIndex: 0,
@@ -123,6 +171,19 @@ export async function executeFlow(
     failedSteps: [],
     totalSteps: flow.steps.length,
     startTime: Date.now(),
+    aborted: false,
+  }
+
+  // Issue #864: Diff Preview Before Auto-Apply. If the preview option is
+  // enabled, generate a diff preview and ask the user to approve before
+  // executing any step.
+  if (options?.preview && options?.onPreview) {
+    const preview = generateDiffPreview(flow)
+    const approved = await options.onPreview(preview)
+    if (!approved) {
+      state.aborted = true
+      return state
+    }
   }
 
   for (let i = 0; i < flow.steps.length; i++) {
@@ -226,15 +287,23 @@ export async function shouldContinueOnError(error: Error, step: FlowStep): Promi
     return true
   }
 
-  // Check error message for transient error codes (for wrapped/system errors)
-  if (transientCodes.some(code => error.message.includes(code))) {
+  // Check error message for transient error codes using precise delimiters
+  // to avoid false positives from substring matching (issue #866). We match
+  // a code that appears at the start of the message or immediately after a
+  // colon (optionally preceded by whitespace), which is how Node/libc
+  // formats system errors (e.g. "ETIMEDOUT: operation timed out" or
+  // "connect ETIMEDOUT 1.2.3.4:80").
+  if (transientCodes.some(code => new RegExp(`(^|:\\s*)${code}\\b`).test(error.message))) {
     return true
   }
 
   // Missing bridge configuration is a recoverable error — the step fails but
   // the flow should continue so the remaining steps can still be attempted
-  // (issue #808).
-  if (error.message.includes('No bridge')) {
+  // (issue #808). Match the exact "No bridge.<method> available" prefix
+  // produced by executeCommand/executeFileOperation to avoid false positives
+  // from unrelated messages that merely contain the substring "No bridge"
+  // (issue #866).
+  if (/^No bridge\.(runCommand|editFile) available/.test(error.message)) {
     return true
   }
 

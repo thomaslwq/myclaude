@@ -25,6 +25,32 @@ describe('shouldContinueOnError (issue #774)', () => {
     expect(await shouldContinueOnError(new Error('SyntaxError: bad code'), {} as never)).toBe(false)
     expect(await shouldContinueOnError(new Error('EINVAL'), {} as never)).toBe(false)
   })
+
+  // Issue #866: fragile substring matching for error codes
+  test('messages that merely contain a transient code substring do not match (issue #866)', async () => {
+    // These messages contain the substring "ETIMEDOUT" but are not actual
+    // ETIMEDOUT errors and should NOT be treated as transient.
+    expect(await shouldContinueOnError(new Error('ETIMEDOUTS is not recognized'), {} as never)).toBe(false)
+    expect(await shouldContinueOnError(new Error('Cannot read property ETIMEDOUT of undefined'), {} as never)).toBe(false)
+    expect(await shouldContinueOnError(new Error('fooETIMEDOUTbar'), {} as never)).toBe(false)
+  })
+
+  test('messages with a properly delimited transient code still match (issue #866)', async () => {
+    // A leading code (e.g. "ETIMEDOUT: ...") or a code after a colon should
+    // still be recognized as transient.
+    expect(await shouldContinueOnError(new Error('ETIMEDOUT: operation timed out'), {} as never)).toBe(true)
+    expect(await shouldContinueOnError(new Error('request failed: ETIMEDOUT'), {} as never)).toBe(true)
+  })
+
+  test('messages that merely contain "No bridge" substring do not match (issue #866)', async () => {
+    expect(await shouldContinueOnError(new Error('There is No bridge here, just a string'), {} as never)).toBe(false)
+    expect(await shouldContinueOnError(new Error('No bridgeNo bridgeNo'), {} as never)).toBe(false)
+  })
+
+  test('actual missing-bridge errors still match (issue #866)', async () => {
+    expect(await shouldContinueOnError(new Error('No bridge.runCommand available to execute: mkdir'), {} as never)).toBe(true)
+    expect(await shouldContinueOnError(new Error('No bridge.editFile available to edit: foo'), {} as never)).toBe(true)
+  })
 })
 
 describe('executeFlow failure handling (issue #774)', () => {
@@ -140,6 +166,89 @@ describe('missing bridge configuration (issue #808)', () => {
     expect(state.failedSteps).toContain('a')
     expect(state.failedSteps).toContain('b')
     expect(state.failedSteps.length).toBe(2)
+  })
+})
+
+describe('diff preview before auto-apply (issue #864)', () => {
+  test('generateDiffPreview returns a human-readable preview of all steps', async () => {
+    const { generateDiffPreview } = await import('../executor.js')
+    const flow: FlowDefinition = {
+      name: 'test-flow',
+      description: 'A test flow',
+      steps: [
+        { id: '1', description: 'Create Dockerfile', files: ['Dockerfile'], reasoning: 'Containerize the app' },
+        { id: '2', description: 'Install deps', command: 'npm install express', reasoning: 'Add dependencies' },
+      ],
+    }
+    const preview = generateDiffPreview(flow)
+    expect(preview).toContain('test-flow')
+    expect(preview).toContain('Create Dockerfile')
+    expect(preview).toContain('Dockerfile')
+    expect(preview).toContain('Install deps')
+    expect(preview).toContain('npm install express')
+    expect(preview).toContain('Containerize the app')
+  })
+
+  test('executeFlow with preview option calls onPreview and waits for approval', async () => {
+    const { generateDiffPreview } = await import('../executor.js')
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: 'a', description: 'mkdir', command: 'mkdir /x' },
+        { id: 'b', description: 'touch', command: 'touch /y' },
+      ],
+    }
+    let previewCalled = false
+    let previewContent = ''
+    const state = await executeFlow(
+      flow,
+      { bridge: { runCommand: async () => {}, editFile: async () => {} } },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        preview: true,
+        onPreview: async (preview: string) => {
+          previewCalled = true
+          previewContent = preview
+          return true // approve
+        },
+      },
+    )
+    expect(previewCalled).toBe(true)
+    expect(previewContent).toContain('mkdir')
+    expect(previewContent).toContain('touch')
+    expect(state.completedSteps).toEqual(['a', 'b'])
+  })
+
+  test('executeFlow with preview rejected aborts before executing any step', async () => {
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: 'a', description: 'mkdir', command: 'mkdir /x' },
+        { id: 'b', description: 'touch', command: 'touch /y' },
+      ],
+    }
+    let runCommandCalled = false
+    const state = await executeFlow(
+      flow,
+      { bridge: { runCommand: async () => { runCommandCalled = true }, editFile: async () => {} } },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        preview: true,
+        onPreview: async () => false, // reject
+      },
+    )
+    expect(runCommandCalled).toBe(false)
+    expect(state.completedSteps).toEqual([])
+    expect(state.failedSteps).toEqual([])
+    expect(state.aborted).toBe(true)
   })
 })
 
