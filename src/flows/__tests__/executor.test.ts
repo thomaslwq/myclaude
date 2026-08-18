@@ -42,14 +42,26 @@ describe('shouldContinueOnError (issue #774)', () => {
     expect(await shouldContinueOnError(new Error('request failed: ETIMEDOUT'), {} as never)).toBe(true)
   })
 
+  // Issue #868: Node.js net/http system errors use the format
+  // "connect ETIMEDOUT <addr>" where the code is preceded by a word and
+  // space, not a colon or start-of-string. The old regex missed this.
+  test('Node.js "connect ETIMEDOUT <addr>" format matches (issue #868)', async () => {
+    expect(await shouldContinueOnError(new Error('connect ETIMEDOUT 1.2.3.4:80'), {} as never)).toBe(true)
+    expect(await shouldContinueOnError(new Error('connect ETIMEDOUT 127.0.0.1:3000'), {} as never)).toBe(true)
+  })
+
   test('messages that merely contain "No bridge" substring do not match (issue #866)', async () => {
     expect(await shouldContinueOnError(new Error('There is No bridge here, just a string'), {} as never)).toBe(false)
     expect(await shouldContinueOnError(new Error('No bridgeNo bridgeNo'), {} as never)).toBe(false)
   })
 
-  test('actual missing-bridge errors still match (issue #866)', async () => {
-    expect(await shouldContinueOnError(new Error('No bridge.runCommand available to execute: mkdir'), {} as never)).toBe(true)
-    expect(await shouldContinueOnError(new Error('No bridge.editFile available to edit: foo'), {} as never)).toBe(true)
+  test('actual missing-bridge errors still match (issue #866) and are now fatal (issue #859)', async () => {
+    // Issue #859: a missing bridge is a permanent/fatal condition — if the
+    // bridge is missing at step 1 it will still be missing at step N, so
+    // continuing only produces N identical failures. These errors now
+    // return false (abort) instead of true (continue).
+    expect(await shouldContinueOnError(new Error('No bridge.runCommand available to execute: mkdir'), {} as never)).toBe(false)
+    expect(await shouldContinueOnError(new Error('No bridge.editFile available to edit: foo'), {} as never)).toBe(false)
   })
 })
 
@@ -130,13 +142,16 @@ describe('onStepFail callback error handling (issue #823)', () => {
   })
 })
 
-describe('missing bridge configuration (issue #808)', () => {
-  test('shouldContinueOnError returns true for missing bridge errors', async () => {
-    expect(await shouldContinueOnError(new Error('No bridge.runCommand available to execute: mkdir'), {} as never)).toBe(true)
-    expect(await shouldContinueOnError(new Error('No bridge.editFile available to edit: foo'), {} as never)).toBe(true)
+describe('missing bridge configuration (issue #808 / #859)', () => {
+  test('shouldContinueOnError returns false (fatal) for missing bridge errors (issue #859)', async () => {
+    // Issue #859: a missing bridge is a permanent condition — if the bridge
+    // is missing at step 1 it will still be missing at step N, so continuing
+    // only produces N identical failures. These errors now abort the flow.
+    expect(await shouldContinueOnError(new Error('No bridge.runCommand available to execute: mkdir'), {} as never)).toBe(false)
+    expect(await shouldContinueOnError(new Error('No bridge.editFile available to edit: foo'), {} as never)).toBe(false)
   })
 
-  test('flow continues gracefully when bridge is missing (no context)', async () => {
+  test('flow aborts immediately when bridge is missing (no context) (issue #859)', async () => {
     const flow: FlowDefinition = {
       name: 't',
       description: 'test',
@@ -145,14 +160,16 @@ describe('missing bridge configuration (issue #808)', () => {
         { id: 'b', description: 'b', command: 'touch /y' },
       ],
     }
-    // No bridge context provided - missing bridge is a recoverable error
+    // No bridge context provided - missing bridge is now a fatal error and
+    // the flow aborts after the first failure instead of wastefully
+    // attempting every remaining step.
     const state = await executeFlow(flow, {})
-    expect(state.failedSteps).toContain('a')
-    expect(state.failedSteps).toContain('b')
-    expect(state.failedSteps.length).toBe(2)
+    expect(state.failedSteps).toEqual(['a'])
+    expect(state.failedSteps).not.toContain('b')
+    expect(state.aborted).toBe(true)
   })
 
-  test('flow continues gracefully when bridge has no runCommand', async () => {
+  test('flow aborts immediately when bridge has no runCommand (issue #859)', async () => {
     const flow: FlowDefinition = {
       name: 't',
       description: 'test',
@@ -163,9 +180,37 @@ describe('missing bridge configuration (issue #808)', () => {
     }
     // Bridge object exists but has no runCommand method
     const state = await executeFlow(flow, { bridge: { editFile: async () => {} } })
-    expect(state.failedSteps).toContain('a')
-    expect(state.failedSteps).toContain('b')
-    expect(state.failedSteps.length).toBe(2)
+    expect(state.failedSteps).toEqual(['a'])
+    expect(state.failedSteps).not.toContain('b')
+    expect(state.aborted).toBe(true)
+  })
+})
+
+describe('missing bridge aborts early (issue #859)', () => {
+  test('a 7-step flow with no bridge only fails the first step and sets aborted', async () => {
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: '1', description: '1', command: 'echo one' },
+        { id: '2', description: '2', command: 'echo two' },
+        { id: '3', description: '3', command: 'echo three' },
+        { id: '4', description: '4', command: 'echo four' },
+        { id: '5', description: '5', command: 'echo five' },
+        { id: '6', description: '6', command: 'echo six' },
+        { id: '7', description: '7', command: 'echo seven' },
+      ],
+    }
+    const failedSteps: string[] = []
+    const onStepFail = async (step: any) => {
+      failedSteps.push(step.id)
+    }
+    const state = await executeFlow(flow, {}, undefined, undefined, onStepFail)
+    // Only the first step is attempted and failed; the remaining 6 are skipped.
+    expect(failedSteps).toEqual(['1'])
+    expect(state.failedSteps).toEqual(['1'])
+    expect(state.completedSteps).toHaveLength(0)
+    expect(state.aborted).toBe(true)
   })
 })
 

@@ -96,29 +96,63 @@ export interface FlowStep {
 }
 
 /**
+ * Escape backslashes and backticks in a string so it can be safely
+ * placed inside a Markdown inline code span without breaking out.
+ * Issue #869.
+ */
+function escapeCodeSpan(text: string): string {
+  return text.replace(/\\/g, '\\\\').replace(/`/g, '\\`')
+}
+
+/**
+ * Escape Markdown special characters in a string so it can be safely
+ * interpolated into Markdown text without injecting formatting, links,
+ * headings, or HTML. Issue #869.
+ */
+function escapeMarkdown(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\*/g, '\\*')
+    .replace(/_/g, '\\_')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]')
+    .replace(/#/g, '\\#')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/!/g, '\\!')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+}
+
+/**
  * Generate a human-readable diff preview of a flow's steps before they are
  * auto-applied. This allows users to review the exact changes before the
  * Buddy pet executes them (issue #864).
+ *
+ * All untrusted content (flow name/description, step fields) is escaped
+ * before being interpolated into the Markdown string to prevent Markdown
+ * injection or XSS when the preview is rendered in a web context (issue #869).
  */
 export function generateDiffPreview(flow: FlowDefinition): string {
   const lines: string[] = []
-  lines.push(`## Diff Preview: ${flow.name}`)
+  lines.push(`## Diff Preview: ${escapeMarkdown(flow.name)}`)
   lines.push(``)
-  lines.push(`**Description**: ${flow.description}`)
+  lines.push(`**Description**: ${escapeMarkdown(flow.description)}`)
   lines.push(``)
   lines.push(`**Steps (${flow.steps.length}):**`)
   lines.push(``)
   for (let i = 0; i < flow.steps.length; i++) {
     const step = flow.steps[i]
-    lines.push(`### Step ${i + 1}: ${step.description}`)
+    lines.push(`### Step ${i + 1}: ${escapeMarkdown(step.description)}`)
     if (step.reasoning) {
-      lines.push(`- **Reasoning**: ${step.reasoning}`)
+      lines.push(`- **Reasoning**: ${escapeMarkdown(step.reasoning)}`)
     }
     if (step.command) {
-      lines.push(`- **Command**: \`${step.command}\``)
+      lines.push(`- **Command**: \`${escapeCodeSpan(step.command)}\``)
     }
     if (step.files && step.files.length > 0) {
-      lines.push(`- **Files**: ${step.files.map(f => `\`${f}\``).join(', ')}`)
+      lines.push(`- **Files**: ${step.files.map(f => `\`${escapeCodeSpan(f)}\``).join(', ')}`)
     }
     lines.push(``)
   }
@@ -229,6 +263,9 @@ export async function executeFlow(
       // Decide whether to continue or stop
       const shouldContinue = await shouldContinueOnError(error as Error, step)
       if (!shouldContinue) {
+        // A fatal error aborts the flow: remaining steps are skipped so we
+        // don't waste time/effort producing identical failures (issue #859).
+        state.aborted = true
         break
       }
     }
@@ -290,21 +327,38 @@ export async function shouldContinueOnError(error: Error, step: FlowStep): Promi
   // Check error message for transient error codes using precise delimiters
   // to avoid false positives from substring matching (issue #866). We match
   // a code that appears at the start of the message or immediately after a
-  // colon (optionally preceded by whitespace), which is how Node/libc
-  // formats system errors (e.g. "ETIMEDOUT: operation timed out" or
-  // "connect ETIMEDOUT 1.2.3.4:80").
-  if (transientCodes.some(code => new RegExp(`(^|:\\s*)${code}\\b`).test(error.message))) {
+  // colon (optionally preceded by whitespace), which is how Node/libc formats
+  // some system errors (e.g. "ETIMEDOUT: operation timed out").
+  //
+  // Issue #868: Node.js net/http system errors also use the format
+  // "<syscall> ETIMEDOUT <addr:port>" (e.g. "connect ETIMEDOUT 1.2.3.4:80"),
+  // where the code is preceded by a word and space — not at start or after a
+  // colon. We additionally match this format by requiring an address:port
+  // token after the code, which avoids false positives from unrelated
+  // messages that merely contain the code as a standalone word.
+  if (
+    transientCodes.some(
+      code =>
+        new RegExp(`(^|:\\s*)${code}\\b|\\b${code}\\s+\\S+:\\d+`).test(
+          error.message,
+        ),
+    )
+  ) {
     return true
   }
 
-  // Missing bridge configuration is a recoverable error — the step fails but
-  // the flow should continue so the remaining steps can still be attempted
-  // (issue #808). Match the exact "No bridge.<method> available" prefix
-  // produced by executeCommand/executeFileOperation to avoid false positives
-  // from unrelated messages that merely contain the substring "No bridge"
-  // (issue #866).
+  // Missing bridge configuration is a fatal error — if the bridge is
+  // unavailable at step 1, it will still be unavailable at every subsequent
+  // step, so continuing would only produce N identical failures with no
+  // useful work done (issue #859). The previous behavior treated this as
+  // recoverable (issue #808), but "recoverable" was misleading: there is no
+  // point attempting remaining steps when the underlying capability is
+  // missing for the whole flow. Match the exact "No bridge.<method>
+  // available" prefix produced by executeCommand/executeFileOperation to
+  // avoid false positives from unrelated messages that merely contain the
+  // substring "No bridge" (issue #866).
   if (/^No bridge\.(runCommand|editFile) available/.test(error.message)) {
-    return true
+    return false
   }
 
   // Any other error is fatal and aborts the flow.
