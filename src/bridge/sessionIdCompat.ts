@@ -15,48 +15,28 @@
 let _isCseShimEnabled: (() => boolean) | undefined
 
 /**
- * Mutex state for setCseShimGate().
- *
- * A Promise-based lock that is acquired synchronously (check-then-set is
- * atomic within a single microtask) and released only by
- * resetCseShimGateForTesting(). Because the lock is acquired in the same
- * synchronous execution frame as the check, no two concurrently-scheduled
- * microtasks can both observe an unlocked state — the first to run sets
- * `_gateLocked` before yielding, so the second sees it as held.
- *
- * See issue #821: the previous boolean-only guard was correct for pure
- * synchronous callers, but the lock is now explicit and documented so
- * future maintainers don't reintroduce the check-then-set gap.
- */
-let _gateLocked = false
-
-/**
  * Register the GrowthBook gate for the cse_ shim. Called from bridge
  * init code that already imports bridgeEnabled.ts.
  *
- * Locked after the first registration: a second call (e.g. from a different
- * init path) is ignored so the translation behavior cannot change
- * mid-execution after the first toCompatSessionId call (issue #705).
+ * The gate is re-settable: a later init path can overwrite a previously
+ * registered gate (issue #860). This is safe because the gate is a
+ * function evaluated lazily at translation time — there is no cached
+ * boolean that could go stale. If a transient GrowthBook fetch failure
+ * causes the first caller to register a `() => false` gate, a later
+ * caller can register a corrected gate once GrowthBook recovers.
  *
- * Thread-safety (issue #821): the lock is acquired synchronously within
- * this function — no `await` between the check and the set — so even when
- * two async init paths (REPL bridge + daemon bridge) call this
- * concurrently, only the first microtask to execute wins. The second
- * caller observes `_gateLocked === true` and returns without mutating
- * state.
+ * Thread-safety (issue #821): JavaScript is single-threaded and the
+ * assignment is synchronous, so no two concurrently-scheduled
+ * microtasks can corrupt state — they execute one after another and
+ * the last writer wins, which is the desired behavior for gate updates.
  */
 export function setCseShimGate(gate: () => boolean): void {
-  if (_gateLocked) return
-  // Acquire the lock synchronously before storing the gate so that no
-  // interleaving microtask can pass the check above.
-  _gateLocked = true
   _isCseShimEnabled = gate
 }
 
 /**
  * Returns the currently registered gate (or undefined if none has been
- * registered). Exposed for tests that need to assert which gate won under
- * concurrent initialization (issue #821).
+ * registered). Exposed for tests that need to assert which gate is active.
  */
 export function getCseShimGate(): (() => boolean) | undefined {
   return _isCseShimEnabled
@@ -65,7 +45,6 @@ export function getCseShimGate(): (() => boolean) | undefined {
 /** Test-only: clear the gate so a fresh test can register its own. */
 export function resetCseShimGateForTesting(): void {
   _isCseShimEnabled = undefined
-  _gateLocked = false
 }
 
 /**
