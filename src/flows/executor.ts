@@ -199,6 +199,15 @@ export async function executeFlow(
   onComplete?: (state: FlowExecutionState) => Promise<void>,
   options?: FlowExecutionOptions,
 ): Promise<FlowExecutionState> {
+  // Issue #874: Validate step ID uniqueness. Flow definitions can be
+  // LLM-generated and may contain duplicate step IDs, which would make
+  // state tracking ambiguous (e.g. completedSteps/failedSteps would
+  // contain the same ID for different steps). Reject such flows early.
+  const ids = flow.steps.map(s => s.id)
+  if (new Set(ids).size !== ids.length) {
+    throw new Error('Flow definition contains duplicate step IDs')
+  }
+
   const state: FlowExecutionState = {
     currentStepIndex: 0,
     completedSteps: [],

@@ -297,6 +297,33 @@ describe('diff preview before auto-apply (issue #864)', () => {
   })
 })
 
+describe('duplicate step ID validation (issue #874)', () => {
+  test('executeFlow throws when flow contains duplicate step IDs', async () => {
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: '1', description: 'first', command: 'mkdir /x' },
+        { id: '1', description: 'second', command: 'touch /y' },
+      ],
+    }
+    expect(executeFlow(flow, { bridge: { runCommand: async () => {}, editFile: async () => {} } })).rejects.toThrow('Flow definition contains duplicate step IDs')
+  })
+
+  test('executeFlow does not throw when step IDs are unique', async () => {
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: '1', description: 'first', command: 'mkdir /x' },
+        { id: '2', description: 'second', command: 'touch /y' },
+      ],
+    }
+    const state = await executeFlow(flow, { bridge: { runCommand: async () => {}, editFile: async () => {} } })
+    expect(state.completedSteps).toEqual(['1', '2'])
+  })
+})
+
 describe('executeCommand sanitization (issue #841)', () => {
   test('sanitizeCommand parses a simple command into argv', () => {
     const parsed = sanitizeCommand('npm install express jsonwebtoken bcrypt')
