@@ -351,15 +351,22 @@ export async function shouldContinueOnError(error: Error, step: FlowStep): Promi
   // Issue #868: Node.js net/http system errors also use the format
   // "<syscall> ETIMEDOUT <addr:port>" (e.g. "connect ETIMEDOUT 1.2.3.4:80"),
   // where the code is preceded by a word and space — not at start or after a
-  // colon. We additionally match this format by requiring an address:port
+  // colon. We additionally match this format by requiring a valid address:port
   // token after the code, which avoids false positives from unrelated
   // messages that merely contain the code as a standalone word.
+  //
+  // Issue #877: The previous `\S+:\d+` alternative was too permissive — it
+  // matched any non-whitespace string followed by a colon and digits (e.g.
+  // "ETIMEDOUT completed:0" or "ETIMEDOUT foo:1"). Tighten it to only accept
+  // valid IPv4:port or hostname:port formats.
+  const ipv4Port = String.raw`\d{1,3}(?:\.\d{1,3}){3}:\d+`
+  const hostnamePort = String.raw`[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?){1,}:\d+`
   if (
     transientCodes.some(
       code =>
-        new RegExp(`(^|:\\s*)${code}\\b|\\b${code}\\s+\\S+:\\d+`).test(
-          error.message,
-        ),
+        new RegExp(
+          `(^|:\\s*)${code}\\b|\\b${code}\\s+(?:${ipv4Port}|${hostnamePort})`,
+        ).test(error.message),
     )
   ) {
     return true

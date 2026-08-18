@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, jest } from 'bun:test'
-import { executeFlow, generateDiffPreview } from '../flows/executor'
-import type { FlowDefinition } from '../flows/executor'
+import { executeFlow, generateDiffPreview, shouldContinueOnError } from '../flows/executor'
+import type { FlowDefinition, FlowStep } from '../flows/executor'
 
 // Mock bridge object: commands/file ops fail by default so the flow marks
 // the step failed (issue #773 — executeCommand now routes through bridge).
@@ -443,6 +443,53 @@ describe('executeFlow', () => {
     expect(failedSteps).toEqual(['1'])
     expect(state.failedSteps).toEqual(['1'])
     expect(state.aborted).toBe(true)
+  })
+})
+
+describe('shouldContinueOnError', () => {
+  const step: FlowStep = {
+    id: '1',
+    description: 'Test step',
+  }
+
+  it('should return true for transient error code ETIMEDOUT', async () => {
+    const err = Object.assign(new Error('Operation timed out'), { code: 'ETIMEDOUT' })
+    expect(await shouldContinueOnError(err, step)).toBe(true)
+  })
+
+  it('should return true for Node.js system error format "connect ETIMEDOUT 1.2.3.4:80"', async () => {
+    const err = new Error('connect ETIMEDOUT 1.2.3.4:80')
+    expect(await shouldContinueOnError(err, step)).toBe(true)
+  })
+
+  it('should return true for Node.js system error format with hostname:port', async () => {
+    const err = new Error('connect ETIMEDOUT example.com:80')
+    expect(await shouldContinueOnError(err, step)).toBe(true)
+  })
+
+  it('should return false for false positive "operation ETIMEDOUT completed:0 results"', async () => {
+    // Issue #877: the old regex matched `ETIMEDOUT completed:0` because
+    // `\S+:\d+` accepted any non-whitespace string before the colon.
+    const err = new Error('operation ETIMEDOUT completed:0 results')
+    expect(await shouldContinueOnError(err, step)).toBe(false)
+  })
+
+  it('should return false for false positive "operation ETIMEDOUT foo:1"', async () => {
+    // Issue #877: `foo:1` is not a valid host:port or IP:port. The message
+    // does not start with the code nor follow a colon, so only the address
+    // alternative could match — and `foo:1` is not a valid address:port.
+    const err = new Error('operation ETIMEDOUT foo:1')
+    expect(await shouldContinueOnError(err, step)).toBe(false)
+  })
+
+  it('should return false for non-transient error code EACCES', async () => {
+    const err = Object.assign(new Error('Permission denied'), { code: 'EACCES' })
+    expect(await shouldContinueOnError(err, step)).toBe(false)
+  })
+
+  it('should return false for generic error without transient code', async () => {
+    const err = new Error('Something went wrong')
+    expect(await shouldContinueOnError(err, step)).toBe(false)
   })
 })
 
