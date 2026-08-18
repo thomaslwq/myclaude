@@ -165,7 +165,34 @@ describe('executeCommand sanitization (issue #841)', () => {
     expect(sanitizeCommand('mkdir -p src/foo')).toEqual(['mkdir', '-p', 'src/foo'])
     expect(sanitizeCommand('touch file.txt')).toEqual(['touch', 'file.txt'])
   })
+})
 
+describe('onComplete callback error handling (issue #837)', () => {
+  test('onComplete throwing does not reject executeFlow', async () => {
+    const flow: FlowDefinition = {
+      name: 't',
+      description: 'test',
+      steps: [
+        { id: 'a', description: 'a', command: 'mkdir /x' },
+        { id: 'b', description: 'b', command: 'touch /y' },
+      ],
+    }
+    const state = await executeFlow(
+      flow,
+      { bridge: { runCommand: async () => {}, editFile: async () => {} } },
+      undefined,
+      undefined,
+      undefined,
+      async () => {
+        throw new Error('onComplete boom')
+      },
+    )
+    expect(state.completedSteps).toEqual(['a', 'b'])
+    expect(state.failedSteps).toEqual([])
+  })
+})
+
+describe('executeCommand sanitization (issue #841)', () => {
   test('executeCommand passes parsed argv array to bridge.runCommand', async () => {
     const received: any[] = []
     const bridge = {

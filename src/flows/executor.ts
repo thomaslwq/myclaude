@@ -174,7 +174,14 @@ export async function executeFlow(
   }
 
   if (onComplete) {
-    await onComplete(state)
+    try {
+      await onComplete(state)
+    } catch (callbackError) {
+      // Callback errors should not cause the executeFlow promise to reject
+      // after the flow has completed processing all steps. This is
+      // consistent with the error handling for onStepComplete/onStepFail.
+      console.error('onComplete callback failed:', callbackError)
+    }
   }
 
   return state
