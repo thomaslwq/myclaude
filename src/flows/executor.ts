@@ -318,7 +318,7 @@ export async function executeCommand(command: string, context: any): Promise<voi
     await context.bridge.runCommand(argv)
     return
   }
-  throw new Error('No bridge.runCommand available to execute: ' + command)
+  throw new Error('No bridge.runCommand available to execute command (input omitted for security)')
 }
 
 export async function executeFileOperation(file: string, context: any): Promise<void> {
@@ -328,7 +328,7 @@ export async function executeFileOperation(file: string, context: any): Promise<
     await context.bridge.editFile(file)
     return
   }
-  throw new Error('No bridge.editFile available to edit: ' + file)
+  throw new Error('No bridge.editFile available to edit file (input omitted for security)')
 }
 
 export async function shouldContinueOnError(error: Error, step: FlowStep): Promise<boolean> {

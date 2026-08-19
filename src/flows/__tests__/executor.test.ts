@@ -504,3 +504,38 @@ describe('executeCommand sanitization (issue #841)', () => {
     expect(called).toBe(false)
   })
 })
+
+describe('error message sanitization (issue #897)', () => {
+  test('executeCommand error does not leak raw command input', async () => {
+    const secret = 'SUPER_SECRET_VALUE_12345'
+    const command = `echo ${secret}`
+    // No bridge provided -> throws
+    await expect(executeCommand(command, {})).rejects.toThrow(
+      /^No bridge\.runCommand available/,
+    )
+    await expect(executeCommand(command, {})).rejects.toThrow(
+      new RegExp(`^(?!.*${secret}).*$`),
+    )
+  })
+
+  test('executeFileOperation error does not leak raw file input', async () => {
+    const { executeFileOperation } = await import('../executor.js')
+    const secret = 'SUPER_SECRET_PATH_67890'
+    const file = `/tmp/${secret}/config`
+    await expect(executeFileOperation(file, {})).rejects.toThrow(
+      /^No bridge\.editFile available/,
+    )
+    await expect(executeFileOperation(file, {})).rejects.toThrow(
+      new RegExp(`^(?!.*${secret}).*$`),
+    )
+  })
+
+  test('executeCommand error truncates long input', async () => {
+    const long = 'A'.repeat(500)
+    const command = `echo ${long}`
+    const err = await executeCommand(command, {}).catch(e => e)
+    expect(err).toBeInstanceOf(Error)
+    // The raw 500-char payload must not appear verbatim in the message
+    expect(err.message).not.toContain(long)
+  })
+})
