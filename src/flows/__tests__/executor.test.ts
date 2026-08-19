@@ -178,7 +178,7 @@ describe('missing bridge configuration (issue #808 / #859)', () => {
         { id: 'b', description: 'b', command: 'touch /y' },
       ],
     }
-    // Bridge object exists but has no runCommand method
+    // Bridge object exists but has no runCommand method - fatal (issue #871)
     const state = await executeFlow(flow, { bridge: { editFile: async () => {} } })
     expect(state.failedSteps).toEqual(['a'])
     expect(state.failedSteps).not.toContain('b')
