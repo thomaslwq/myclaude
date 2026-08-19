@@ -42,12 +42,38 @@ describe('shouldContinueOnError (issue #774)', () => {
     expect(await shouldContinueOnError(new Error('request failed: ETIMEDOUT'), {} as never)).toBe(true)
   })
 
-  // Issue #868: Node.js net/http system errors use the format
-  // "connect ETIMEDOUT <addr>" where the code is preceded by a word and
-  // space, not a colon or start-of-string. The old regex missed this.
-  test('Node.js "connect ETIMEDOUT <addr>" format matches (issue #868)', async () => {
-    expect(await shouldContinueOnError(new Error('connect ETIMEDOUT 1.2.3.4:80'), {} as never)).toBe(true)
-    expect(await shouldContinueOnError(new Error('connect ETIMEDOUT 127.0.0.1:3000'), {} as never)).toBe(true)
+  // Issue #868/#895: Node.js net/http system errors use the format
+  // "connect ETIMEDOUT <addr>". Real Node.js errors of this kind set
+  // structured properties (.code, .errno, .syscall) which we rely on
+  // instead of fragile message-string regex matching.
+  test('Node.js "connect ETIMEDOUT <addr>" system errors match via structured .code (issue #868/#895)', async () => {
+    const e1 = new Error('connect ETIMEDOUT 1.2.3.4:80')
+    ;(e1 as any).code = 'ETIMEDOUT'
+    ;(e1 as any).syscall = 'connect'
+    ;(e1 as any).errno = -110
+    expect(await shouldContinueOnError(e1, {} as never)).toBe(true)
+
+    const e2 = new Error('connect ETIMEDOUT 127.0.0.1:3000')
+    ;(e2 as any).code = 'ETIMEDOUT'
+    ;(e2 as any).syscall = 'connect'
+    expect(await shouldContinueOnError(e2, {} as never)).toBe(true)
+  })
+
+  test('structured .errno (string) property is checked (issue #895)', async () => {
+    // Some Node.js errors set .errno to the string code. Even if .code is
+    // missing, .errno should be checked as a structured property.
+    const e = new Error('operation timed out')
+    ;(e as any).errno = 'ETIMEDOUT'
+    expect(await shouldContinueOnError(e, {} as never)).toBe(true)
+  })
+
+  test('plain message in "connect CODE <addr>" format without structured props is not matched (issue #895)', async () => {
+    // Without .code/.errno, the "connect ETIMEDOUT <addr>" message format
+    // is NOT matched by the simple fallback — only "^CODE" or ": CODE"
+    // patterns are. Message formats vary across Node versions/platforms and
+    // are intentionally not relied upon beyond a simple, documented fallback.
+    expect(await shouldContinueOnError(new Error('connect ETIMEDOUT 1.2.3.4:80'), {} as never)).toBe(false)
+    expect(await shouldContinueOnError(new Error('connect ETIMEDOUT 127.0.0.1:3000'), {} as never)).toBe(false)
   })
 
   test('messages that merely contain "No bridge" substring do not match (issue #866)', async () => {

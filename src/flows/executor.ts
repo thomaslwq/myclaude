@@ -338,37 +338,39 @@ export async function shouldContinueOnError(error: Error, step: FlowStep): Promi
   // transient here (issues #774/#850: transient-continue, permanent-abort).
   const transientCodes = ['ETIMEDOUT']
   const err = error as any
-  if (err.code && transientCodes.includes(err.code)) {
+
+  // Primary classification: rely on STRUCTURED error properties that Node.js
+  // and libuv attach to system errors. These are stable across Node versions
+  // and platforms, unlike error message strings (issue #895). The previous
+  // implementation used increasingly complex regex patterns against
+  // `error.message` (issues #866/#868/#877), which is fragile because message
+  // formats vary across Node versions and platforms.
+  //
+  // Node.js system errors set:
+  //   - `error.code`    e.g. "ETIMEDOUT", "ECONNREFUSED"
+  //   - `error.errno`   either a numeric libuv errno or the string code
+  //   - `error.syscall` e.g. "connect", "read"
+  // We check `code` first (the canonical property), then `errno` (which some
+  // errors set to the string code even when `code` is absent).
+  const codeFromProps = typeof err.code === 'string' ? err.code : typeof err.errno === 'string' ? err.errno : null
+  if (codeFromProps && transientCodes.includes(codeFromProps)) {
     return true
   }
 
-  // Check error message for transient error codes using precise delimiters
-  // to avoid false positives from substring matching (issue #866). We match
-  // a code that appears at the start of the message or immediately after a
-  // colon (optionally preceded by whitespace), which is how Node/libc formats
-  // some system errors (e.g. "ETIMEDOUT: operation timed out").
+  // Fallback: a SIMPLE, well-documented message-based match. This is a last
+  // resort for errors that carry a transient code only inside their message
+  // (e.g. errors re-thrown without preserving structured properties). To stay
+  // maintainable, we intentionally do NOT try to match every Node.js message
+  // variant (such as "connect ETIMEDOUT <addr:port>"); those cases should be
+  // fixed at the source by preserving structured properties instead of
+  // growing the regex further (issue #895).
   //
-  // Issue #868: Node.js net/http system errors also use the format
-  // "<syscall> ETIMEDOUT <addr:port>" (e.g. "connect ETIMEDOUT 1.2.3.4:80"),
-  // where the code is preceded by a word and space — not at start or after a
-  // colon. We additionally match this format by requiring a valid address:port
-  // token after the code, which avoids false positives from unrelated
-  // messages that merely contain the code as a standalone word.
-  //
-  // Issue #877: The previous `\S+:\d+` alternative was too permissive — it
-  // matched any non-whitespace string followed by a colon and digits (e.g.
-  // "ETIMEDOUT completed:0" or "ETIMEDOUT foo:1"). Tighten it to only accept
-  // valid IPv4:port or hostname:port formats.
-  const ipv4Port = String.raw`\d{1,3}(?:\.\d{1,3}){3}:\d+`
-  const hostnamePort = String.raw`[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?){1,}:\d+`
-  if (
-    transientCodes.some(
-      code =>
-        new RegExp(
-          `(^|:\\s*)${code}\\b|\\b${code}\\s+(?:${ipv4Port}|${hostnamePort})`,
-        ).test(error.message),
-    )
-  ) {
+  // We only match a code that appears at the start of the message or
+  // immediately after a colon (optionally preceded by whitespace), which is
+  // how Node/libc formats some system errors (e.g. "ETIMEDOUT: operation timed
+  // out" or "request failed: ETIMEDOUT"). A word boundary after the code
+  // avoids matching substrings like "ETIMEDOUTS" (issue #866).
+  if (transientCodes.some(code => new RegExp(`(^|:\\s*)${code}\\b`).test(error.message))) {
     return true
   }
 
