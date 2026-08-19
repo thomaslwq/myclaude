@@ -51,7 +51,7 @@ export function sanitizeCommand(command: string): string[] {
       // that could enable command substitution or injection. Issue #841.
       if (/[`$<>|;&\\\n\r]/.test(node)) {
         throw new Error(
-          `Invalid command: shell metacharacter in token "${node}" is not allowed: "${command}"`,
+          'Invalid command: shell metacharacter in token is not allowed (input omitted for security)',
         )
       }
       argv.push(node)
@@ -65,12 +65,12 @@ export function sanitizeCommand(command: string): string[] {
     if (node && typeof node === 'object') {
       const kind = (node as any).op || (node as any).pattern || 'shell metacharacter'
       throw new Error(
-        `Invalid command: shell metacharacter/operator (${kind}) is not allowed: "${command}"`,
+        `Invalid command: shell metacharacter/operator (${kind}) is not allowed (input omitted for security)`,
       )
     }
 
     // Any non-string, non-object entry is unexpected; reject defensively.
-    throw new Error(`Invalid command: unexpected token in command: "${command}"`)
+    throw new Error('Invalid command: unexpected token in command (input omitted for security)')
   }
 
   if (argv.length === 0) {
@@ -80,7 +80,7 @@ export function sanitizeCommand(command: string): string[] {
   const program = argv[0]
   if (!ALLOWED_COMMANDS.has(program)) {
     throw new Error(
-      `Invalid command: program "${program}" is not on the allowlist of permitted commands`,
+      'Invalid command: program is not on the allowlist of permitted commands (input omitted for security)',
     )
   }
 

