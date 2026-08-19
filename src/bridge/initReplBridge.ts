@@ -119,6 +119,9 @@ export async function initReplBridge(
 
   // Wire the cse_ shim kill switch so toCompatSessionId respects the
   // GrowthBook gate. Daemon/SDK paths skip this — shim defaults to active.
+  // First-writer-wins (issue #880): if a gate is already registered (e.g.
+  // by a concurrent bridge init), this call is a no-op — the first gate
+  // wins, preventing cross-instance contamination.
   setCseShimGate(isCseShimEnabled)
 
   // Issue #759: heavy modules (growthbook / oauth client / policyLimits /

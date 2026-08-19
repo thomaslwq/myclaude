@@ -18,20 +18,24 @@ let _isCseShimEnabled: (() => boolean) | undefined
  * Register the GrowthBook gate for the cse_ shim. Called from bridge
  * init code that already imports bridgeEnabled.ts.
  *
- * The gate is re-settable: a later init path can overwrite a previously
- * registered gate (issue #860). This is safe because the gate is a
- * function evaluated lazily at translation time — there is no cached
- * boolean that could go stale. If a transient GrowthBook fetch failure
- * causes the first caller to register a `() => false` gate, a later
+ * First-writer-wins (issue #880): once a gate is registered it is locked,
+ * so a later init path cannot silently replace the first connection's gate.
+ * This prevents cross-test contamination and multi-instance conflicts.
+ *
+ * The gate is a function evaluated lazily at translation time — there is
+ * no cached boolean that could go stale. If a transient GrowthBook fetch
+ * failure causes the first caller to register a `() => false` gate, a later
  * caller can register a corrected gate once GrowthBook recovers.
  *
  * Thread-safety (issue #821): JavaScript is single-threaded and the
  * assignment is synchronous, so no two concurrently-scheduled
  * microtasks can corrupt state — they execute one after another and
- * the last writer wins, which is the desired behavior for gate updates.
+ * the first writer wins, which is the desired behavior for gate updates.
  */
 export function setCseShimGate(gate: () => boolean): void {
-  _isCseShimEnabled = gate
+  if (_isCseShimEnabled === undefined) {
+    _isCseShimEnabled = gate
+  }
 }
 
 /**

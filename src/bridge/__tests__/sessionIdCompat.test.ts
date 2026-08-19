@@ -36,16 +36,16 @@ describe('sessionIdCompat — gate lifecycle (issue #705)', () => {
     expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
   })
 
-  test('gate can be updated by a later init path (issue #860)', () => {
+  test('first-writer-wins: a later init path cannot overwrite the first gate (issue #880)', () => {
     // First registration: shim active
     setCseShimGate(() => true)
     expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
 
-    // A second registration with a different gate MUST be honored so that
-    // a transient GrowthBook failure (first caller registers () => false)
-    // can be corrected once GrowthBook recovers (issue #860).
+    // A second registration with a different gate MUST NOT win — the first
+    // gate is locked so a later init path cannot silently replace the
+    // first connection's gate (issue #880).
     setCseShimGate(() => false)
-    expect(toCompatSessionId('cse_abc123')).toBe('cse_abc123')
+    expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
   })
 
   test('toInfraSessionId is the inverse and respects the gate', () => {
@@ -59,15 +59,15 @@ describe('sessionIdCompat — gate lifecycle (issue #705)', () => {
   })
 })
 
-describe('sessionIdCompat — concurrent initialization (issue #860)', () => {
-  test('concurrent setCseShimGate calls are safe — last writer wins', async () => {
+describe('sessionIdCompat — concurrent initialization (issue #880)', () => {
+  test('concurrent setCseShimGate calls are safe — first writer wins', async () => {
     resetCseShimGateForTesting()
 
     // Simulate two async init paths (REPL bridge + daemon bridge) that
     // both call setCseShimGate concurrently. Because the gate is a
     // lazily-evaluated function, there is no stale cached boolean — the
-    // last writer wins, which is the desired behavior so a later init
-    // path can correct a transient failure from an earlier one (issue #860).
+    // first writer wins, which is the desired behavior so a later init
+    // path cannot silently replace the first connection's gate (issue #880).
     const gateA = () => true
     const gateB = () => false
 
@@ -76,10 +76,10 @@ describe('sessionIdCompat — concurrent initialization (issue #860)', () => {
       Promise.resolve().then(() => setCseShimGate(gateB)),
     ])
 
-    // The last-registered gate should be the one stored.
-    expect(getCseShimGate()).toBe(gateB)
-    // And translation behavior must reflect gate B (shim disabled).
-    expect(toCompatSessionId('cse_abc123')).toBe('cse_abc123')
+    // The first-registered gate should be the one stored.
+    expect(getCseShimGate()).toBe(gateA)
+    // And translation behavior must reflect gate A (shim active).
+    expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
   })
 
   test('gate is set synchronously within setCseShimGate before returning', async () => {
@@ -95,9 +95,9 @@ describe('sessionIdCompat — concurrent initialization (issue #860)', () => {
       Promise.resolve().then(() => setCseShimGate(gateB)),
     ])
 
-    // A gate should be registered (last writer wins).
+    // A gate should be registered (first writer wins).
     expect(getCseShimGate()).toBeDefined()
-    expect(getCseShimGate()).toBe(gateB)
+    expect(getCseShimGate()).toBe(gateA)
     expect(results).toEqual([undefined, undefined])
   })
 })
