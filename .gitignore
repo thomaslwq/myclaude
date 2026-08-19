@@ -33,3 +33,6 @@ package-lock.json
 # Build artifacts
 _final.mjs
 _del_temp.mjs
+
+# Local secrets (API keys) — never commit
+.env
