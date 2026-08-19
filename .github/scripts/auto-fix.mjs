@@ -47,10 +47,10 @@ const CONFIG = {
   llmModelName:     process.env.LLM_MODEL_NAME || 'openai/glm-4.5',
   llmApiBase:       process.env.LLM_API_BASE || 'https://open.bigmodel.cn/api/paas/v4/',
 
-  // Primary: SenseTime 商汤日日新 glm-5.2 (1M context)
+  // Primary: SenseTime 商汤日日新 — deepseek-v4-flash (glm-5.2 不稳定, 换回 deepseek-v4-flash)
   sensenovaApiKey:  process.env.SENSENOVA_API_KEY || '',
-  sensenovaModel:   process.env.SENSENOVA_MODEL || 'glm-5.2',
-  sensenovaMaxTokens: 131072, // glm-5.2 上下文 1M，但单请求 max_tokens 上限 131072
+  sensenovaModel:   process.env.SENSENOVA_MODEL || 'deepseek-v4-flash',
+  sensenovaMaxTokens: 131072, // 上下文上限, 单请求 max_tokens 上限 131072
   sensenovaApiBase: 'https://token.sensenova.cn/v1',
 
   ghToken:          process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
