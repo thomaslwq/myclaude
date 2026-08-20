@@ -256,7 +256,7 @@ describe('executeFlow', () => {
     expect(state.failedSteps).toEqual(['1'])
   })
 
-  it('should mark step as complete when onStepComplete throws error', async () => {
+  it('should mark step as complete when onStepComplete throws error and propagate error to caller', async () => {
     const flow: FlowDefinition = {
       name: 'test-flow',
       description: 'Test flow',
@@ -284,16 +284,17 @@ describe('executeFlow', () => {
       failedSteps.push(step.id)
     }
 
-    const state = await executeFlow(flow, mockContext, undefined, onStepComplete, onStepFail)
+    // Step 1 should be marked as completed (not failed) even though onStepComplete threw,
+    // but the error should be propagated to the caller (issue #908).
+    await expect(
+      executeFlow(flow, mockContext, undefined, onStepComplete, onStepFail),
+    ).rejects.toThrow('onStepComplete error')
 
-    // Step 1 should be marked as completed (not failed) even though onStepComplete threw
     expect(completedSteps).toEqual(['1', '2'])
     expect(failedSteps).toEqual([])
-    expect(state.completedSteps).toEqual(['1', '2'])
-    expect(state.failedSteps).toEqual([])
   })
 
-  it('should mark step as complete when onStepComplete throws error and continue flow', async () => {
+  it('should mark step as complete when onStepComplete throws error and continue flow, then propagate error to caller', async () => {
     const flow: FlowDefinition = {
       name: 'test-flow',
       description: 'Test flow',
@@ -325,16 +326,17 @@ describe('executeFlow', () => {
       failedSteps.push(step.id)
     }
 
-    const state = await executeFlow(flow, mockContext, undefined, onStepComplete, onStepFail)
+    // All steps should still be executed (completed), but the callback error
+    // should be propagated to the caller after the flow completes (issue #908).
+    await expect(
+      executeFlow(flow, mockContext, undefined, onStepComplete, onStepFail),
+    ).rejects.toThrow('onStepComplete error')
 
-    // Step 1 should be marked as completed (not failed) even though onStepComplete threw
     expect(completedSteps).toEqual(['1', '2', '3'])
     expect(failedSteps).toEqual([])
-    expect(state.completedSteps).toEqual(['1', '2', '3'])
-    expect(state.failedSteps).toEqual([])
   })
 
-  it('should mark step as complete when onStepComplete throws error and continue flow with files', async () => {
+  it('should mark step as complete when onStepComplete throws error and continue flow with files, then propagate error to caller', async () => {
     const flow: FlowDefinition = {
       name: 'test-flow',
       description: 'Test flow',
@@ -362,13 +364,14 @@ describe('executeFlow', () => {
       failedSteps.push(step.id)
     }
 
-    const state = await executeFlow(flow, mockContext, undefined, onStepComplete, onStepFail)
+    // All steps should still be executed (completed), but the callback error
+    // should be propagated to the caller after the flow completes (issue #908).
+    await expect(
+      executeFlow(flow, mockContext, undefined, onStepComplete, onStepFail),
+    ).rejects.toThrow('onStepComplete error')
 
-    // Step 1 should be marked as completed (not failed) even though onStepComplete threw
     expect(completedSteps).toEqual(['1', '2'])
     expect(failedSteps).toEqual([])
-    expect(state.completedSteps).toEqual(['1', '2'])
-    expect(state.failedSteps).toEqual([])
   })
 
   it('should abort flow on first step when bridge is missing (No bridge error is fatal, issue #859)', async () => {

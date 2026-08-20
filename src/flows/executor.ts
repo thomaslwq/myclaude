@@ -226,6 +226,10 @@ export async function executeFlow(
     aborted: false,
   }
 
+  // Collect callback errors during flow execution so they can be
+  // propagated to the caller after the flow completes (issue #908).
+  const callbackErrors: Error[] = []
+
   // Issue #864: Diff Preview Before Auto-Apply. If the preview option is
   // enabled, generate a diff preview and ask the user to approve before
   // executing any step.
@@ -264,8 +268,11 @@ export async function executeFlow(
         try {
           await onStepComplete(step, state)
         } catch (callbackError) {
-          // Callback errors should not mark the step as failed or stop the flow.
+          // Callback errors should not mark the step as failed or stop the flow,
+          // but they must be propagated to the caller so the caller knows a
+          // critical failure occurred (issue #908).
           console.error(`onStepComplete callback failed for step "${step.id}":`, callbackError)
+          callbackErrors.push(callbackError as Error)
         }
       }
     } catch (error) {
@@ -274,8 +281,11 @@ export async function executeFlow(
         try {
           await onStepFail(step, state, error as Error)
         } catch (callbackError) {
-          // Callback errors should not stop the flow or prevent onComplete from firing.
+          // Callback errors should not stop the flow or prevent onComplete from firing,
+          // but they must be propagated to the caller so the caller knows a
+          // critical failure occurred (issue #908).
           console.error(`onStepFail callback failed for step "${step.id}":`, callbackError)
+          callbackErrors.push(callbackError as Error)
         }
       }
       // Decide whether to continue or stop
@@ -293,11 +303,22 @@ export async function executeFlow(
     try {
       await onComplete(state)
     } catch (callbackError) {
-      // Callback errors should not cause the executeFlow promise to reject
-      // after the flow has completed processing all steps. This is
-      // consistent with the error handling for onStepComplete/onStepFail.
+      // Callback errors must be propagated to the caller so the caller
+      // knows a critical failure occurred (issue #908).
       console.error('onComplete callback failed:', callbackError)
+      callbackErrors.push(callbackError as Error)
     }
+  }
+
+  // If any callback errors were collected, propagate them to the caller
+  // after the flow has completed processing all steps (issue #908).
+  if (callbackErrors.length > 0) {
+    // If there's only one error, throw it directly; otherwise wrap in
+    // an AggregateError for completeness.
+    if (callbackErrors.length === 1) {
+      throw callbackErrors[0]
+    }
+    throw new AggregateError(callbackErrors, 'Multiple callback errors occurred during flow execution')
   }
 
   return state
