@@ -4,7 +4,6 @@ import {
   getBridgeBaseUrlOverride,
   createBridgeOverrideResolver,
   getResolver,
-  resetResolver,
 } from '../bridgeConfig.js'
 
 // Mock the build-time MACRO constant
@@ -137,40 +136,4 @@ describe('bridgeConfig security', () => {
     })
   })
 
-  describe('resetResolver', () => {
-    it('should re-read current globalThis.MACRO and update the cached resolver', () => {
-      // MACRO is set in beforeEach to DEV_BRIDGE_OVERRIDES_ENABLED = false
-      // The resolver was captured at module load time with that value
-      expect(getBridgeTokenOverride()).toBeUndefined()
-
-      // Now change MACRO to enable overrides
-      ;(globalThis as any).MACRO = {
-        DEV_BRIDGE_OVERRIDES_ENABLED: true,
-        BRIDGE_OVERRIDE_TOKEN: 'resolved-token',
-        BRIDGE_OVERRIDE_BASE_URL: 'https://resolved.com',
-      }
-
-      // Without reset, the cached resolver still has the old values
-      expect(getBridgeTokenOverride()).toBeUndefined()
-
-      // Reset the resolver to re-read MACRO
-      resetResolver()
-
-      // Now the resolver should reflect the new MACRO values
-      expect(getBridgeTokenOverride()).toBe('resolved-token')
-      expect(getBridgeBaseUrlOverride()).toBe('https://resolved.com')
-    })
-
-    it('should work with empty MACRO (undefined)', () => {
-      // Temporarily set MACRO to undefined
-      ;(globalThis as any).MACRO = undefined
-
-      // Reset should not throw
-      resetResolver()
-
-      // Should return undefined for all values
-      expect(getBridgeTokenOverride()).toBeUndefined()
-      expect(getBridgeBaseUrlOverride()).toBeUndefined()
-    })
-  })
 })

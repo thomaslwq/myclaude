@@ -64,15 +64,6 @@ export function getResolver() {
 }
 
 /**
- * Resets the cached resolver by re-reading the current globalThis.MACRO.
- * Used only in tests to clear state between test cases.
- * @internal
- */
-export function resetResolver(): void {
-  _resolver = createBridgeOverrideResolver((globalThis as any).MACRO)
-}
-
-/**
  * Get the bridge token override from the cached resolver.
  */
 export function getBridgeTokenOverride(): string | undefined {
