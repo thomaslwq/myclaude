@@ -12,7 +12,12 @@
  * so the shim defaults to active (matching isCseShimEnabled()'s own default).
  */
 
+import { Mutex } from 'async-mutex'
+
 let _isCseShimEnabled: (() => boolean) | undefined
+
+/** Mutex protecting _isCseShimEnabled for thread-safe access across workers. */
+const _gateMutex = new Mutex()
 
 /**
  * Register the GrowthBook gate for the cse_ shim. Called from bridge
@@ -27,15 +32,16 @@ let _isCseShimEnabled: (() => boolean) | undefined
  * failure causes the first caller to register a `() => false` gate, a later
  * caller can register a corrected gate once GrowthBook recovers.
  *
- * Thread-safety (issue #821): JavaScript is single-threaded and the
- * assignment is synchronous, so no two concurrently-scheduled
- * microtasks can corrupt state — they execute one after another and
- * the first writer wins, which is the desired behavior for gate updates.
+ * Thread-safety: uses a Mutex to protect the critical section, making it
+ * safe to call from Web Workers or worker_threads even if multiple
+ * concurrent registration attempts happen simultaneously.
  */
-export function setCseShimGate(gate: () => boolean): void {
-  if (_isCseShimEnabled === undefined) {
-    _isCseShimEnabled = gate
-  }
+export async function setCseShimGate(gate: () => boolean): Promise<void> {
+  await _gateMutex.runExclusive(() => {
+    if (_isCseShimEnabled === undefined) {
+      _isCseShimEnabled = gate
+    }
+  })
 }
 
 /**
@@ -47,8 +53,10 @@ export function getCseShimGate(): (() => boolean) | undefined {
 }
 
 /** Test-only: clear the gate so a fresh test can register its own. */
-export function resetCseShimGateForTesting(): void {
-  _isCseShimEnabled = undefined
+export async function resetCseShimGateForTesting(): Promise<void> {
+  await _gateMutex.runExclusive(() => {
+    _isCseShimEnabled = undefined
+  })
 }
 
 /**

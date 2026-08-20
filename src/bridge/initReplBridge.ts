@@ -122,7 +122,7 @@ export async function initReplBridge(
   // First-writer-wins (issue #880): if a gate is already registered (e.g.
   // by a concurrent bridge init), this call is a no-op — the first gate
   // wins, preventing cross-instance contamination.
-  setCseShimGate(isCseShimEnabled)
+  await setCseShimGate(isCseShimEnabled)
 
   // Issue #759: heavy modules (growthbook / oauth client / policyLimits /
   // auth) are dynamically imported at init time instead of statically at

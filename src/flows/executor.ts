@@ -322,6 +322,33 @@ export async function executeCommand(command: string, context: any): Promise<voi
 }
 
 export async function executeFileOperation(file: string, context: any): Promise<void> {
+  // Issue #855: reject path traversal and other dangerous patterns
+  if (typeof file !== 'string') {
+    throw new Error('Invalid file path: must be a string')
+  }
+
+  // Reject NUL bytes (null bytes) that can be used to truncate paths on some systems
+  if (file.includes('\x00')) {
+    throw new Error('Invalid file path: NUL byte detected')
+  }
+
+  // Normalize path separators to forward slash for consistent checking
+  const normalized = file.replace(/\\/g, '/')
+
+  // Reject absolute paths (Unix: /etc/passwd, Windows: C:/...)
+  if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
+    throw new Error('Invalid file path: absolute paths are not allowed')
+  }
+
+  // Reject paths that traverse upward (either directly or embedded)
+  // Checks for '..' as a path component, not just anywhere in the string
+  const parts = normalized.split('/')
+  for (const part of parts) {
+    if (part === '..') {
+      throw new Error('Invalid file path: path traversal (..) is not allowed')
+    }
+  }
+
   // Issue #773: the stub never executed anything. Route through the bridge
   // API when available so flows can actually edit files.
   if (context?.bridge?.editFile) {

@@ -15,8 +15,8 @@ import {
  * mid-execution. The fix locks the gate so the first registration wins.
  */
 
-beforeEach(() => {
-  resetCseShimGateForTesting()
+beforeEach(async () => {
+  await resetCseShimGateForTesting()
 })
 
 describe('sessionIdCompat — gate lifecycle (issue #705)', () => {
@@ -25,36 +25,36 @@ describe('sessionIdCompat — gate lifecycle (issue #705)', () => {
     expect(toCompatSessionId('session_abc123')).toBe('session_abc123') // no-op
   })
 
-  test('gate returning false disables the cse_ shim', () => {
-    setCseShimGate(() => false)
+  test('gate returning false disables the cse_ shim', async () => {
+    await setCseShimGate(() => false)
     expect(toCompatSessionId('cse_abc123')).toBe('cse_abc123') // untranslated
     expect(toCompatSessionId('session_abc123')).toBe('session_abc123')
   })
 
-  test('gate returning true keeps the shim active', () => {
-    setCseShimGate(() => true)
+  test('gate returning true keeps the shim active', async () => {
+    await setCseShimGate(() => true)
     expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
   })
 
-  test('first-writer-wins: a later init path cannot overwrite the first gate (issue #880)', () => {
+  test('first-writer-wins: a later init path cannot overwrite the first gate (issue #880)', async () => {
     // First registration: shim active
-    setCseShimGate(() => true)
+    await setCseShimGate(() => true)
     expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
 
     // A second registration with a different gate MUST NOT win — the first
     // gate is locked so a later init path cannot silently replace the
     // first connection's gate (issue #880).
-    setCseShimGate(() => false)
+    await setCseShimGate(() => false)
     expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
   })
 
-  test('toInfraSessionId is the inverse and respects the gate', () => {
-    setCseShimGate(() => true)
+  test('toInfraSessionId is the inverse and respects the gate', async () => {
+    await setCseShimGate(() => true)
     expect(toInfraSessionId('session_abc123')).toBe('cse_abc123')
     expect(toInfraSessionId('cse_abc123')).toBe('cse_abc123') // no-op
     // When the shim is disabled, neither direction translates.
-    resetCseShimGateForTesting()
-    setCseShimGate(() => false)
+    await resetCseShimGateForTesting()
+    await setCseShimGate(() => false)
     expect(toInfraSessionId('session_abc123')).toBe('session_abc123')
   })
 })
