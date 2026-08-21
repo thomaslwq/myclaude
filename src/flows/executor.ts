@@ -142,12 +142,16 @@ export interface FlowStep {
  * are unambiguous. Issue #869, #873.
  */
 function escapeCodeSpan(text: string): string {
+  // Replace newlines (CR and LF) with a space first so untrusted text
+  // cannot break out of the inline code span and inject Markdown
+  // structure. Issue #925.
+  const sanitized = text.replace(/\r\n|\r|\n/g, ' ')
   // Find the longest run of backticks and use one more backtick as delimiter
-  const maxRun = (text.match(/`+/g) || []).reduce((m, s) => Math.max(m, s.length), 0)
+  const maxRun = (sanitized.match(/`+/g) || []).reduce((m, s) => Math.max(m, s.length), 0)
   const delim = '`'.repeat(maxRun + 1)
   // Add spaces inside delimiters if content starts/ends with backtick
-  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : ''
-  return `${delim}${pad}${text}${pad}${delim}`
+  const pad = sanitized.startsWith('`') || sanitized.endsWith('`') ? ' ' : ''
+  return `${delim}${pad}${sanitized}${pad}${delim}`
 }
 
 /**
@@ -157,6 +161,10 @@ function escapeCodeSpan(text: string): string {
  */
 function escapeMarkdown(text: string): string {
   return text
+    // Replace newlines (CR and LF) with a space before any escaping so
+    // untrusted text cannot break out of the current Markdown line and
+    // inject headings, lists, code blocks, etc. Issue #925.
+    .replace(/\r\n|\r|\n/g, ' ')
     .replace(/\\/g, '\\\\')
     .replace(/`/g, '\\`')
     .replace(/\*/g, '\\*')
