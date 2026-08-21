@@ -86,6 +86,41 @@ export function sanitizeCommand(command: string): string[] {
     )
   }
 
+  // Issue #928: validate file path arguments for commands that operate on files
+  // (cp, mv, touch, mkdir). These commands can read/write files outside the
+  // workspace via absolute paths or path traversal (..), bypassing the
+  // protections in executeFileOperation. We apply the same validation rules
+  // as executeFileOperation to the path-like arguments of these commands.
+  const FILE_OPERATING_COMMANDS = new Set<string>(['cp', 'mv', 'touch', 'mkdir'])
+  if (FILE_OPERATING_COMMANDS.has(program)) {
+    for (let i = 1; i < argv.length; i++) {
+      const arg = argv[i]
+      if (typeof arg !== 'string') continue
+
+      // Reject NUL bytes (null bytes) that can be used to truncate paths on some systems
+      if (arg.includes('\x00')) {
+        throw new Error('Invalid command argument: NUL byte detected (input omitted for security)')
+      }
+
+      // Normalize path separators to forward slash for consistent checking
+      const normalized = arg.replace(/\\/g, '/')
+
+      // Reject absolute paths (Unix: /etc/passwd, Windows: C:/...)
+      if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
+        throw new Error('Invalid command argument: absolute paths are not allowed (input omitted for security)')
+      }
+
+      // Reject paths that traverse upward (either directly or embedded)
+      // Checks for '..' as a path component, not just anywhere in the string
+      const parts = normalized.split('/')
+      for (const part of parts) {
+        if (part === '..') {
+          throw new Error('Invalid command argument: path traversal (..) is not allowed (input omitted for security)')
+        }
+      }
+    }
+  }
+
   return argv
 }
 

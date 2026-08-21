@@ -13,8 +13,8 @@ import { sanitizeCommand } from '../executor.js'
 
 describe('sanitizeCommand allowlist (issue #854)', () => {
   test('safe stateless commands are still allowed', () => {
-    expect(() => sanitizeCommand('mkdir /tmp/x')).not.toThrow()
-    expect(() => sanitizeCommand('touch /tmp/x')).not.toThrow()
+    expect(() => sanitizeCommand('mkdir mydir')).not.toThrow()
+    expect(() => sanitizeCommand('touch myfile')).not.toThrow()
     expect(() => sanitizeCommand('echo hi')).not.toThrow()
     expect(() => sanitizeCommand('cp a b')).not.toThrow()
   })
@@ -35,5 +35,32 @@ describe('sanitizeCommand allowlist (issue #854)', () => {
   test('shell metacharacters are still rejected', () => {
     expect(() => sanitizeCommand('echo a; rm -rf /')).toThrow()
     expect(() => sanitizeCommand('echo $(whoami)')).toThrow()
+  })
+
+  test('rejects path traversal via file arguments in allowed commands (issue #928)', () => {
+    // Absolute paths should be rejected
+    expect(() => sanitizeCommand('cp /etc/passwd ./leaked')).toThrow()
+    expect(() => sanitizeCommand('touch /etc/cron.d/backdoor')).toThrow()
+    expect(() => sanitizeCommand('mkdir /root/evil')).toThrow()
+    expect(() => sanitizeCommand('mv /etc/shadow ./stolen')).toThrow()
+
+    // Path traversal via .. should be rejected
+    expect(() => sanitizeCommand('cp ../../secret.txt ./stolen')).toThrow()
+    expect(() => sanitizeCommand('mv ../../secret.txt ./stolen')).toThrow()
+    expect(() => sanitizeCommand('touch ../../evil.txt')).toThrow()
+    expect(() => sanitizeCommand('mkdir ../../evil')).toThrow()
+
+    // NUL bytes should be rejected
+    // Use an actual NUL byte character (\x00 = 0x00)
+    expect(() => sanitizeCommand('cp foo' + '\x00' + 'bar ./safe')).toThrow()
+  })
+
+  test('allows valid relative paths in allowed commands (issue #928)', () => {
+    // Valid relative paths should still be allowed
+    expect(() => sanitizeCommand('cp ./safe/file.txt ./dest/')).not.toThrow()
+    expect(() => sanitizeCommand('mv file.txt backup/')).not.toThrow()
+    expect(() => sanitizeCommand('touch newfile.txt')).not.toThrow()
+    expect(() => sanitizeCommand('mkdir ./newdir')).not.toThrow()
+    expect(() => sanitizeCommand('echo hello world')).not.toThrow()
   })
 })
