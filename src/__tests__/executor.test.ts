@@ -460,14 +460,16 @@ describe('shouldContinueOnError', () => {
     expect(await shouldContinueOnError(err, step)).toBe(true)
   })
 
-  it('should return true for Node.js system error format "connect ETIMEDOUT 1.2.3.4:80"', async () => {
+  it('does not match plain "connect ETIMEDOUT <addr>" message without structured props (issue #895)', async () => {
+    // Message formats vary across Node versions/platforms; without
+    // .code/.errno the simple fallback intentionally does NOT match.
     const err = new Error('connect ETIMEDOUT 1.2.3.4:80')
-    expect(await shouldContinueOnError(err, step)).toBe(true)
+    expect(await shouldContinueOnError(err, step)).toBe(false)
   })
 
-  it('should return true for Node.js system error format with hostname:port', async () => {
+  it('does not match hostname:port message without structured props (issue #895)', async () => {
     const err = new Error('connect ETIMEDOUT example.com:80')
-    expect(await shouldContinueOnError(err, step)).toBe(true)
+    expect(await shouldContinueOnError(err, step)).toBe(false)
   })
 
   it('should return false for false positive "operation ETIMEDOUT completed:0 results"', async () => {

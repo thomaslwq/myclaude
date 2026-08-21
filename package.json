@@ -1,6 +1,6 @@
 {
   "name": "@funnycode/myclaude",
-  "version": "0.1.284",
+  "version": "0.1.285",
   "private": false,
   "description": "An open-source AI coding assistant in your terminal - powered by Claude",
   "license": "MIT",

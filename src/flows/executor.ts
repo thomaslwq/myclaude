@@ -15,13 +15,15 @@ import { parse } from 'shell-quote'
  * the purpose of the allowlist.
  */
 const ALLOWED_COMMANDS = new Set<string>([
-  'npm',
+  // Issues #854/#886/#889/#890: git and npm were removed — git can exec
+  // arbitrary commands via config hooks / rebase --exec, and npm can run
+  // arbitrary code via `npm run` / `npm exec` / postinstall scripts.
+  // Only stateless, non-script-executing commands remain.
   'mkdir',
   'touch',
   'cp',
   'mv',
   'echo',
-  'git',
   'tsc',
   'vitest',
 ])
@@ -127,6 +129,8 @@ function escapeMarkdown(text: string): string {
     .replace(/\[/g, '\\[')
     .replace(/\]/g, '\\]')
     .replace(/#/g, '\\#')
+    // Escape & first so the &lt;/&gt; entities below stay inert (issue #887)
+    .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/!/g, '\\!')
@@ -380,11 +384,21 @@ export async function executeFileOperation(file: string, context: any): Promise<
 }
 
 export async function shouldContinueOnError(error: Error, step: FlowStep): Promise<boolean> {
-  // Only genuinely transient errors are recoverable. EACCES (permission
-  // denied) and ENOENT (file not found) are permanent — retrying the same
-  // operation produces the same failure — so only ETIMEDOUT counts as
-  // transient here (issues #774/#850: transient-continue, permanent-abort).
-  const transientCodes = ['ETIMEDOUT']
+  // Only genuinely transient errors are recoverable: network timeouts and
+  // common transient network failures that DO resolve on retry (connection
+  // reset, network unreachable, broken pipe, DNS resolution, socket hangup).
+  // EACCES (permission denied) and ENOENT (file not found) are permanent —
+  // retrying produces the same failure — so they stay fatal
+  // (issues #774/#850/#888: transient-continue, permanent-abort).
+  const transientCodes = [
+    'ETIMEDOUT',
+    'ECONNRESET',
+    'ENETUNREACH',
+    'EPIPE',
+    'EAI_AGAIN',
+    'ENOTFOUND',
+    'ECONNREFUSED',
+  ]
   const err = error as any
 
   // Primary classification: rely on STRUCTURED error properties that Node.js
