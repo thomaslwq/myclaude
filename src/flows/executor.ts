@@ -421,9 +421,10 @@ export async function executeFileOperation(file: string, context: any): Promise<
 export async function shouldContinueOnError(error: Error, step: FlowStep): Promise<boolean> {
   // Only genuinely transient errors are recoverable: network timeouts and
   // common transient network failures that DO resolve on retry (connection
-  // reset, network unreachable, broken pipe, DNS resolution, socket hangup).
-  // EACCES (permission denied) and ENOENT (file not found) are permanent —
-  // retrying produces the same failure — so they stay fatal
+  // reset, network unreachable, broken pipe, temporary DNS failure (EAI_AGAIN)).
+  // EACCES (permission denied), ENOENT (file not found), ENOTFOUND (DNS lookup
+  // failed — hostname does not exist), and ECONNREFUSED (service not listening)
+  // are permanent — retrying produces the same failure — so they stay fatal
   // (issues #774/#850/#888: transient-continue, permanent-abort).
   const transientCodes = [
     'ETIMEDOUT',
@@ -431,8 +432,6 @@ export async function shouldContinueOnError(error: Error, step: FlowStep): Promi
     'ENETUNREACH',
     'EPIPE',
     'EAI_AGAIN',
-    'ENOTFOUND',
-    'ECONNREFUSED',
   ]
   const err = error as any
 
