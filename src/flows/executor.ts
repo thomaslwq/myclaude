@@ -103,20 +103,32 @@ export function sanitizeCommand(command: string): string[] {
         throw new Error('Invalid command argument: NUL byte detected (input omitted for security)')
       }
 
-      // Normalize path separators to forward slash for consistent checking
-      const normalized = arg.replace(/\\/g, '/')
-
-      // Reject absolute paths (Unix: /etc/passwd, Windows: C:/...)
-      if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
-        throw new Error('Invalid command argument: absolute paths are not allowed (input omitted for security)')
+      // Issue #939: For --flag=value tokens, the value may embed an absolute
+      // path or traversal that bypasses the whole-token checks (e.g.
+      // `--project=/etc/evil/tsconfig.json` does not start with '/').
+      // Validate both the full token and the value after '='.
+      const valuesToCheck = [arg]
+      const eqIndex = arg.indexOf('=')
+      if (eqIndex !== -1) {
+        valuesToCheck.push(arg.slice(eqIndex + 1))
       }
 
-      // Reject paths that traverse upward (either directly or embedded)
-      // Checks for '..' as a path component, not just anywhere in the string
-      const parts = normalized.split('/')
-      for (const part of parts) {
-        if (part === '..') {
-          throw new Error('Invalid command argument: path traversal (..) is not allowed (input omitted for security)')
+      for (const value of valuesToCheck) {
+        // Normalize path separators to forward slash for consistent checking
+        const normalized = value.replace(/\\/g, '/')
+
+        // Reject absolute paths (Unix: /etc/passwd, Windows: C:/...)
+        if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
+          throw new Error('Invalid command argument: absolute paths are not allowed (input omitted for security)')
+        }
+
+        // Reject paths that traverse upward (either directly or embedded)
+        // Checks for '..' as a path component, not just anywhere in the string
+        const parts = normalized.split('/')
+        for (const part of parts) {
+          if (part === '..') {
+            throw new Error('Invalid command argument: path traversal (..) is not allowed (input omitted for security)')
+          }
         }
       }
     }

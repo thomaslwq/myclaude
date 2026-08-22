@@ -83,4 +83,23 @@ describe('sanitizeCommand allowlist (issue #854)', () => {
     expect(() => sanitizeCommand('tsc --project ./tsconfig.json')).not.toThrow()
     expect(() => sanitizeCommand('vitest ./test/suite.test.ts')).not.toThrow()
   })
+
+  test('rejects path traversal via --flag=/absolute/path syntax (issue #939)', () => {
+    // Absolute path embedded in = syntax (bypasses startsWith('/') check)
+    expect(() => sanitizeCommand('tsc --project=/etc/evil/tsconfig.json')).toThrow()
+    expect(() => sanitizeCommand('vitest --config=/etc/evil/vitest.config.ts')).toThrow()
+    expect(() => sanitizeCommand('cp --target-directory=/etc/evil ./file')).toThrow()
+
+    // Path traversal via .. embedded in = syntax
+    expect(() => sanitizeCommand('tsc --project=../../evil/tsconfig.json')).toThrow()
+    expect(() => sanitizeCommand('vitest --config=../../evil/vitest.config.ts')).toThrow()
+
+    // Windows drive path embedded in = syntax
+    expect(() => sanitizeCommand('tsc --project=C:/evil/tsconfig.json')).toThrow()
+  })
+
+  test('allows valid relative paths in = syntax (issue #939)', () => {
+    expect(() => sanitizeCommand('tsc --project=./tsconfig.json')).not.toThrow()
+    expect(() => sanitizeCommand('vitest --config=./vitest.config.ts')).not.toThrow()
+  })
 })
