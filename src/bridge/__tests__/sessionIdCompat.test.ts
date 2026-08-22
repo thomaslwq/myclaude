@@ -36,6 +36,17 @@ describe('sessionIdCompat — gate lifecycle (issue #705)', () => {
     expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
   })
 
+  test('unawaited setCseShimGate is immediately visible to synchronous reads (issue #935)', () => {
+    // Regression test: the async-mutex used to defer the gate write to a
+    // microtask, so a synchronous read right after the call observed the old
+    // (undefined) gate. The write must be synchronous so sync readers like
+    // toCompatSessionId / toInfraSessionId can never see a stale gate.
+    resetCseShimGateForTesting()
+    setCseShimGate(() => false) // deliberately NOT awaited
+    expect(toCompatSessionId('cse_abc123')).toBe('cse_abc123') // untranslated
+    expect(toInfraSessionId('session_abc123')).toBe('session_abc123')
+  })
+
   test('first-writer-wins: a later init path cannot overwrite the first gate (issue #880)', async () => {
     // First registration: shim active
     await setCseShimGate(() => true)
