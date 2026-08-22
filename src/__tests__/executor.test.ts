@@ -374,6 +374,46 @@ describe('executeFlow', () => {
     expect(failedSteps).toEqual([])
   })
 
+  it('should still execute step and propagate onStepStart error to caller (issue #940)', async () => {
+    const flow: FlowDefinition = {
+      name: 'test-flow',
+      description: 'Test flow',
+      steps: [
+        {
+          id: '1',
+          description: 'Test step 1',
+        },
+        {
+          id: '2',
+          description: 'Test step 2',
+        },
+      ],
+    }
+
+    const completedSteps: string[] = []
+    const failedSteps: string[] = []
+    const onStepStart = async (step: any, state: any) => {
+      if (step.id === '1') {
+        throw new Error('onStepStart error')
+      }
+    }
+    const onStepComplete = async (step: any, state: any) => {
+      completedSteps.push(step.id)
+    }
+    const onStepFail = async (step: any, state: any, error: Error) => {
+      failedSteps.push(step.id)
+    }
+
+    // Step 1 should still be executed (completed) even though onStepStart
+    // threw, but the error should be propagated to the caller (issue #940).
+    await expect(
+      executeFlow(flow, mockContext, onStepStart, onStepComplete, onStepFail),
+    ).rejects.toThrow('onStepStart error')
+
+    expect(completedSteps).toEqual(['1', '2'])
+    expect(failedSteps).toEqual([])
+  })
+
   it('should abort flow on first step when bridge is missing (No bridge error is fatal, issue #859)', async () => {
     // When context.bridge is undefined or lacks runCommand/editFile, every
     // step will fail with the same "No bridge..." error. The flow should

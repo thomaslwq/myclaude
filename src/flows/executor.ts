@@ -296,7 +296,15 @@ export async function executeFlow(
 
     try {
       if (onStepStart) {
-        await onStepStart(step, state)
+        try {
+          await onStepStart(step, state)
+        } catch (callbackError) {
+          // Callback errors should not mark the step as failed or stop the flow,
+          // but they must be propagated to the caller so the caller knows a
+          // critical failure occurred (issue #908, #940).
+          console.error(`onStepStart callback failed for step "${step.id}":`, callbackError)
+          callbackErrors.push(callbackError as Error)
+        }
       }
 
       // Execute the step
