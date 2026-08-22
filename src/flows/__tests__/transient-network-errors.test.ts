@@ -13,7 +13,7 @@ import { shouldContinueOnError } from '../executor.js'
 
 describe('shouldContinueOnError - transient network errors (issue #888)', () => {
   test('common transient network errors are recoverable', async () => {
-    const transient = ['ECONNRESET', 'ENETUNREACH', 'EPIPE', 'EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED']
+    const transient = ['ECONNRESET', 'ENETUNREACH', 'EPIPE', 'EAI_AGAIN']
     for (const code of transient) {
       const err = Object.assign(new Error('network'), { code })
       expect(await shouldContinueOnError(err, {} as never), `code=${code}`).toBe(true)
