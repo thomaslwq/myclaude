@@ -18,28 +18,21 @@ let _isCseShimEnabled: (() => boolean) | undefined
  * Register the GrowthBook gate for the cse_ shim. Called from bridge
  * init code that already imports bridgeEnabled.ts.
  *
- * First-writer-wins (issue #880): once a gate is registered it is locked,
- * so a later init path cannot silently replace the first connection's gate.
- * This prevents cross-test contamination and multi-instance conflicts.
+ * Overwriteable (issue #941): gates can be overwritten to allow recovery
+ * from transient failures. If a transient GrowthBook fetch failure causes
+ * the first caller to register a `() => false` gate, a later caller can
+ * register a corrected gate once GrowthBook recovers.
  *
- * The gate is a function evaluated lazily at translation time — there is
- * no cached boolean that could go stale. If a transient GrowthBook fetch
- * failure causes the first caller to register a `() => false` gate, a later
- * caller can register a corrected gate once GrowthBook recovers.
- *
- * Thread-safety (issue #935): the check-and-write below is fully
- * synchronous — the assignment becomes visible to synchronous readers
- * (toCompatSessionId / toInfraSessionId) immediately, before this function
- * returns. An async mutex cannot protect those sync reads, so we deliberately
- * avoid one: in a single JS isolate the check-and-write is atomic, and in
- * multi-worker setups each worker owns its own module state anyway.
+ * Thread-safety (issue #935): the assignment becomes visible to synchronous
+ * readers (toCompatSessionId / toInfraSessionId) immediately, before this
+ * function returns. An async mutex cannot protect those sync reads, so we
+ * deliberately avoid one: in a single JS isolate the assignment is atomic,
+ * and in multi-worker setups each worker owns its own module state anyway.
  * The function keeps an async signature so existing bulkhead/init callers
  * can still `await` registration before proceeding.
  */
 export async function setCseShimGate(gate: () => boolean): Promise<void> {
-  if (_isCseShimEnabled === undefined) {
-    _isCseShimEnabled = gate
-  }
+  _isCseShimEnabled = gate
 }
 
 /**
