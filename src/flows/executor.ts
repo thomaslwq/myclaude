@@ -86,12 +86,13 @@ export function sanitizeCommand(command: string): string[] {
     )
   }
 
-  // Issue #928: validate file path arguments for commands that operate on files
-  // (cp, mv, touch, mkdir). These commands can read/write files outside the
-  // workspace via absolute paths or path traversal (..), bypassing the
-  // protections in executeFileOperation. We apply the same validation rules
-  // as executeFileOperation to the path-like arguments of these commands.
-  const FILE_OPERATING_COMMANDS = new Set<string>(['cp', 'mv', 'touch', 'mkdir'])
+  // Issue #928/#934: validate file path arguments for commands that operate on
+  // files or accept file/directory arguments (cp, mv, touch, mkdir, tsc, vitest).
+  // These commands can read/write files outside the workspace via absolute paths
+  // or path traversal (..), bypassing the protections in executeFileOperation.
+  // We apply the same validation rules as executeFileOperation to the path-like
+  // arguments of these commands.
+  const FILE_OPERATING_COMMANDS = new Set<string>(['cp', 'mv', 'touch', 'mkdir', 'tsc', 'vitest'])
   if (FILE_OPERATING_COMMANDS.has(program)) {
     for (let i = 1; i < argv.length; i++) {
       const arg = argv[i]

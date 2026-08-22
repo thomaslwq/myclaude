@@ -63,4 +63,24 @@ describe('sanitizeCommand allowlist (issue #854)', () => {
     expect(() => sanitizeCommand('mkdir ./newdir')).not.toThrow()
     expect(() => sanitizeCommand('echo hello world')).not.toThrow()
   })
+
+  test('rejects path traversal for tsc arguments (issue #934)', () => {
+    // Absolute paths
+    expect(() => sanitizeCommand('tsc --project /etc/evil/tsconfig.json')).toThrow()
+    // Path traversal via ..
+    expect(() => sanitizeCommand('tsc --project ../../evil/tsconfig.json')).toThrow()
+  })
+
+  test('rejects path traversal for vitest arguments (issue #934)', () => {
+    // Absolute paths
+    expect(() => sanitizeCommand('vitest /etc/evil/test.ts')).toThrow()
+    // Path traversal via ..
+    expect(() => sanitizeCommand('vitest ../../evil/test.ts')).toThrow()
+  })
+
+  test('allows valid relative paths for tsc and vitest (issue #934)', () => {
+    // Valid relative paths should still be allowed
+    expect(() => sanitizeCommand('tsc --project ./tsconfig.json')).not.toThrow()
+    expect(() => sanitizeCommand('vitest ./test/suite.test.ts')).not.toThrow()
+  })
 })
