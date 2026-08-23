@@ -1,6 +1,6 @@
 {
   "name": "@funnycode/myclaude",
-  "version": "0.1.291",
+  "version": "0.1.292",
   "private": false,
   "description": "An open-source AI coding assistant in your terminal - powered by Claude",
   "license": "MIT",
@@ -67,7 +67,7 @@
     "asciichart": "1.5.25",
     "async-mutex": "0.5.0",
     "auto-bind": "5.0.1",
-    "axios": "1.19.0",
+    "axios": "1.7.9",
     "bidi-js": "1.0.3",
     "chalk": "5.6.2",
     "chokidar": "5.0.0",

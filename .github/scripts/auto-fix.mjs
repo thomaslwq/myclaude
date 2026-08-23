@@ -659,11 +659,8 @@ async function main() {
   // ── Step 1: Fetch open issues labeled "auto-fix" ──
   log.step('Fetching all open issues...');
 
-  // NOTE: `gh issue list --json ...` already prints the JSON array; do NOT add
-  // `--jq '.'` — under Windows cmd.exe the single quotes are passed literally
-  // to jq and the expression fails to parse.
   const issuesResult = runCmd(
-    `gh issue list --repo "${CONFIG.repository}" --state open --json number,title,body,url --limit ${CONFIG.maxIssues}`,
+    `gh issue list --repo "${CONFIG.repository}" --state open --json number,title,body,url --limit ${CONFIG.maxIssues} --jq '.'`,
     { timeout: 30000, ignoreError: true }
   );
 
