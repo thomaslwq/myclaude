@@ -98,11 +98,12 @@ if [ "$REMAIN" -gt 0 ] && [ -n "${DRY_RUN:-}" ]; then
 fi
 
 # ---------- 9. npm 发布 ----------
-if [ -n "${NPM_TOKEN:-}" ]; then
+# 认证优先用 .npmrc 中的 _authToken(npm whoami 可验证);NPM_TOKEN 环境变量为备选。
+if [ -f "$PROJECT_DIR/.npmrc" ] && grep -q "_authToken" "$PROJECT_DIR/.npmrc" || [ -n "${NPM_TOKEN:-}" ]; then
   echo "[INFO] 发布 npm..."
   npm publish 2>&1 | tail -3 || echo "[WARN] npm publish 失败"
 else
-  echo "[WARN] 未配置 NPM_TOKEN,跳过 npm 发布。"
+  echo "[WARN] 未找到 npm 认证(.npmrc _authToken 或 NPM_TOKEN),跳过 npm 发布。"
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 结束。日志: $LOG_FILE"
