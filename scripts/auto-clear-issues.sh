@@ -8,6 +8,18 @@
 # ============================================================
 set -uo pipefail
 
+# ── 自我重定位: 避免 Windows 文件锁 ──
+# 本脚本在仓库内运行时, git rebase/checkout 需要覆盖 scripts/auto-clear-issues.sh,
+# 而 Windows 会锁住正在运行的脚本文件 → Permission denied → rebase 失败。
+# 解决: 若从仓库路径运行, 先复制到临时目录再执行, 仓库内的副本即可被 git 自由改写。
+if [ -z "${MYCLAUDE_AUTO_RELOCATED:-}" ]; then
+  SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  TMP_SCRIPT="$(mktemp --suffix=.sh)"
+  cp "$SELF" "$TMP_SCRIPT"
+  MYCLAUDE_AUTO_RELOCATED=1 bash "$TMP_SCRIPT" "$@"
+  exit $?
+fi
+
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="thomaslwq/myclaude"
 LOG_DIR="$HOME/.myclaude-auto"
