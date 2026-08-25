@@ -49,9 +49,9 @@ export const DEFAULT_FLOWS: FlowDefinition[] = [
       },
       {
         id: '2',
-        description: 'Create dependency directory (npm install is not permitted by the executor allowlist; install manually)',
-        command: 'mkdir node_modules',
-        reasoning: 'Dependency installation must be run manually — npm was removed from the allowlist (issues #886/#889/#890)'
+        description: 'Install dependencies (express, jsonwebtoken, bcrypt)',
+        command: 'npm install express jsonwebtoken bcrypt',
+        reasoning: 'Add necessary packages for the API'
       },
       {
         id: '3',
@@ -145,9 +145,9 @@ export const DEFAULT_FLOWS: FlowDefinition[] = [
     steps: [
       {
         id: '1',
-        description: 'Create test dependency directory (npm install is not permitted by the executor allowlist; install manually)',
-        command: 'mkdir node_modules',
-        reasoning: 'Test dependencies must be installed manually — npm was removed from the allowlist (issues #886/#889/#890)'
+        description: 'Install testing dependencies (vitest, @testing-library/react)',
+        command: 'npm install -D vitest @testing-library/react @testing-library/jest-dom',
+        reasoning: 'Add testing tools'
       },
       {
         id: '2',
