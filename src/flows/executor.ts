@@ -18,14 +18,17 @@ const ALLOWED_COMMANDS = new Set<string>([
   // Issues #854/#886/#889/#890: git and npm were removed — git can exec
   // arbitrary commands via config hooks / rebase --exec, and npm can run
   // arbitrary code via `npm run` / `npm exec` / postinstall scripts.
-  // Only stateless, non-script-executing commands remain.
+  //
+  // Issue #970: tsc and vitest were removed — both are script-executing.
+  // vitest runs test files containing arbitrary JS/TS code, and tsc can
+  // load compiler plugins via tsconfig.json, so both can execute
+  // attacker-controlled code. Only stateless, non-script-executing
+  // commands remain.
   'mkdir',
   'touch',
   'cp',
   'mv',
   'echo',
-  'tsc',
-  'vitest',
 ])
 
 /**
@@ -87,12 +90,12 @@ export function sanitizeCommand(command: string): string[] {
   }
 
   // Issue #928/#934: validate file path arguments for commands that operate on
-  // files or accept file/directory arguments (cp, mv, touch, mkdir, tsc, vitest).
+  // files or accept file/directory arguments (cp, mv, touch, mkdir).
   // These commands can read/write files outside the workspace via absolute paths
   // or path traversal (..), bypassing the protections in executeFileOperation.
   // We apply the same validation rules as executeFileOperation to the path-like
   // arguments of these commands.
-  const FILE_OPERATING_COMMANDS = new Set<string>(['cp', 'mv', 'touch', 'mkdir', 'tsc', 'vitest'])
+  const FILE_OPERATING_COMMANDS = new Set<string>(['cp', 'mv', 'touch', 'mkdir'])
   if (FILE_OPERATING_COMMANDS.has(program)) {
     for (let i = 1; i < argv.length; i++) {
       const arg = argv[i]
@@ -105,7 +108,7 @@ export function sanitizeCommand(command: string): string[] {
 
       // Issue #939: For --flag=value tokens, the value may embed an absolute
       // path or traversal that bypasses the whole-token checks (e.g.
-      // `--project=/etc/evil/tsconfig.json` does not start with '/').
+      // `--target-directory=/etc/evil` does not start with '/').
       // Validate both the full token and the value after '='.
       const valuesToCheck = [arg]
       const eqIndex = arg.indexOf('=')
