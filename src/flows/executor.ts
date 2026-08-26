@@ -482,22 +482,14 @@ export async function shouldContinueOnError(error: Error, step: FlowStep): Promi
     return true
   }
 
-  // Fallback: a SIMPLE, well-documented message-based match. This is a last
-  // resort for errors that carry a transient code only inside their message
-  // (e.g. errors re-thrown without preserving structured properties). To stay
-  // maintainable, we intentionally do NOT try to match every Node.js message
-  // variant (such as "connect ETIMEDOUT <addr:port>"); those cases should be
-  // fixed at the source by preserving structured properties instead of
-  // growing the regex further (issue #895).
-  //
-  // We only match a code that appears at the start of the message or
-  // immediately after a colon (optionally preceded by whitespace), which is
-  // how Node/libc formats some system errors (e.g. "ETIMEDOUT: operation timed
-  // out" or "request failed: ETIMEDOUT"). A word boundary after the code
-  // avoids matching substrings like "ETIMEDOUTS" (issue #866).
-  if (transientCodes.some(code => new RegExp(`(^|:\\s*)${code}\\b`).test(error.message))) {
-    return true
-  }
+  // We deliberately do NOT fall back to scanning `error.message` for
+  // transient codes. Message-based matching is fragile: error message
+  // formats vary across Node versions/platforms, and a code appearing
+  // inside a longer identifier (e.g. "ETIMEDOUT-config endpoint") can
+  // produce false positives that cause permanent failures to be retried
+  // indefinitely (issue #972). Structured `error.code`/`error.errno`
+  // properties are the only reliable signal; if they are absent, the error
+  // is treated as permanent and the flow aborts.
 
   // Missing bridge configuration is a fatal error — if the bridge is
   // unavailable at step 1, it will still be unavailable at every subsequent

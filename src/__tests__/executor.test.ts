@@ -536,6 +536,11 @@ describe('shouldContinueOnError', () => {
     const err = new Error('Something went wrong')
     expect(await shouldContinueOnError(err, step)).toBe(false)
   })
+
+  it('should not match transient code embedded in a longer identifier (issue #972)', async () => {
+    const err = new Error('Failed to resolve ETIMEDOUT-config endpoint')
+    expect(await shouldContinueOnError(err, step)).toBe(false)
+  })
 })
 
 describe('generateDiffPreview', () => {
