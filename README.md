@@ -1,14 +1,5 @@
 # 🎭 myclaude
 
-> **⚠️ SECURITY NOTICE: This is an open-source fork/rebrand of Anthropic's Claude Code.**
-> This package is **NOT** the official Anthropic package. It is published by a third party
-> under the `@funnycode` organization. If you are looking for the official Anthropic
-> package, use `@anthropic-ai/claude-code` (if available) or visit https://claude.ai.
->
-> This fork uses the official Anthropic SDK to communicate with the Anthropic API —
-> your API keys are sent directly to Anthropic's servers, not to this package's author.
-> However, as with any third-party fork, you should review the source code before use.
-
 > **Your AI coding sidekick in the terminal — write smarter, ship faster.**
 
 ```bash
@@ -27,9 +18,13 @@ npx @funnycode/myclaude
 | 🐾 | **BUDDY Pet** | A virtual pet grows as you code — hatch it, feed it, play with it. 18 species, legendary rarity, shiny variants. |
 | 🏆 | **Achievements** | Unlock 20+ achievements. Streaks, milestones, discoveries — your coding journey gamified. |
 | 🎯 | **Frontend TDD** | `/frontend-tdd` — Red-Green-Refactor workflow for frontend testing, built right in. |
+| 🧪 | **Agentic TDD** | `/agentic-tdd` — autonomous test-driven development loop for any codebase. |
 | 🌊 | **Git Flow** | `/new-feature`, `/finish-release`, `/new-hotfix` — full Git Flow workflow as slash commands. |
 | 🤖 | **ECC Built-in** | 76+ commands and 246+ skills loaded at startup — zero setup. |
 | 🧠 | **AI Chat** | Write, refactor, debug, and explain code. Multi-model (Anthropic, Bedrock, Vertex, Foundry). |
+| 🎙️ | **Voice Mode** | `/voice` — hands-free coding with voice input. |
+| 🌐 | **Browser Automation** | Web search, fetch, and browser automation for real-time information retrieval. |
+| 🖥️ | **Dev Server** | `/dev-server` — spin up a local dev server with live preview. |
 | 🎨 | **Beautiful TUI** | React Ink terminal UI with themes, Vim mode, syntax highlighting. |
 | 🔌 | **Plugins & MCP** | Extend with plugins, MCP servers, custom skills. |
 
@@ -68,7 +63,9 @@ myclaude
 | Command | What it does |
 |---------|-------------|
 | **`/frontend-tdd <description>`** | **TDD Red-Green-Refactor cycle for frontend features** |
+| **`/agentic-tdd <description>`** | **Autonomous TDD loop for any codebase** |
 | `/review` | Review a pull request |
+| `/security-review` | Security-focused code review |
 | `/plan` | Create an implementation plan |
 
 ### 🌊 Git Flow
@@ -99,6 +96,13 @@ myclaude
 | `/plugin` | Install & manage plugins |
 | `/hooks` | Manage hooks |
 | `/skills` | List available skills |
+| `/codegraph` | Semantic code intelligence (auto-detected) |
+
+### 🎙️ Voice & Dev
+| Command | What it does |
+|---------|-------------|
+| `/voice` | Toggle voice input mode (hands-free coding) |
+| `/dev-server` | Start a local dev server with live preview |
 
 ### ⚙️ System
 | Command | What it does |
