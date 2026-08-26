@@ -50,7 +50,7 @@ const CONFIG = {
   // Primary: SenseTime 商汤日日新 — deepseek-v4-flash (glm-5.2 不稳定, 换回 deepseek-v4-flash)
   sensenovaApiKey:  process.env.SENSENOVA_API_KEY || '',
   sensenovaModel:   process.env.SENSENOVA_MODEL || 'deepseek-v4-flash',
-  sensenovaMaxTokens: 65536, // 上下文上限, 单请求 max_tokens 上限 65536
+  sensenovaMaxTokens: 131072, // 上下文上限, 单请求 max_tokens 上限 131072
   sensenovaApiBase: 'https://token.sensenova.cn/v1',
 
   ghToken:          process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
@@ -660,7 +660,7 @@ async function main() {
   log.step('Fetching all open issues...');
 
   const issuesResult = runCmd(
-    `gh issue list --repo "${CONFIG.repository}" --state open --json number,title,body,url --limit ${CONFIG.maxIssues}`,
+    `gh issue list --repo "${CONFIG.repository}" --state open --json number,title,body,url --limit ${CONFIG.maxIssues} --jq '.'`,
     { timeout: 30000, ignoreError: true }
   );
 
