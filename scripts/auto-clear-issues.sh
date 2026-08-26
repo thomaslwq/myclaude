@@ -12,15 +12,18 @@ set -uo pipefail
 # 本脚本在仓库内运行时, git rebase/checkout 需要覆盖 scripts/auto-clear-issues.sh,
 # 而 Windows 会锁住正在运行的脚本文件 → Permission denied → rebase 失败。
 # 解决: 若从仓库路径运行, 先复制到临时目录再执行, 仓库内的副本即可被 git 自由改写。
+# 注意: PROJECT_DIR 必须在重定位前用原始路径算好并导出, 否则临时副本里
+#       BASH_SOURCE[0] 指向 /tmp 会算错目录。
+ORIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$ORIG_DIR/.." && pwd)"
+export PROJECT_DIR
 if [ -z "${MYCLAUDE_AUTO_RELOCATED:-}" ]; then
-  SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
   TMP_SCRIPT="$(mktemp --suffix=.sh)"
-  cp "$SELF" "$TMP_SCRIPT"
+  cp "$ORIG_DIR/$(basename "${BASH_SOURCE[0]}")" "$TMP_SCRIPT"
   MYCLAUDE_AUTO_RELOCATED=1 bash "$TMP_SCRIPT" "$@"
   exit $?
 fi
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="thomaslwq/myclaude"
 LOG_DIR="$HOME/.myclaude-auto"
 LOG_FILE="$LOG_DIR/auto-clear-$(date +%Y%m%d).log"
