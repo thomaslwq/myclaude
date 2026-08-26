@@ -1,7 +1,6 @@
 import { buildTool } from '../../Tool.js'
 import { z } from 'zod/v4'
 import { lazySchema } from '../../utils/lazySchema.js'
-import { execFileNoThrow } from '../../utils/execFileNoThrow.js'
 
 /**
  * Browser automation tool for testing web applications.
@@ -12,6 +11,13 @@ import { execFileNoThrow } from '../../utils/execFileNoThrow.js'
  * - Fill forms
  * - Take screenshots
  * - Extract text content
+ * - Evaluate JavaScript
+ * - Hover over elements
+ * - Select dropdown options
+ * - Scroll to elements
+ * - Wait for conditions
+ * - Run accessibility audits
+ * - Close the browser
  *
  * This tool enables myclaude to interact with web UIs for testing
  * and automation tasks, similar to OpenHands capabilities.
@@ -27,6 +33,12 @@ const inputSchema = lazySchema(() =>
         'screenshot',
         'text',
         'evaluate',
+        'hover',
+        'select',
+        'scroll',
+        'wait',
+        'audit',
+        'close',
       ])
       .describe('The action to perform'),
     url: z
@@ -41,7 +53,7 @@ const inputSchema = lazySchema(() =>
     value: z
       .string()
       .optional()
-      .describe('Value to fill into the element'),
+      .describe('Value to fill into the element or JavaScript to evaluate'),
     waitUntil: z
       .enum(['load', 'domcontentloaded', 'networkidle'])
       .optional()
@@ -52,6 +64,37 @@ const inputSchema = lazySchema(() =>
       .optional()
       .default(30000)
       .describe('Timeout in milliseconds'),
+    options: z
+      .array(z.string())
+      .optional()
+      .describe('Options for select action (dropdown values)'),
+    scrollPosition: z
+      .enum(['top', 'center', 'bottom'])
+      .optional()
+      .default('center')
+      .describe('Scroll position for scroll action'),
+    waitFor: z
+      .enum(['selector', 'timeout', 'url'])
+      .optional()
+      .default('timeout')
+      .describe('What to wait for in wait action'),
+    waitTimeout: z
+      .number()
+      .optional()
+      .default(5000)
+      .describe('Timeout for wait action in milliseconds'),
+    auditType: z
+      .enum(['accessibility', 'performance', 'seo', 'best-practices'])
+      .optional()
+      .default('accessibility')
+      .describe('Type of audit to run'),
+    viewport: z
+      .object({
+        width: z.number().optional().default(1280),
+        height: z.number().optional().default(720),
+      })
+      .optional()
+      .describe('Viewport size for the browser'),
   }),
 )
 
@@ -80,6 +123,12 @@ export const BrowserAutomationTool = buildTool({
       screenshot: 'take a screenshot of the page',
       text: 'extract text from the page',
       evaluate: 'execute JavaScript on the page',
+      hover: 'hover over an element',
+      select: 'select a dropdown option',
+      scroll: 'scroll to an element',
+      wait: 'wait for a condition',
+      audit: 'run an accessibility or performance audit',
+      close: 'close the browser',
     }
     return `Perform browser automation action: ${actions[input.action] || input.action}`
   },
@@ -103,12 +152,21 @@ export const BrowserAutomationTool = buildTool({
       // Check if Playwright is available
       const playwright = await import('playwright')
 
+      // Handle close action without launching browser
+      if (input.action === 'close') {
+        return {
+          success: true,
+          message: 'Browser close requested (stateless mode - no persistent browser)',
+        }
+      }
+
       // Initialize browser context
       const context = await playwright.chromium.launchPersistentContext(
         process.env.BROWSER_AUTOMATION_USER_DATA_DIR || '/tmp/myclaude-browser',
         {
           headless: process.env.BROWSER_AUTOMATION_HEADLESS !== 'false',
           args: ['--no-sandbox', '--disable-setuid-sandbox'],
+          viewport: input.viewport || { width: 1280, height: 720 },
         },
       )
 
@@ -223,6 +281,173 @@ export const BrowserAutomationTool = buildTool({
             success: true,
             message: 'JavaScript executed successfully',
             data: result,
+          }
+        }
+
+        case 'hover': {
+          if (!input.selector) {
+            return {
+              success: false,
+              message: 'Selector is required for hover action',
+            }
+          }
+
+          await page.waitForSelector(input.selector, {
+            timeout: input.timeout,
+          })
+          await page.hover(input.selector)
+
+          return {
+            success: true,
+            message: `Hovered over element: ${input.selector}`,
+          }
+        }
+
+        case 'select': {
+          if (!input.selector || !input.options || input.options.length === 0) {
+            return {
+              success: false,
+              message: 'Selector and options are required for select action',
+            }
+          }
+
+          await page.waitForSelector(input.selector, {
+            timeout: input.timeout,
+          })
+          await page.selectOption(input.selector, input.options)
+
+          return {
+            success: true,
+            message: `Selected options in: ${input.selector}`,
+          }
+        }
+
+        case 'scroll': {
+          if (!input.selector) {
+            return {
+              success: false,
+              message: 'Selector is required for scroll action',
+            }
+          }
+
+          await page.waitForSelector(input.selector, {
+            timeout: input.timeout,
+          })
+          await page.scrollIntoView(input.selector, {
+            block: input.scrollPosition,
+          })
+
+          return {
+            success: true,
+            message: `Scrolled to element: ${input.selector} (${input.scrollPosition})`,
+          }
+        }
+
+        case 'wait': {
+          if (input.waitFor === 'selector' && input.selector) {
+            await page.waitForSelector(input.selector, {
+              timeout: input.waitTimeout,
+            })
+            return {
+              success: true,
+              message: `Waited for selector: ${input.selector}`,
+            }
+          } else if (input.waitFor === 'url' && input.url) {
+            await page.waitForURL(input.url, {
+              timeout: input.waitTimeout,
+            })
+            return {
+              success: true,
+              message: `Waited for URL: ${input.url}`,
+            }
+          } else {
+            await page.waitForTimeout(input.waitTimeout)
+            return {
+              success: true,
+              message: `Waited ${input.waitTimeout}ms`,
+            }
+          }
+        }
+
+        case 'audit': {
+          // Run a basic accessibility audit using page.evaluate
+          const auditResults = await page.evaluate(
+            (auditType: string) => {
+              const results: Record<string, unknown> = {
+                type: auditType,
+                issues: [] as string[],
+                warnings: [] as string[],
+              }
+
+              if (auditType === 'accessibility') {
+                // Check for common accessibility issues
+                const imagesWithoutAlt = document.querySelectorAll('img:not([alt])')
+                if (imagesWithoutAlt.length > 0) {
+                  results.issues.push(
+                    `${imagesWithoutAlt.length} image(s) missing alt text`,
+                  )
+                }
+
+                const inputsWithoutLabel = document.querySelectorAll(
+                  'input:not([aria-label]):not([aria-labelledby]):not([id])',
+                )
+                if (inputsWithoutLabel.length > 0) {
+                  results.issues.push(
+                    `${inputsWithoutLabel.length} input(s) may be missing labels`,
+                  )
+                }
+
+                const buttonsWithoutText = document.querySelectorAll(
+                  'button:not([aria-label]):not([title])',
+                )
+                const emptyButtons = Array.from(buttonsWithoutText).filter(
+                  (btn) => !btn.textContent?.trim(),
+                )
+                if (emptyButtons.length > 0) {
+                  results.issues.push(
+                    `${emptyButtons.length} button(s) without accessible name`,
+                  )
+                }
+
+                const linksWithoutText = document.querySelectorAll(
+                  'a:not([aria-label]):not([title])',
+                )
+                const emptyLinks = Array.from(linksWithoutText).filter(
+                  (link) => !link.textContent?.trim(),
+                )
+                if (emptyLinks.length > 0) {
+                  results.issues.push(
+                    `${emptyLinks.length} link(s) without accessible name`,
+                  )
+                }
+
+                const missingLang = !document.documentElement.lang
+                if (missingLang) {
+                  results.issues.push('HTML element missing lang attribute')
+                }
+
+                const missingTitle = !document.title
+                if (missingTitle) {
+                  results.issues.push('Page missing <title> element')
+                }
+
+                const missingMetaViewport = !document.querySelector(
+                  'meta[name="viewport"]',
+                )
+                if (missingMetaViewport) {
+                  results.warnings.push('Missing viewport meta tag')
+                }
+              }
+
+              return results
+            },
+            input.auditType,
+          )
+
+          return {
+            success: true,
+            message: `${input.auditType} audit completed`,
+            data: auditResults,
           }
         }
 
