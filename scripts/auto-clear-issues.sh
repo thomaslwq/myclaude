@@ -19,8 +19,9 @@ if [ -z "${MYCLAUDE_AUTO_RELOCATED:-}" ]; then
   export PROJECT_DIR
   TMP_SCRIPT="$(mktemp --suffix=.sh)"
   cp "$ORIG_DIR/$(basename "${BASH_SOURCE[0]}")" "$TMP_SCRIPT"
-  MYCLAUDE_AUTO_RELOCATED=1 bash "$TMP_SCRIPT" "$@"
-  exit $?
+  # 必须用 exec 替换当前进程: 若用 bash 启动子进程, 父进程仍持有原脚本文件句柄,
+  # git rebase 覆盖 scripts/auto-clear-issues.sh 时依旧 Permission denied。
+  MYCLAUDE_AUTO_RELOCATED=1 exec bash "$TMP_SCRIPT" "$@"
 fi
 PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
 
