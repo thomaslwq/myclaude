@@ -3,13 +3,14 @@ import { sanitizeCommand } from '../executor.js'
 import { getAllFlows } from '../definitions.js'
 
 /**
- * Regression tests for issue #968: DEFAULT_FLOWS still contained `npm install`
+/**
+ * Regression tests for issues #924/#968: DEFAULT_FLOWS contained `npm install`
  * commands, but npm was removed from the executor's ALLOWED_COMMANDS allowlist
  * (issues #886/#889/#890). Every flow step with a `command` must pass
  * sanitizeCommand — a built-in flow that can never execute is a guaranteed
  * runtime failure.
  */
-describe('default flows are executable under the allowlist (issue #968)', () => {
+describe('default flows are executable under the allowlist (issues #924/#968)', () => {
   test('every DEFAULT_FLOWS step command passes sanitizeCommand', () => {
     const flows = getAllFlows()
     expect(flows.length).toBeGreaterThan(0)
