@@ -47,14 +47,18 @@ describe('sessionIdCompat — gate lifecycle (issue #705)', () => {
     expect(toInfraSessionId('session_abc123')).toBe('session_abc123')
   })
 
-  test('first-writer-wins: a later init path cannot overwrite the first gate (issue #880)', async () => {
+  test('first-writer-wins: a later init path cannot overwrite the first gate (issues #880/#969)', async () => {
     // First registration: shim active
     await setCseShimGate(() => true)
     expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
 
-    // A second registration with a different gate CAN overwrite the first
-    // gate to allow recovery from transient failures (issue #941).
+    // A second plain registration with a different gate must be a no-op —
+    // first-writer-wins prevents cross-instance contamination (issue #969).
     await setCseShimGate(() => false)
+    expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
+
+    // Explicit recovery from a transiently-bad gate is still possible (issue #941).
+    await setCseShimGate(() => false, { force: true })
     expect(toCompatSessionId('cse_abc123')).toBe('cse_abc123')
   })
 
@@ -74,8 +78,9 @@ describe('sessionIdCompat — concurrent initialization (issue #880)', () => {
     resetCseShimGateForTesting()
 
     // Simulate two async init paths (REPL bridge + daemon bridge) that
-    // both call setCseShimGate concurrently. Because the gate is a
-    // lazily-evaluated function, the last writer wins, which allows
+    // both call setCseShimGate concurrently. Plain calls are first-writer-wins
+    // (issues #880/#969): the first gate registered wins, preventing
+    // cross-instance contamination. Explicit { force: true } still allows
     // recovery from transient failures (issue #941).
     const gateA = () => true
     const gateB = () => false
@@ -85,10 +90,10 @@ describe('sessionIdCompat — concurrent initialization (issue #880)', () => {
       Promise.resolve().then(() => setCseShimGate(gateB)),
     ])
 
-    // The last-registered gate should be the one stored.
-    expect(getCseShimGate()).toBe(gateB)
-    // And translation behavior must reflect gate B (shim disabled).
-    expect(toCompatSessionId('cse_abc123')).toBe('cse_abc123')
+    // The FIRST-registered gate should be the one stored.
+    expect(getCseShimGate()).toBe(gateA)
+    // And translation behavior must reflect gate A (shim active).
+    expect(toCompatSessionId('cse_abc123')).toBe('session_abc123')
   })
 
   test('gate is set synchronously within setCseShimGate before returning', async () => {
@@ -104,9 +109,9 @@ describe('sessionIdCompat — concurrent initialization (issue #880)', () => {
       Promise.resolve().then(() => setCseShimGate(gateB)),
     ])
 
-    // A gate should be registered (last writer wins).
+    // A gate should be registered (first writer wins).
     expect(getCseShimGate()).toBeDefined()
-    expect(getCseShimGate()).toBe(gateB)
+    expect(getCseShimGate()).toBe(gateA)
     expect(results).toEqual([undefined, undefined])
   })
 })

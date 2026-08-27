@@ -374,7 +374,7 @@ describe('executeFlow', () => {
     expect(failedSteps).toEqual([])
   })
 
-  it('should still execute step and propagate onStepStart error to caller (issue #940)', async () => {
+  it('should NOT execute the step when onStepStart throws (issue #971, supersedes #940)', async () => {
     const flow: FlowDefinition = {
       name: 'test-flow',
       description: 'Test flow',
@@ -404,14 +404,25 @@ describe('executeFlow', () => {
       failedSteps.push(step.id)
     }
 
-    // Step 1 should still be executed (completed) even though onStepStart
-    // threw, but the error should be propagated to the caller (issue #940).
-    await expect(
-      executeFlow(flow, mockContext, onStepStart, onStepComplete, onStepFail),
-    ).rejects.toThrow('onStepStart error')
+    // Issue #971: onStepStart is a pre-execution hook (e.g. authorization
+    // check). If it throws, the step must NOT execute — otherwise the
+    // unauthorized action would run anyway. The error is treated as a step
+    // failure: the step is marked failed, onStepFail fires, and the flow
+    // aborts (the error is not transient). This supersedes the old #940
+    // behavior where the step still executed.
+    const state = await executeFlow(
+      flow,
+      mockContext,
+      onStepStart,
+      onStepComplete,
+      onStepFail,
+    )
 
-    expect(completedSteps).toEqual(['1', '2'])
-    expect(failedSteps).toEqual([])
+    expect(completedSteps).toEqual([])
+    expect(failedSteps).toEqual(['1'])
+    expect(state.failedSteps).toEqual(['1'])
+    expect(state.completedSteps).toEqual([])
+    expect(state.aborted).toBe(true)
   })
 
   it('should abort flow on first step when bridge is missing (No bridge error is fatal, issue #859)', async () => {

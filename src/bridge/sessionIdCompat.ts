@@ -31,8 +31,13 @@ let _isCseShimEnabled: (() => boolean) | undefined
  * The function keeps an async signature so existing bulkhead/init callers
  * can still `await` registration before proceeding.
  */
-export async function setCseShimGate(gate: () => boolean): Promise<void> {
-  _isCseShimEnabled = gate
+export async function setCseShimGate(
+  gate: () => boolean,
+  options?: { force?: boolean },
+): Promise<void> {
+  if (_isCseShimEnabled === undefined || options?.force) {
+    _isCseShimEnabled = gate
+  }
 }
 
 /**

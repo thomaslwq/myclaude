@@ -307,16 +307,13 @@ export async function executeFlow(
     state.currentStepIndex = i
 
     try {
+      // Issue #971: onStepStart is a pre-execution hook (e.g. authorization
+      // or permission checks). If it throws, the step must NOT execute —
+      // otherwise the unauthorized action would run anyway. Treat the error
+      // as a step failure: mark the step failed, invoke onStepFail, and let
+      // shouldContinueOnError decide whether the flow continues or aborts.
       if (onStepStart) {
-        try {
-          await onStepStart(step, state)
-        } catch (callbackError) {
-          // Callback errors should not mark the step as failed or stop the flow,
-          // but they must be propagated to the caller so the caller knows a
-          // critical failure occurred (issue #908, #940).
-          console.error(`onStepStart callback failed for step "${step.id}":`, callbackError)
-          callbackErrors.push(callbackError as Error)
-        }
+        await onStepStart(step, state)
       }
 
       // Execute the step

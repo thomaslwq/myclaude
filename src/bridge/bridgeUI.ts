@@ -9,8 +9,6 @@ import { stringWidth } from '../ink/stringWidth.js'
 import { logForDebugging } from '../utils/debug.js'
 import {
   buildActiveFooterText,
-  buildBridgeConnectUrl,
-  buildBridgeSessionUrl,
   buildIdleFooterText,
   FAILED_FOOTER_TEXT,
   formatDuration,
@@ -20,6 +18,7 @@ import {
   truncatePrompt,
   wrapWithOsc8Link,
 } from './bridgeStatusUtil.js'
+import { buildBridgeConnectUrl, buildBridgeSessionUrl } from './bridgeUrlBuilder.js'
 import type {
   BridgeConfig,
   BridgeLogger,
@@ -69,6 +68,12 @@ export function createBridgeLogger(options: {
   // Tool activity for the second status line
   let lastToolSummary: string | null = null
   let lastToolTime = 0
+
+  // Cached payloads for the reconnecting/failed states so renderStatusLine
+  // can re-draw them on demand (e.g. after a QR toggle or refresh).
+  let reconnectDelayStr = ''
+  let reconnectElapsedStr = ''
+  let failedErrorText = ''
 
   // Session count indicator (shown when multi-session mode is enabled)
   let sessionActive = 0
@@ -187,9 +192,39 @@ export function createBridgeLogger(options: {
   /** Render and write the current status lines based on state. */
   function renderStatusLine(): void {
     if (currentState === 'reconnecting' || currentState === 'failed') {
-      // These states are handled separately (updateReconnectingStatus /
-      // updateFailedStatus). Return before clearing so callers like toggleQr
-      // and setSpawnModeDisplay don't blank the display during these states.
+      // These states are rendered by updateReconnectingStatus /
+      // updateFailedStatus, but toggleQr / refreshDisplay / setSpawnModeDisplay
+      // still expect a re-render (issue #639). Re-draw the status block so
+      // new output is produced without blanking the displayed status text.
+      clearStatusLines()
+      if (qrVisible) {
+        for (const line of qrLines) {
+          writeStatus(`${chalk.dim(line)}\n`)
+        }
+      }
+      if (currentState === 'reconnecting') {
+        const frame =
+          BRIDGE_SPINNER_FRAMES[connectingTick % BRIDGE_SPINNER_FRAMES.length]!
+        connectingTick++
+        writeStatus(
+          `${chalk.yellow(frame)} ${chalk.yellow('Reconnecting')} ${chalk.dim('\u00b7')} ${chalk.dim(`retrying in ${reconnectDelayStr}`)} ${chalk.dim('\u00b7')} ${chalk.dim(`disconnected ${reconnectElapsedStr}`)}\n`,
+        )
+      } else {
+        let suffix = ''
+        if (repoName) {
+          suffix += chalk.dim(' \u00b7 ') + chalk.dim(repoName)
+        }
+        if (branch) {
+          suffix += chalk.dim(' \u00b7 ') + chalk.dim(branch)
+        }
+        writeStatus(
+          `${chalk.red(BRIDGE_FAILED_INDICATOR)} ${chalk.red('Remote Control Failed')}${suffix}\n`,
+        )
+        writeStatus(`${chalk.dim(FAILED_FOOTER_TEXT)}\n`)
+        if (failedErrorText) {
+          writeStatus(`${chalk.red(failedErrorText)}\n`)
+        }
+      }
       return
     }
 
@@ -414,6 +449,8 @@ export function createBridgeLogger(options: {
       stopConnecting()
       clearStatusLines()
       currentState = 'reconnecting'
+      reconnectDelayStr = delayStr
+      reconnectElapsedStr = elapsedStr
 
       // QR code above the status line
       if (qrVisible) {
@@ -428,12 +465,20 @@ export function createBridgeLogger(options: {
       writeStatus(
         `${chalk.yellow(frame)} ${chalk.yellow('Reconnecting')} ${chalk.dim('\u00b7')} ${chalk.dim(`retrying in ${delayStr}`)} ${chalk.dim('\u00b7')} ${chalk.dim(`disconnected ${elapsedStr}`)}\n`,
       )
+
+      // Animate the reconnecting spinner at a consistent rate (150ms), like
+      // the initial connecting spinner (issue #639). Stopped on state change.
+      connectingTimer = setInterval(() => {
+        connectingTick++
+        renderStatusLine()
+      }, 150)
     },
 
     updateFailedStatus(error: string): void {
       stopConnecting()
       clearStatusLines()
       currentState = 'failed'
+      failedErrorText = error
 
       let suffix = ''
       if (repoName) {
@@ -527,9 +572,8 @@ export function createBridgeLogger(options: {
     },
 
     refreshDisplay(): void {
-      // Skip during reconnecting/failed — renderStatusLine clears then returns
-      // early for those states, which would erase the spinner/error.
-      if (currentState === 'reconnecting' || currentState === 'failed') return
+      // renderStatusLine re-draws reconnecting/failed status blocks instead
+      // of blanking them (issue #639), so a refresh is always safe.
       renderStatusLine()
     },
   }
