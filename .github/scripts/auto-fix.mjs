@@ -33,7 +33,7 @@
  */
 
 // ── Imports ──────────────────────────────────────────────────────────────────
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { execSync } from 'child_process';
 import { resolve } from 'path';
 import { fetchWithRetry } from './llm-retry.mjs';
@@ -104,6 +104,51 @@ function listDir(dirPath) {
   const fullPath = resolve(ROOT, dirPath);
   if (!existsSync(fullPath)) return [];
   return runCmd(`ls -la "${fullPath}" 2>/dev/null || echo "(empty)"`, { ignoreError: true }).stdout;
+}
+
+/** Search file contents across the repo (excludes node_modules/dist/.git/.test-tmp). */
+function searchRepo(pattern, dirPath = '.') {
+  if (!pattern || pattern.length < 2) return 'Error: search requires a "pattern" of at least 2 characters';
+  const fullPath = resolve(ROOT, dirPath);
+  if (!existsSync(fullPath)) return `Error: Path not found: ${dirPath}`;
+  const excludes = ['node_modules', 'dist', '.git', '.test-tmp', 'coverage', '.next'];
+  const matches = [];
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      if (excludes.includes(ent.name)) continue;
+      const p = resolve(dir, ent.name);
+      if (ent.isDirectory()) {
+        walk(p);
+        continue;
+      }
+      // Skip binary/large files
+      if (!/\.(ts|tsx|js|jsx|mjs|cjs|json|md|yml|yaml|toml|py|rs|go)$/i.test(ent.name)) continue;
+      try {
+        const size = statSync(p).size;
+        if (size > 200_000) continue;
+        const content = readFileSync(p, 'utf-8');
+        if (!content.includes(pattern)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].includes(pattern)) {
+            matches.push(`${p.replace(ROOT + '/', '')}:${i + 1}: ${lines[i].trim().slice(0, 150)}`);
+            if (matches.length >= 30) break;
+          }
+        }
+      } catch {
+        // ignore unreadable files
+      }
+    }
+  };
+  walk(fullPath);
+  if (!matches.length) return `No matches found for "${pattern}" in ${dirPath}`;
+  return matches.join('\n');
 }
 
 /** Get the project structure overview. */
@@ -353,37 +398,61 @@ You operate in a loop. In each iteration, you output a single action in JSON for
 
 \`\`\`json
 {
-  "action": "read_file | list_dir | project_structure | edit_file | write_file | run_command | run_tests | submit | abort",
+  "action": "plan | search | read_file | list_dir | project_structure | edit_file | write_file | run_command | run_test | run_tests | submit | abort",
   "params": { ... }
 }
 \`\`\`
 
+### Workflow (MANDATORY, especially for complex issues):
+
+1. **理解（Understand）**: Read the issue carefully. Use search/read_file/list_dir to locate the relevant code and its tests. DO NOT edit anything yet.
+2. **规划（Plan）**: Before making ANY edit, output a plan action:
+   \`{"action": "plan", "params": {"problem": "root cause hypothesis", "steps": ["step 1", "step 2"], "files": ["file1", "file2"], "tests": ["test file(s) to verify"]}}\`
+   Editing before a plan is rejected.
+3. **实施（Act）**: Execute the plan with small, surgical edits. Run the relevant test file after each significant change.
+4. **验证（Verify）**: Run the targeted test (run_test) then the full suite (run_tests) to confirm nothing is broken.
+5. **提交（Submit）**: Only submit when tests pass or you have a concrete, verified fix. A submit without any file change or without running tests after the last edit is rejected.
+
+For COMPLEX issues spanning multiple files/modules:
+- Always start with search to find all usages and related code, not just the file named in the issue.
+- Break the fix into multiple small edit_file calls instead of one big write_file.
+- If you get stuck after several attempts, abort with the reason instead of looping forever.
+
 ### Available actions:
 
-1. **read_file** — Read a file from the repository.
+1. **plan** — Declare your plan before editing (required once before the first edit).
+   \`{"action": "plan", "params": {"problem": "...", "steps": [...], "files": [...], "tests": [...]}}\`
+
+2. **search** — Search file contents across the repo (excludes node_modules/dist/.git).
+   \`{"action": "search", "params": {"pattern": "functionName or text", "path": "src" (optional, default repo root)}}\`
+
+3. **read_file** — Read a file from the repository.
    \`{"action": "read_file", "params": {"path": "src/foo.ts"}}\`
 
-2. **list_dir** — List contents of a directory.
+4. **list_dir** — List contents of a directory.
    \`{"action": "list_dir", "params": {"path": "src"}}\`
 
-3. **project_structure** — Get the project directory tree (top 3 levels).
+5. **project_structure** — Get the project directory tree (top 3 levels).
 
-4. **edit_file** — Apply a surgical text replacement in a file.
+6. **edit_file** — Apply a surgical text replacement in a file.
    \`{"action": "edit_file", "params": {"path": "src/foo.ts", "old_string": "exact text to replace", "new_string": "replacement text"}}\`
 
-5. **write_file** — Write or overwrite an entire file.
+7. **write_file** — Write or overwrite an entire file.
    \`{"action": "write_file", "params": {"path": "src/foo.ts", "content": "full file content"}}\`
 
-6. **run_command** — Run a shell command in the repo root.
+8. **run_command** — Run a shell command in the repo root.
    \`{"action": "run_command", "params": {"command": "bun run build"}}\`
 
-7. **run_tests** — Run the test suite (\`bun test\`). Shortcut for run_command.
+9. **run_test** — Run ONE specific test file (preferred over the full suite for fast feedback).
+   \`{"action": "run_test", "params": {"path": "src/tests/foo.test.ts"}}\`
 
-8. **submit** — You believe the issue is fixed. Tests will be run automatically.
-   \`{"action": "submit", "params": {"summary": "what was changed and why"}}\`
+10. **run_tests** — Run the full test suite (\`bun test\`). Use after all changes are complete.
 
-9. **abort** — You cannot fix this issue (e.g., needs more info, external dependency).
-   \`{"action": "abort", "params": {"reason": "why it cannot be fixed"}}\`
+11. **submit** — You believe the issue is fixed. Tests will be run automatically.
+    \`{"action": "submit", "params": {"summary": "what was changed and why"}}\`
+
+12. **abort** — You cannot fix this issue (e.g., needs more info, external dependency).
+    \`{"action": "abort", "params": {"reason": "why it cannot be fixed"}}\`
 
 ### Rules:
 - **TDD (Test-Driven Development)**: Always follow Red-Green-Refactor:
@@ -392,8 +461,8 @@ You operate in a loop. In each iteration, you output a single action in JSON for
   3. **Refactor**: Clean up while keeping the test green.
 - Start by reading the relevant source files and test files to understand the codebase.
 - Use edit_file for small, targeted changes. Use write_file only when rewriting a whole file.
-- After editing, run the tests to verify (bun test).
-- If the test suite is large, run only the relevant test file: bun test path/to/test.ts.
+- After editing, run the relevant test file to verify (run_test), then the full suite (run_tests).
+- If the test suite is large, run only the relevant test file: run_test path/to/test.ts.
 - DO NOT modify node_modules, dist/, .git/ directories.
 - DO NOT create new files unless absolutely necessary (test files are the exception).
 - If you need to see the project structure first, use project_structure action once.
@@ -418,6 +487,9 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
   let finalSummary = '';
   let aborted = false;
   let testPassed = false;
+  let hasPlan = false;         // plan 前置门控: 必须先规划再编辑
+  let editedFiles = new Set(); // 跟踪本次已修改的文件
+  let testsRunAfterEdit = false; // 最近一次编辑后是否跑过测试（submit 门控）
 
   while (iteration < MAX_ITERATIONS && toolCallCount < MAX_TOOL_CALLS) {
     iteration++;
@@ -460,6 +532,21 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
     // Execute the action
     let result;
     switch (actionName) {
+      case 'plan': {
+        hasPlan = true;
+        testsRunAfterEdit = false;
+        const steps = Array.isArray(params.steps) ? params.steps.map((s) => `  - ${s}`).join('\n') : '(none)';
+        const files = Array.isArray(params.files) ? params.files.join(', ') : '(none)';
+        const tests = Array.isArray(params.tests) ? params.tests.join(', ') : '(none)';
+        result = `✅ Plan recorded.\nProblem hypothesis: ${params.problem || '(none)'}\nFiles to change: ${files}\nSteps:\n${steps}\nTests to run: ${tests}`;
+        break;
+      }
+
+      case 'search': {
+        result = searchRepo(params.pattern, params.path || '.');
+        break;
+      }
+
       case 'read_file': {
         result = readRepoFile(params.path);
         if (result === null) {
@@ -479,6 +566,10 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
       }
 
       case 'edit_file': {
+        if (!hasPlan) {
+          result = 'Error: You must call "plan" before editing. Declare your plan first.';
+          break;
+        }
         const { path, old_string, new_string } = params;
         if (!path || !old_string) {
           result = 'Error: edit_file requires "path", "old_string", and "new_string"';
@@ -500,11 +591,17 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
           break;
         }
         writeFileSync(fullPath, newContent, 'utf-8');
+        editedFiles.add(path);
+        testsRunAfterEdit = false;
         result = `✅ Successfully edited ${path}`;
         break;
       }
 
       case 'write_file': {
+        if (!hasPlan) {
+          result = 'Error: You must call "plan" before writing. Declare your plan first.';
+          break;
+        }
         const { path, content } = params;
         if (!path || content === undefined) {
           result = 'Error: write_file requires "path" and "content"';
@@ -521,6 +618,8 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
           mkdirSync(dir, { recursive: true });
         }
         writeFileSync(fullPath, content, 'utf-8');
+        editedFiles.add(path);
+        testsRunAfterEdit = false;
         result = `✅ Successfully wrote ${path} (${content.length} bytes)`;
         break;
       }
@@ -547,12 +646,37 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
         break;
       }
 
+      case 'run_test': {
+        // 定向跑单个测试文件（快速反馈）
+        const testPath = params.path;
+        if (!testPath) {
+          result = 'Error: run_test requires "path" (e.g. src/tests/foo.test.ts)';
+          break;
+        }
+        try {
+          const r = runCmd(`bun test "${testPath}"`, { timeout: 120000, ignoreError: true });
+          result = `Exit code: ${r.exitCode}\n${r.stdout.slice(0, 3000)}\n${r.stderr.slice(0, 1000)}`;
+          if (r.exitCode === 0) {
+            testPassed = true;
+            testsRunAfterEdit = true;
+          } else {
+            testsRunAfterEdit = false;
+          }
+        } catch (e) {
+          result = `Test error: ${e.message}`;
+        }
+        break;
+      }
+
       case 'run_tests': {
         try {
           const r = runCmd('bun test', { timeout: 120000, ignoreError: true });
           result = `Exit code: ${r.exitCode}\n${r.stdout.slice(0, 3000)}\n${r.stderr.slice(0, 1000)}`;
           if (r.exitCode === 0) {
             testPassed = true;
+            testsRunAfterEdit = true;
+          } else {
+            testsRunAfterEdit = false;
           }
         } catch (e) {
           result = `Test error: ${e.message}`;
@@ -561,6 +685,18 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
       }
 
       case 'submit': {
+        if (!hasPlan) {
+          result = 'Error: You must call "plan" before submitting. Declare your plan first.';
+          break;
+        }
+        if (editedFiles.size === 0) {
+          result = 'Error: No files were changed. Make an edit before submitting, or abort.';
+          break;
+        }
+        if (!testsRunAfterEdit) {
+          result = 'Warning: You have not run tests since the last edit. Run run_test (targeted) or run_tests (full suite) first, then submit.';
+          break;
+        }
         finalSummary = params.summary || 'Issue fixed by auto-fix agent';
         log.info(`Agent submitted fix: ${finalSummary}`);
         // Run tests one more time to confirm
@@ -596,7 +732,7 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
       }
 
       default: {
-        result = `Unknown action: ${actionName}. Valid actions: read_file, list_dir, project_structure, edit_file, write_file, run_command, run_tests, submit, abort`;
+        result = `Unknown action: ${actionName}. Valid actions: plan, search, read_file, list_dir, project_structure, edit_file, write_file, run_command, run_test, run_tests, submit, abort`;
       }
     }
 
