@@ -141,6 +141,7 @@ import { validateUuid } from './utils/uuid.js';
 // Plugin startup checks are now handled non-blockingly in REPL.tsx
 
 import { registerMcpAddCommand } from './commands/mcp/addCommand.js';
+import { registerMcpDiscoverCommand } from './commands/mcp/discoverCommand.js';
 import { registerMcpXaaIdpCommand } from './commands/mcp/xaaIdpCommand.js';
 import { logPermissionContextForAnts } from './services/internalLogging.js';
 import { fetchClaudeAIMcpConfigsIfEligible } from './services/mcp/claudeai.js';
@@ -3968,6 +3969,8 @@ async function run(): Promise<CommanderCommand> {
 
   // Register the mcp add subcommand (extracted for testability)
   registerMcpAddCommand(mcp);
+  // Register the mcp discover subcommand (issue #976: MCP marketplace discovery)
+  registerMcpDiscoverCommand(mcp);
   if (isXaaEnabled()) {
     registerMcpXaaIdpCommand(mcp);
   }
