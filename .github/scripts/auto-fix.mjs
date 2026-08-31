@@ -656,11 +656,12 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
         try {
           const r = runCmd(`bun test "${testPath}"`, { timeout: 120000, ignoreError: true });
           result = `Exit code: ${r.exitCode}\n${r.stdout.slice(0, 3000)}\n${r.stderr.slice(0, 1000)}`;
+          // 只要在最近一次编辑后跑过测试就算"已尝试"（submit 门控用），
+          // 是否通过由 testPassed 记录——仓库存在存量失败测试时，若要求
+          // exitCode==0 才放行，agent 永远无法 submit（issue #974 卡死根因）
+          testsRunAfterEdit = true;
           if (r.exitCode === 0) {
             testPassed = true;
-            testsRunAfterEdit = true;
-          } else {
-            testsRunAfterEdit = false;
           }
         } catch (e) {
           result = `Test error: ${e.message}`;
@@ -672,11 +673,10 @@ Please fix this issue. Start by exploring the relevant files, then make the nece
         try {
           const r = runCmd('bun test', { timeout: 120000, ignoreError: true });
           result = `Exit code: ${r.exitCode}\n${r.stdout.slice(0, 3000)}\n${r.stderr.slice(0, 1000)}`;
+          // 同 run_test：编辑后跑过全量测试即视为"已尝试"，不要求全绿
+          testsRunAfterEdit = true;
           if (r.exitCode === 0) {
             testPassed = true;
-            testsRunAfterEdit = true;
-          } else {
-            testsRunAfterEdit = false;
           }
         } catch (e) {
           result = `Test error: ${e.message}`;
