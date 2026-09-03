@@ -36,3 +36,9 @@ _del_temp.mjs
 
 # Local secrets (API keys) — never commit
 .env
+
+# Local issue dump files (issue scanner / analysis scratch data — never commit)
+/closed_issues.json
+/issue_*.json
+/myclaude_issues.json
+/open_issues*.json
