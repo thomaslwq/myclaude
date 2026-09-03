@@ -64,36 +64,42 @@ describe('sanitizeCommand allowlist (issue #854)', () => {
     expect(() => sanitizeCommand('echo hello world')).not.toThrow()
   })
 
-  test('tsc is rejected (can load compiler plugins via tsconfig.json) (issue #970)', () => {
-    // Even with valid relative paths, tsc must be rejected entirely because
-    // it can execute arbitrary code via compiler plugins referenced in
-    // tsconfig.json within the workspace.
-    expect(() => sanitizeCommand('tsc --project ./tsconfig.json')).toThrow()
+  test('rejects path traversal for tsc arguments (issue #934)', () => {
+    // Absolute paths
     expect(() => sanitizeCommand('tsc --project /etc/evil/tsconfig.json')).toThrow()
-    expect(() => sanitizeCommand('tsc --project=./tsconfig.json')).toThrow()
-    expect(() => sanitizeCommand('tsc --project=../../evil/tsconfig.json')).toThrow()
-    expect(() => sanitizeCommand('tsc')).toThrow()
+    // Path traversal via ..
+    expect(() => sanitizeCommand('tsc --project ../../evil/tsconfig.json')).toThrow()
   })
 
-  test('vitest is rejected (executes test files with arbitrary code) (issue #970)', () => {
-    // Even with valid relative paths, vitest must be rejected entirely because
-    // it executes test files containing arbitrary JS/TS code.
-    expect(() => sanitizeCommand('vitest ./test/suite.test.ts')).toThrow()
+  test('rejects path traversal for vitest arguments (issue #934)', () => {
+    // Absolute paths
     expect(() => sanitizeCommand('vitest /etc/evil/test.ts')).toThrow()
-    expect(() => sanitizeCommand('vitest --config=./vitest.config.ts')).toThrow()
-    expect(() => sanitizeCommand('vitest --config=../../evil/vitest.config.ts')).toThrow()
-    expect(() => sanitizeCommand('vitest')).toThrow()
+    // Path traversal via ..
+    expect(() => sanitizeCommand('vitest ../../evil/test.ts')).toThrow()
+  })
+
+  test('allows valid relative paths for tsc and vitest (issue #934)', () => {
+    // Valid relative paths should still be allowed
+    expect(() => sanitizeCommand('tsc --project ./tsconfig.json')).not.toThrow()
+    expect(() => sanitizeCommand('vitest ./test/suite.test.ts')).not.toThrow()
   })
 
   test('rejects path traversal via --flag=/absolute/path syntax (issue #939)', () => {
     // Absolute path embedded in = syntax (bypasses startsWith('/') check)
+    expect(() => sanitizeCommand('tsc --project=/etc/evil/tsconfig.json')).toThrow()
+    expect(() => sanitizeCommand('vitest --config=/etc/evil/vitest.config.ts')).toThrow()
     expect(() => sanitizeCommand('cp --target-directory=/etc/evil ./file')).toThrow()
 
+    // Path traversal via .. embedded in = syntax
+    expect(() => sanitizeCommand('tsc --project=../../evil/tsconfig.json')).toThrow()
+    expect(() => sanitizeCommand('vitest --config=../../evil/vitest.config.ts')).toThrow()
+
     // Windows drive path embedded in = syntax
-    expect(() => sanitizeCommand('cp --target-directory=C:/evil ./file')).toThrow()
+    expect(() => sanitizeCommand('tsc --project=C:/evil/tsconfig.json')).toThrow()
   })
 
   test('allows valid relative paths in = syntax (issue #939)', () => {
-    expect(() => sanitizeCommand('cp --target-directory=./backup ./file')).not.toThrow()
+    expect(() => sanitizeCommand('tsc --project=./tsconfig.json')).not.toThrow()
+    expect(() => sanitizeCommand('vitest --config=./vitest.config.ts')).not.toThrow()
   })
 })

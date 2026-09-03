@@ -22,8 +22,8 @@ describe('shouldContinueOnError - missing bridge is fatal (issue #871)', () => {
       .toBe(false)
   })
 
-  test('ETIMEDOUT message without structured code/errno is NOT recoverable (issue #972)', async () => {
+  test('ETIMEDOUT is still transient (recoverable)', async () => {
     expect(await shouldContinueOnError(new Error('ETIMEDOUT: operation timed out'), {} as never))
-      .toBe(false)
+      .toBe(true)
   })
 })

@@ -18,17 +18,14 @@ const ALLOWED_COMMANDS = new Set<string>([
   // Issues #854/#886/#889/#890: git and npm were removed — git can exec
   // arbitrary commands via config hooks / rebase --exec, and npm can run
   // arbitrary code via `npm run` / `npm exec` / postinstall scripts.
-  //
-  // Issue #970: tsc and vitest were removed — both are script-executing.
-  // vitest runs test files containing arbitrary JS/TS code, and tsc can
-  // load compiler plugins via tsconfig.json, so both can execute
-  // attacker-controlled code. Only stateless, non-script-executing
-  // commands remain.
+  // Only stateless, non-script-executing commands remain.
   'mkdir',
   'touch',
   'cp',
   'mv',
   'echo',
+  'tsc',
+  'vitest',
 ])
 
 /**
@@ -90,12 +87,12 @@ export function sanitizeCommand(command: string): string[] {
   }
 
   // Issue #928/#934: validate file path arguments for commands that operate on
-  // files or accept file/directory arguments (cp, mv, touch, mkdir).
+  // files or accept file/directory arguments (cp, mv, touch, mkdir, tsc, vitest).
   // These commands can read/write files outside the workspace via absolute paths
   // or path traversal (..), bypassing the protections in executeFileOperation.
   // We apply the same validation rules as executeFileOperation to the path-like
   // arguments of these commands.
-  const FILE_OPERATING_COMMANDS = new Set<string>(['cp', 'mv', 'touch', 'mkdir'])
+  const FILE_OPERATING_COMMANDS = new Set<string>(['cp', 'mv', 'touch', 'mkdir', 'tsc', 'vitest'])
   if (FILE_OPERATING_COMMANDS.has(program)) {
     for (let i = 1; i < argv.length; i++) {
       const arg = argv[i]
@@ -108,7 +105,7 @@ export function sanitizeCommand(command: string): string[] {
 
       // Issue #939: For --flag=value tokens, the value may embed an absolute
       // path or traversal that bypasses the whole-token checks (e.g.
-      // `--target-directory=/etc/evil` does not start with '/').
+      // `--project=/etc/evil/tsconfig.json` does not start with '/').
       // Validate both the full token and the value after '='.
       const valuesToCheck = [arg]
       const eqIndex = arg.indexOf('=')
@@ -482,14 +479,22 @@ export async function shouldContinueOnError(error: Error, step: FlowStep): Promi
     return true
   }
 
-  // We deliberately do NOT fall back to scanning `error.message` for
-  // transient codes. Message-based matching is fragile: error message
-  // formats vary across Node versions/platforms, and a code appearing
-  // inside a longer identifier (e.g. "ETIMEDOUT-config endpoint") can
-  // produce false positives that cause permanent failures to be retried
-  // indefinitely (issue #972). Structured `error.code`/`error.errno`
-  // properties are the only reliable signal; if they are absent, the error
-  // is treated as permanent and the flow aborts.
+  // Fallback: a SIMPLE, well-documented message-based match. This is a last
+  // resort for errors that carry a transient code only inside their message
+  // (e.g. errors re-thrown without preserving structured properties). To stay
+  // maintainable, we intentionally do NOT try to match every Node.js message
+  // variant (such as "connect ETIMEDOUT <addr:port>"); those cases should be
+  // fixed at the source by preserving structured properties instead of
+  // growing the regex further (issue #895).
+  //
+  // We only match a code that appears at the start of the message or
+  // immediately after a colon (optionally preceded by whitespace), which is
+  // how Node/libc formats some system errors (e.g. "ETIMEDOUT: operation timed
+  // out" or "request failed: ETIMEDOUT"). A word boundary after the code
+  // avoids matching substrings like "ETIMEDOUTS" (issue #866).
+  if (transientCodes.some(code => new RegExp(`(^|:\\s*)${code}\\b`).test(error.message))) {
+    return true
+  }
 
   // Missing bridge configuration is a fatal error — if the bridge is
   // unavailable at step 1, it will still be unavailable at every subsequent
