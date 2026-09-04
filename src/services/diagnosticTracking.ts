@@ -32,7 +32,11 @@ export class DiagnosticTrackingService {
   private baseline: Map<string, Diagnostic[]> = new Map()
 
   private initialized = false
-  private mcpClient: MCPServerConnection | undefined
+
+  // The most recently seen MCP clients. The connected IDE client is resolved
+  // from this list at call time rather than being cached, because the client
+  // can be replaced or reconnected between queries.
+  private clients: MCPServerConnection[] = []
 
   // Track when files were last processed/fetched
   private lastProcessedTimestamps: Map<string, number> = new Map()
@@ -48,18 +52,32 @@ export class DiagnosticTrackingService {
     return DiagnosticTrackingService.instance
   }
 
+  /**
+   * Resolve the currently connected IDE client.
+   *
+   * The client is looked up on every call instead of being cached, because
+   * the connected MCP client can change (e.g. the IDE reconnects and a new
+   * client object is created). Caching it would leave the service talking to
+   * a stale connection.
+   */
+  private getIdeClient(): MCPServerConnection | undefined {
+    return getConnectedIdeClient(this.clients)
+  }
+
   initialize(mcpClient: MCPServerConnection) {
     if (this.initialized) {
       return
     }
 
-    // TODO: Do not cache the connected mcpClient since it can change.
-    this.mcpClient = mcpClient
+    // Store the clients list rather than caching the client itself; the
+    // connected client is resolved lazily so reconnects are picked up.
+    this.clients = [mcpClient]
     this.initialized = true
   }
 
   async shutdown(): Promise<void> {
     this.initialized = false
+    this.clients = []
     this.baseline.clear()
     this.rightFileDiagnosticsState.clear()
     this.lastProcessedTimestamps.clear()
@@ -101,11 +119,8 @@ export class DiagnosticTrackingService {
    * This is important for language services like diagnostics to work properly.
    */
   async ensureFileOpened(fileUri: string): Promise<void> {
-    if (
-      !this.initialized ||
-      !this.mcpClient ||
-      this.mcpClient.type !== 'connected'
-    ) {
+    const ideClient = this.getIdeClient()
+    if (!this.initialized || !ideClient) {
       return
     }
 
@@ -121,7 +136,7 @@ export class DiagnosticTrackingService {
           selectToEndOfLine: false,
           makeFrontmost: false,
         },
-        this.mcpClient,
+        ideClient,
       )
     } catch (error) {
       logError(error as Error)
@@ -133,11 +148,8 @@ export class DiagnosticTrackingService {
    * This is called before editing a file to ensure we have a baseline to compare against.
    */
   async beforeFileEdited(filePath: string): Promise<void> {
-    if (
-      !this.initialized ||
-      !this.mcpClient ||
-      this.mcpClient.type !== 'connected'
-    ) {
+    const ideClient = this.getIdeClient()
+    if (!this.initialized || !ideClient) {
       return
     }
 
@@ -147,7 +159,7 @@ export class DiagnosticTrackingService {
       const result = await callIdeRpc(
         'getDiagnostics',
         { uri: `file://${filePath}` },
-        this.mcpClient,
+        ideClient,
       )
       const diagnosticFile = this.parseDiagnosticResult(result)[0]
       if (diagnosticFile) {
@@ -186,11 +198,8 @@ export class DiagnosticTrackingService {
    * Only processes diagnostics for files that have been edited.
    */
   async getNewDiagnostics(): Promise<DiagnosticFile[]> {
-    if (
-      !this.initialized ||
-      !this.mcpClient ||
-      this.mcpClient.type !== 'connected'
-    ) {
+    const ideClient = this.getIdeClient()
+    if (!this.initialized || !ideClient) {
       return []
     }
 
@@ -200,7 +209,7 @@ export class DiagnosticTrackingService {
       const result = await callIdeRpc(
         'getDiagnostics',
         {}, // Empty params fetches all diagnostics
-        this.mcpClient,
+        ideClient,
       )
       allDiagnosticFiles = this.parseDiagnosticResult(result)
     } catch (_error) {
@@ -320,21 +329,20 @@ export class DiagnosticTrackingService {
 
   /**
    * Handle the start of a new query. This method:
+   * - Refreshes the known MCP clients so a replaced/reconnected IDE client is picked up
    * - Initializes the diagnostic tracker if not already initialized
    * - Resets the tracker if already initialized (for new query loops)
-   * - Automatically finds the IDE client from the provided clients list
    *
    * @param clients Array of MCP clients that may include an IDE client
-   * @param shouldQuery Whether a query is actually being made (not just a command)
    */
   async handleQueryStart(clients: MCPServerConnection[]): Promise<void> {
-    // Only proceed if we should query and have clients
-    if (!this.initialized) {
-      // Find the connected IDE client
-      const connectedIdeClient = getConnectedIdeClient(clients)
+    // Always refresh the clients list so we never talk to a stale IDE client
+    this.clients = clients
 
-      if (connectedIdeClient) {
-        this.initialize(connectedIdeClient)
+    if (!this.initialized) {
+      // Only initialize if there is a connected IDE client
+      if (getConnectedIdeClient(clients)) {
+        this.initialized = true
       }
     } else {
       // Reset diagnostic tracking for new query loops
