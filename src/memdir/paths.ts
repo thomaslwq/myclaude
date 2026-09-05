@@ -98,7 +98,7 @@ const AUTO_MEM_ENTRYPOINT_NAME = 'MEMORY.md'
  * SECURITY: Rejects paths that would be dangerous as a read-allowlist root
  * or that normalize() doesn't fully resolve:
  * - relative (!isAbsolute): "../foo" — would be interpreted relative to CWD
- * - root/near-root (length < 3): "/" → "" after strip; "/a" too short
+ * - root path: "/" → "" after strip
  * - Windows drive-root (C: regex): "C:\" → "C:" after strip
  * - UNC paths (\\server\share): network paths — opaque trust boundary
  * - null byte: survives normalize(), can truncate in syscalls
@@ -138,7 +138,7 @@ function validateMemoryPath(
   const normalized = normalize(candidate).replace(/[/\\]+$/, '')
   if (
     !isAbsolute(normalized) ||
-    normalized.length < 3 ||
+    normalized === '' ||
     /^[A-Za-z]:$/.test(normalized) ||
     normalized.startsWith('\\\\') ||
     normalized.startsWith('//') ||
