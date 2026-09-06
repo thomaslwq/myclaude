@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.310] - 2026-09-06
+
+### Security
+- **Upgraded `marked` from 18.0.9 → 18.0.11** — pulls in the latest upstream patch releases to address known Markdown-parser vulnerabilities (ReDoS / XSS hardening). The project only uses `marked.lexer` (no HTML renderer), so the XSS surface is already minimal, but staying on the latest patch is the standard mitigation for CVEs in this dependency (fixes #990).
+
 ## [0.1.23] - 2026-06-17
 
 ### Fixed

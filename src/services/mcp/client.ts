@@ -586,7 +586,7 @@ export function getServerCacheKey(
 }
 
 /**
- * TODO (ollie): The memoization here increases complexity by a lot, and im not sure it really improves performance
+ * TODO(#991): evaluate whether the memoization is worth the added complexity — it adds a serialization step on every call and the perf win is unmeasured
  * Attempts to connect to a single MCP server
  * @param name Server name
  * @param serverRef Scoped server configuration
@@ -678,7 +678,9 @@ export const connectToServer = memoize(
       } else if (serverRef.type === 'sse-ide') {
         logMCPDebug(name, `Setting up SSE-IDE transport to ${serverRef.url}`)
         // IDE servers don't need authentication
-        // TODO: Use the auth token provided in the lockfile
+        // The sse-ide schema has no authToken field (only ws-ide does - see
+        // McpWebSocketIDEServerConfigSchema), so there is no lockfile-provided
+        // token to forward here.
         const proxyOptions = getProxyFetchOptions()
         const transportOptions: SSEClientTransportOptions =
           proxyOptions.dispatcher

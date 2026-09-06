@@ -89,7 +89,7 @@
     "jsonc-parser": "3.3.1",
     "lodash-es": "4.17.23",
     "lru-cache": "11.5.2",
-    "marked": "18.0.9",
+    "marked": "18.0.11",
     "p-map": "7.0.4",
     "picomatch": "4.0.4",
     "proper-lockfile": "4.1.2",
