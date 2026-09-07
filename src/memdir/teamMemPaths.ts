@@ -1,3 +1,4 @@
+import { lstatSync, realpathSync } from 'fs'
 import { lstat, realpath } from 'fs/promises'
 import { dirname, join, resolve, sep } from 'path'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
@@ -227,18 +228,114 @@ async function isRealPathWithinTeamDir(
 }
 
 /**
+ * Synchronous version of realpathDeepestExisting for use in synchronous
+ * code paths (e.g. isTeamMemPath).
+ */
+function realpathDeepestExistingSync(absolutePath: string): string {
+  const tail: string[] = []
+  let current = absolutePath
+  let iterations = 0
+  for (
+    let parent = dirname(current);
+    current !== parent;
+    parent = dirname(current)
+  ) {
+    if (++iterations > MAX_REALPATH_DEPTH) {
+      throw new PathTraversalError(
+        `Path depth exceeds maximum allowed (${MAX_REALPATH_DEPTH}): "${absolutePath}"`,
+      )
+    }
+    try {
+      const realCurrent = realpathSync(current)
+      return tail.length === 0
+        ? realCurrent
+        : join(realCurrent, ...tail.reverse())
+    } catch (e: unknown) {
+      const code = getErrnoCode(e)
+      if (code === 'ENOENT') {
+        try {
+          const st = lstatSync(current)
+          if (st.isSymbolicLink()) {
+            throw new PathTraversalError(
+              `Dangling symlink detected (target does not exist): "${current}"`,
+            )
+          }
+        } catch (lstatErr: unknown) {
+          if (lstatErr instanceof PathTraversalError) {
+            throw lstatErr
+          }
+        }
+      } else if (code === 'ELOOP') {
+        throw new PathTraversalError(
+          `Symlink loop detected in path: "${current}"`,
+        )
+      } else if (code !== 'ENOTDIR' && code !== 'ENAMETOOLONG') {
+        throw new PathTraversalError(
+          `Cannot verify path containment (${code}): "${current}"`,
+        )
+      }
+      tail.push(current.slice(parent.length + sep.length))
+      current = parent
+    }
+  }
+  return absolutePath
+}
+
+/**
+ * Synchronous version of isRealPathWithinTeamDir for use in synchronous
+ * code paths (e.g. isTeamMemPath).
+ */
+function isRealPathWithinTeamDirSync(
+  realCandidate: string,
+): boolean {
+  let realTeamDir: string
+  try {
+    realTeamDir = realpathSync(getTeamMemPath().replace(/[/\\]+$/, ''))
+  } catch (e: unknown) {
+    const code = getErrnoCode(e)
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return true
+    }
+    return false
+  }
+  if (realCandidate === realTeamDir) {
+    return true
+  }
+  return realCandidate.startsWith(realTeamDir + sep)
+}
+
+/**
  * Check if a resolved absolute path is within the team memory directory.
  * Uses path.resolve() to convert relative paths and eliminate traversal segments.
- * Does NOT resolve symlinks — for write validation use validateTeamMemWritePath()
- * or validateTeamMemKey() which include symlink resolution.
+ * Resolves symlinks on the deepest existing ancestor to prevent symlink-based
+ * escapes (PSR M22186), consistent with validateTeamMemWritePath() and
+ * validateTeamMemKey().
  */
 export function isTeamMemPath(filePath: string): boolean {
   // SECURITY: resolve() converts to absolute and eliminates .. segments,
   // preventing path traversal attacks (e.g. "team/../../etc/passwd")
   const resolvedPath = resolve(filePath)
-  const teamDir = getTeamMemPath()
-  return resolvedPath.startsWith(teamDir)
+  // getTeamMemPath() returns a path with a trailing separator, but
+  // resolve() never produces a trailing separator. Strip it so the
+  // containment check works for the team dir itself as well as for
+  // paths inside it. Prefix-attack protection is preserved by requiring
+  // a separator after the prefix (or an exact match).
+  const teamDir = getTeamMemPath().replace(/[/\\]+$/, '')
+  if (resolvedPath !== teamDir && !resolvedPath.startsWith(teamDir + sep)) {
+    return false
+  }
+  // Second pass: resolve symlinks on the deepest existing ancestor and verify
+  // the real path is still within the real team dir. This catches symlink-based
+  // escapes that path.resolve() alone cannot detect (PSR M22186).
+  try {
+    const realPath = realpathDeepestExistingSync(resolvedPath)
+    return isRealPathWithinTeamDirSync(realPath)
+  } catch {
+    // PathTraversalError or unexpected error - fail closed.
+    return false
+  }
 }
+
 
 /**
  * Validate that an absolute file path is safe for writing to the team memory directory.
