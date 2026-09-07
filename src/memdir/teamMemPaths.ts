@@ -5,6 +5,14 @@ import { getErrnoCode } from '../utils/errors.js'
 import { getAutoMemPath, isAutoMemoryEnabled } from './paths.js'
 
 /**
+ * Upper bound on how many directory levels realpathDeepestExisting will walk
+ * up before giving up. POSIX PATH_MAX is 4096 bytes, so any legitimate path
+ * is far below this cap. Exceeding it is treated as a traversal attack and
+ * fails closed (issue #995).
+ */
+export const MAX_REALPATH_DEPTH = 4096
+
+/**
  * Error thrown when a path validation detects a traversal or injection attempt.
  */
 export class PathTraversalError extends Error {
@@ -114,11 +122,24 @@ async function realpathDeepestExisting(absolutePath: string): Promise<string> {
   // component sits in the middle of the path; pop and retry so we can realpath
   // the ancestor to detect symlink escapes.
   // Loop terminates when we reach the filesystem root (dirname('/') === '/').
+  //
+  // SECURITY (issue #995): the walk is bounded by MAX_REALPATH_DEPTH so a
+  // maliciously constructed path (or a filesystem with an unusually deep
+  // directory chain) cannot drive the loop indefinitely and cause excessive
+  // CPU usage or a stack overflow. POSIX PATH_MAX is 4096 bytes, so any
+  // legitimate path is far below this cap; exceeding it is treated as a
+  // traversal attack and fails closed.
+  let iterations = 0
   for (
     let parent = dirname(current);
     current !== parent;
     parent = dirname(current)
   ) {
+    if (++iterations > MAX_REALPATH_DEPTH) {
+      throw new PathTraversalError(
+        `Path depth exceeds maximum allowed (${MAX_REALPATH_DEPTH}): "${absolutePath}"`,
+      )
+    }
     try {
       const realCurrent = await realpath(current)
       // Rejoin the non-existing tail in reverse order (deepest popped first)
