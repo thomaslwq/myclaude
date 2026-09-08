@@ -20,6 +20,43 @@ export type MemoryHeader = {
 
 const MAX_MEMORY_FILES = 200
 const FRONTMATTER_MAX_LINES = 30
+// Bound concurrent frontmatter reads so a large memory directory doesn't
+// flood the event loop with simultaneous fs reads (issue #999). 10 is a
+// pragmatic sweet spot: enough parallelism to hide disk latency, small
+// enough to keep the event loop responsive for other work.
+export const SCAN_CONCURRENCY = 10
+
+/**
+ * Minimal promise-based concurrency limiter. Runs at most `limit` tasks
+ * concurrently; results are returned in input order. Rejections are
+ * captured as `PromiseRejectedResult` so a single bad file never aborts
+ * the whole scan.
+ */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length)
+  let next = 0
+
+  await Promise.all(
+    new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+      while (true) {
+        const i = next++
+        if (i >= items.length) return
+        try {
+          const value = await fn(items[i])
+          results[i] = { status: 'fulfilled', value }
+        } catch (reason) {
+          results[i] = { status: 'rejected', reason }
+        }
+      }
+    }),
+  )
+
+  return results
+}
 
 /**
  * Scan a memory directory for .md files, read their frontmatter, and return
@@ -31,6 +68,10 @@ const FRONTMATTER_MAX_LINES = 30
  * read-then-sort rather than stat-sort-read. For the common case (N ≤ 200)
  * this halves syscalls vs a separate stat round; for large N we read a few
  * extra small files but still avoid the double-stat on the surviving 200.
+ *
+ * Reads are throttled through a small concurrency pool (SCAN_CONCURRENCY)
+ * so a large memory directory doesn't saturate the event loop with
+ * simultaneous fs reads (issue #999).
  */
 export async function scanMemoryFiles(
   memoryDir: string,
@@ -42,8 +83,10 @@ export async function scanMemoryFiles(
       f => f.endsWith('.md') && basename(f) !== 'MEMORY.md',
     )
 
-    const headerResults = await Promise.allSettled(
-      mdFiles.map(async (relativePath): Promise<MemoryHeader> => {
+    const headerResults = await mapWithConcurrency(
+      mdFiles,
+      SCAN_CONCURRENCY,
+      async (relativePath): Promise<MemoryHeader> => {
         const filePath = join(memoryDir, relativePath)
         const { content, mtimeMs } = await readFileInRange(
           filePath,
@@ -60,7 +103,7 @@ export async function scanMemoryFiles(
           description: frontmatter.description || null,
           type: parseMemoryType(frontmatter.type),
         }
-      }),
+      },
     )
 
     return headerResults
