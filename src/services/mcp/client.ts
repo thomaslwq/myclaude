@@ -578,15 +578,40 @@ function isIncludedMcpTool(tool: Tool): boolean {
  * @param serverRef Server configuration
  * @returns Cache key string
  */
+// Identity-based cache for getServerCacheKey. lodash memoize invokes the
+// resolver on every call (even cache hits), so without this we'd pay a
+// jsonStringify(serverRef) on every connectToServer invocation. Server
+// configs are long-lived objects (built once at startup and reused), so
+// caching by object identity is safe and avoids the serialization cost
+// on the hot path. WeakMap lets GC reclaim entries when a serverRef is
+// no longer referenced.
+const serverCacheKeyCache = new WeakMap<
+  ScopedMcpServerConfig,
+  Map<string, string>
+>()
+
 export function getServerCacheKey(
   name: string,
   serverRef: ScopedMcpServerConfig,
 ): string {
-  return `${name}-${jsonStringify(serverRef)}`
+  let byName = serverCacheKeyCache.get(serverRef)
+  if (!byName) {
+    byName = new Map()
+    serverCacheKeyCache.set(serverRef, byName)
+  }
+  let key = byName.get(name)
+  if (key === undefined) {
+    key = `${name}-${jsonStringify(serverRef)}`
+    byName.set(name, key)
+  }
+  return key
 }
 
 /**
- * TODO(#991): evaluate whether the memoization is worth the added complexity — it adds a serialization step on every call and the perf win is unmeasured
+ * Memoized by (name, serverRef) identity via getServerCacheKey. The resolver
+ * serializes serverRef once per unique object reference (see the WeakMap cache
+ * in getServerCacheKey), so repeated calls with the same serverRef object skip
+ * the jsonStringify step entirely.
  * Attempts to connect to a single MCP server
  * @param name Server name
  * @param serverRef Scoped server configuration
