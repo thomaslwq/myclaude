@@ -1740,13 +1740,10 @@ export class ClaudeAuthProvider implements OAuthClientProvider {
    * On exchange failure, clears the id_token cache so the next interactive
    * auth does a fresh IdP login (the cached id_token is likely stale/revoked).
    *
-   * TODO(xaa-ga): add cross-process lockfile before GA. `_refreshInProgress`
-   * only dedupes within one process — two CC instances with expiring tokens
-   * both fire the full 4-request XAA chain and race on storage.update().
-   * Unlike inc-4829 the id_token is not single-use so both access_tokens
-   * stay valid (wasted round-trips + keychain write race, not brickage),
-   * but this is the shape CLAUDE.md flags under "Token/auth caching across
-   * process boundaries". Mirror refreshAuthorization()'s lockfile pattern.
+   * Cross-process lockfile: `_refreshInProgress` only dedupes within one
+   * process. Two CC instances with expiring tokens would otherwise both fire
+   * the full 4-request XAA chain and race on storage.update(). Mirrors the
+   * lockfile pattern in refreshAuthorization() below.
    */
   private async xaaRefresh(): Promise<OAuthTokens | undefined> {
     const idp = getXaaIdpSettings()
@@ -1771,25 +1768,97 @@ export class ClaudeAuthProvider implements OAuthClientProvider {
       return undefined // shouldn't happen if `mcp add` was correct
     }
 
-    const idpClientSecret = getIdpClientSecret(idp.issuer)
+    // Acquire a cross-process lockfile so concurrent CC instances don't both
+    // run the full XAA chain and race on storage.update(). Mirrors the
+    // refreshAuthorization() pattern below.
+    const serverKey = getServerKey(this.serverName, this.serverConfig)
+    const claudeDir = getClaudeConfigHomeDir()
+    await mkdir(claudeDir, { recursive: true })
+    const sanitizedKey = serverKey.replace(/[^a-zA-Z0-9]/g, '_')
+    const lockfilePath = join(claudeDir, `mcp-xaa-refresh-${sanitizedKey}.lock`)
 
-    // Discover IdP token endpoint. Could cache (fetchCache.ts already
-    // caches /.well-known/ requests), but OIDC metadata is cheap + idempotent.
-    // xaaRefresh is the silent tokens() path — soft-fail to undefined so the
-    // caller falls through to needs-authentication instead of throwing mid-connect.
-    let oidc
-    try {
-      oidc = await discoverOidc(idp.issuer)
-    } catch (e) {
+    let release: (() => Promise<void>) | undefined
+    for (let retry = 0; retry < MAX_LOCK_RETRIES; retry++) {
+      try {
+        logMCPDebug(
+          this.serverName,
+          `Acquiring XAA refresh lock (attempt ${retry + 1})`,
+        )
+        release = await lockfile.lock(lockfilePath, {
+          realpath: false,
+          onCompromised: () => {
+            logMCPDebug(this.serverName, `XAA refresh lock was compromised`)
+          },
+        })
+        logMCPDebug(this.serverName, `Acquired XAA refresh lock`)
+        break
+      } catch (e: unknown) {
+        const code = getErrnoCode(e)
+        if (code === 'ELOCKED') {
+          logMCPDebug(
+            this.serverName,
+            `XAA refresh lock held by another process, waiting (attempt ${retry + 1}/${MAX_LOCK_RETRIES})`,
+          )
+          await sleep(1000 + Math.random() * 1000)
+          continue
+        }
+        logMCPDebug(
+          this.serverName,
+          `Failed to acquire XAA refresh lock: ${code}, proceeding without lock`,
+        )
+        break
+      }
+    }
+    if (!release) {
       logMCPDebug(
         this.serverName,
-        `XAA: OIDC discovery failed in silent refresh: ${errorMessage(e)}`,
+        `Could not acquire XAA refresh lock after ${MAX_LOCK_RETRIES} retries, proceeding without lock`,
       )
-      return undefined
     }
 
     try {
-      const tokens = await performCrossAppAccess(
+      // Re-read tokens after acquiring lock — another process may have already
+      // refreshed. If so, return the fresh token without firing the XAA chain.
+      clearKeychainCache()
+      const storage = getSecureStorage()
+      const data = storage.read()
+      const tokenData = data?.mcpOAuth?.[serverKey]
+      if (tokenData?.accessToken) {
+        const expiresIn = (tokenData.expiresAt - Date.now()) / 1000
+        if (expiresIn > 300) {
+          logMCPDebug(
+            this.serverName,
+            `Another process already refreshed XAA tokens (expires in ${Math.floor(expiresIn)}s)`,
+          )
+          return {
+            access_token: tokenData.accessToken,
+            refresh_token: tokenData.refreshToken,
+            expires_in: expiresIn,
+            scope: tokenData.scope,
+            token_type: 'Bearer',
+          }
+        }
+      }
+
+      const idpClientSecret = getIdpClientSecret(idp.issuer)
+
+      // Discover IdP token endpoint. Could cache (fetchCache.ts already
+      // caches /.well-known/ requests), but OIDC metadata is cheap + idempotent.
+      // xaaRefresh is the silent tokens() path — soft-fail to undefined so the
+      // caller falls through to needs-authentication instead of throwing mid-connect.
+      let oidc
+      try {
+        oidc = await discoverOidc(idp.issuer)
+      } catch (e) {
+        logMCPDebug(
+          this.serverName,
+          `XAA: OIDC discovery failed in silent refresh: ${errorMessage(e)}`,
+        )
+        return undefined
+      }
+
+      try {
+        const tokens = await performCrossAppAccess(
         this.serverConfig.url,
         {
           clientId,
@@ -1808,7 +1877,6 @@ export class ClaudeAuthProvider implements OAuthClientProvider {
       // and send a client_id-less RFC 7009 request that strict ASes reject.
       const storage = getSecureStorage()
       const existingData = storage.read() || {}
-      const serverKey = getServerKey(this.serverName, this.serverConfig)
       const prev = existingData.mcpOAuth?.[serverKey]
       storage.update({
         ...existingData,
@@ -1846,6 +1914,15 @@ export class ClaudeAuthProvider implements OAuthClientProvider {
         )
       }
       throw e
+    } finally {
+      if (release) {
+        try {
+          await release()
+          logMCPDebug(this.serverName, `Released XAA refresh lock`)
+        } catch {
+          logMCPDebug(this.serverName, `Failed to release XAA refresh lock`)
+        }
+      }
     }
   }
 

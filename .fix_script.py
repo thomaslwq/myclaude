@@ -1,80 +1,181 @@
-import sys
+with open('src/services/mcp/auth.ts','r',encoding='utf-8') as f:
+    data = f.read()
 
-with open('src/memdir/teamMemPaths.ts', 'r', encoding='utf-8') as f:
-    content = f.read()
+old = '''   * Cross-process lockfile: see below. `_refreshInProgress`
+   * only dedupes within one process \u2014 two CC instances with expiring tokens
+   * both fire the full 4-request XAA chain and race on storage.update().
+   * Unlike inc-4829 the id_token is not single-use so both access_tokens
+   * stay valid (wasted round-trips + keychain write race, not brickage),
+   * but this is the shape CLAUDE.md flags under "Token/auth caching across
+   * process boundaries". Mirror refreshAuthorization()'s lockfile pattern.
+   */
+  private async xaaRefresh(): Promise<OAuthTokens | undefined> {
+    const idp = getXaaIdpSettings()
+    if (!idp) return undefined // config was removed mid-session
 
-# Find the isTeamMemPath function
-idx = content.find('export function isTeamMemPath')
-if idx < 0:
-    print('Function not found')
-    sys.exit(1)
+    const idToken = getCachedIdpIdToken(idp.issuer)
+    if (!idToken) {
+      logMCPDebug(
+        this.serverName,
+        'XAA: id_token not cached, needs interactive re-auth',
+      )
+      return undefined
+    }
 
-# Find the end of the function (next closing brace at column 0)
-end_idx = content.find('\n}', idx)
-if end_idx < 0:
-    print('End not found')
-    sys.exit(1)
-end_idx += 2  # include the closing brace and newline
+    const clientId = this.serverConfig.oauth?.clientId
+    const clientConfig = getMcpClientConfig(this.serverName, this.serverConfig)
+    if (!clientId || !clientConfig?.clientSecret) {
+      logMCPDebug(
+        this.serverName,
+        'XAA: missing clientId or clientSecret in config \u2014 skipping silent refresh',
+      )
+      return undefined // shouldn't happen if `mcp add` was correct
+    }
 
-old_func = content[idx:end_idx]
-print('OLD FUNCTION:')
-print(repr(old_func))
-print('---')
+    const idpClientSecret = getIdpClientSecret(idp.issuer)
 
-new_func = '''export function isTeamMemPath(filePath: string): boolean {
-  // SECURITY: resolve() converts to absolute and eliminates .. segments,
-  // preventing path traversal attacks (e.g. "team/../../etc/passwd")
-  const resolvedPath = resolve(filePath)
-  const teamDir = getTeamMemPath()
-  if (!resolvedPath.startsWith(teamDir)) {
-    return false
-  }
-  // Second pass: resolve symlinks on the deepest existing ancestor and verify
-  // the real path is still within the real team dir. This catches symlink-based
-  // escapes that path.resolve() alone cannot detect (PSR M22186).
-  try {
-    const realPath = realpathDeepestExistingSync(resolvedPath)
-    return isRealPathWithinTeamDirSync(realPath)
-  } catch {
-    // PathTraversalError or unexpected error - fail closed.
-    return false
-  }
-}
-'''
+    // Discover IdP token endpoint. Could cache (fetchCache.ts already
+    // caches /.well-known/ requests), but OIDC metadata is cheap + idempotent.
+    // xaaRefresh is the silent tokens() path \u2014 soft-fail to undefined so the
+    // caller falls through to needs-authentication instead of throwing mid-connect.
+    let oidc
+    try {
+      oidc = await discoverOidc(idp.issuer)
+    } catch (e) {
+      logMCPDebug(
+        this.serverName,
+        `XAA: OIDC discovery failed in silent refresh: ${errorMessage(e)}`,
+      )
+      return undefined
+    }
 
-content = content[:idx] + new_func + content[end_idx:]
+    try {
+      const tokens = await performCrossAppAccess('''
 
-# Also update the comment above isTeamMemPath
-old_comment = '''/**
- * Check if a resolved absolute path is within the team memory directory.
- * Uses path.resolve() to convert relative paths and eliminate traversal segments.
- * Does NOT resolve symlinks - for write validation use validateTeamMemWritePath()
- * or validateTeamMemKey() which include symlink resolution.
- */'''
+new = '''   * Cross-process lockfile: `_refreshInProgress` only dedupes within one
+   * process. Two CC instances with expiring tokens would otherwise both fire
+   * the full 4-request XAA chain and race on storage.update(). Mirrors the
+   * lockfile pattern in refreshAuthorization() below.
+   */
+  private async xaaRefresh(): Promise<OAuthTokens | undefined> {
+    const idp = getXaaIdpSettings()
+    if (!idp) return undefined // config was removed mid-session
 
-new_comment = '''/**
- * Check if a resolved absolute path is within the team memory directory.
- * Uses path.resolve() to convert relative paths and eliminate traversal segments.
- * Resolves symlinks on the deepest existing ancestor to prevent symlink-based
- * escapes (PSR M22186), consistent with validateTeamMemWritePath() and
- * validateTeamMemKey().
- */'''
+    const idToken = getCachedIdpIdToken(idp.issuer)
+    if (!idToken) {
+      logMCPDebug(
+        this.serverName,
+        'XAA: id_token not cached, needs interactive re-auth',
+      )
+      return undefined
+    }
 
-if old_comment in content:
-    content = content.replace(old_comment, new_comment)
-    print('Comment updated')
+    const clientId = this.serverConfig.oauth?.clientId
+    const clientConfig = getMcpClientConfig(this.serverName, this.serverConfig)
+    if (!clientId || !clientConfig?.clientSecret) {
+      logMCPDebug(
+        this.serverName,
+        'XAA: missing clientId or clientSecret in config \u2014 skipping silent refresh',
+      )
+      return undefined // shouldn't happen if `mcp add` was correct
+    }
+
+    // Acquire a cross-process lockfile so concurrent CC instances don't both
+    // run the full XAA chain and race on storage.update(). Mirrors the
+    // refreshAuthorization() pattern below.
+    const serverKey = getServerKey(this.serverName, this.serverConfig)
+    const claudeDir = getClaudeConfigHomeDir()
+    await mkdir(claudeDir, { recursive: true })
+    const sanitizedKey = serverKey.replace(/[^a-zA-Z0-9]/g, '_')
+    const lockfilePath = join(claudeDir, `mcp-xaa-refresh-${sanitizedKey}.lock`)
+
+    let release: (() => Promise<void>) | undefined
+    for (let retry = 0; retry < MAX_LOCK_RETRIES; retry++) {
+      try {
+        logMCPDebug(
+          this.serverName,
+          `Acquiring XAA refresh lock (attempt ${retry + 1})`,
+        )
+        release = await lockfile.lock(lockfilePath, {
+          realpath: false,
+          onCompromised: () => {
+            logMCPDebug(this.serverName, `XAA refresh lock was compromised`)
+          },
+        })
+        logMCPDebug(this.serverName, `Acquired XAA refresh lock`)
+        break
+      } catch (e: unknown) {
+        const code = getErrnoCode(e)
+        if (code === 'ELOCKED') {
+          logMCPDebug(
+            this.serverName,
+            `XAA refresh lock held by another process, waiting (attempt ${retry + 1}/${MAX_LOCK_RETRIES})`,
+          )
+          await sleep(1000 + Math.random() * 1000)
+          continue
+        }
+        logMCPDebug(
+          this.serverName,
+          `Failed to acquire XAA refresh lock: ${code}, proceeding without lock`,
+        )
+        break
+      }
+    }
+    if (!release) {
+      logMCPDebug(
+        this.serverName,
+        `Could not acquire XAA refresh lock after ${MAX_LOCK_RETRIES} retries, proceeding without lock`,
+      )
+    }
+
+    try {
+      // Re-read tokens after acquiring lock \u2014 another process may have already
+      // refreshed. If so, return the fresh token without firing the XAA chain.
+      clearKeychainCache()
+      const storage = getSecureStorage()
+      const data = storage.read()
+      const tokenData = data?.mcpOAuth?.[serverKey]
+      if (tokenData?.accessToken) {
+        const expiresIn = (tokenData.expiresAt - Date.now()) / 1000
+        if (expiresIn > 300) {
+          logMCPDebug(
+            this.serverName,
+            `Another process already refreshed XAA tokens (expires in ${Math.floor(expiresIn)}s)`,
+          )
+          return {
+            access_token: tokenData.accessToken,
+            refresh_token: tokenData.refreshToken,
+            expires_in: expiresIn,
+            scope: tokenData.scope,
+            token_type: 'Bearer',
+          }
+        }
+      }
+
+      const idpClientSecret = getIdpClientSecret(idp.issuer)
+
+      // Discover IdP token endpoint. Could cache (fetchCache.ts already
+      // caches /.well-known/ requests), but OIDC metadata is cheap + idempotent.
+      // xaaRefresh is the silent tokens() path \u2014 soft-fail to undefined so the
+      // caller falls through to needs-authentication instead of throwing mid-connect.
+      let oidc
+      try {
+        oidc = await discoverOidc(idp.issuer)
+      } catch (e) {
+        logMCPDebug(
+          this.serverName,
+          `XAA: OIDC discovery failed in silent refresh: ${errorMessage(e)}`,
+        )
+        return undefined
+      }
+
+      try {
+        const tokens = await performCrossAppAccess('''
+
+if old not in data:
+    print('OLD NOT FOUND')
 else:
-    print('Comment not found (may use different dash character)')
-    # Try to find and replace the comment
-    comment_idx = content.rfind('/**', 0, idx)
-    if comment_idx >= 0:
-        comment_end = content.find('*/', comment_idx) + 2
-        old_c = content[comment_idx:comment_end]
-        print('Found comment:', repr(old_c))
-        content = content[:comment_idx] + new_comment + content[comment_end:]
-        print('Comment replaced')
-
-with open('src/memdir/teamMemPaths.ts', 'w', encoding='utf-8', newline='') as f:
-    f.write(content)
-
-print('Done')
+    data = data.replace(old, new, 1)
+    with open('src/services/mcp/auth.ts','w',encoding='utf-8',newline='') as f:
+        f.write(data)
+    print('OK')
