@@ -1857,8 +1857,7 @@ export class ClaudeAuthProvider implements OAuthClientProvider {
         return undefined
       }
 
-      try {
-        const tokens = await performCrossAppAccess(
+      const tokens = await performCrossAppAccess(
         this.serverConfig.url,
         {
           clientId,
@@ -1875,7 +1874,7 @@ export class ClaudeAuthProvider implements OAuthClientProvider {
       // only spreads existing data; if no prior performMCPXaaAuth ran,
       // revokeServerTokens would later read tokenData.clientId as undefined
       // and send a client_id-less RFC 7009 request that strict ASes reject.
-      const storage = getSecureStorage()
+      // Reuse the `storage` binding from above (re-read after lock acquisition).
       const existingData = storage.read() || {}
       const prev = existingData.mcpOAuth?.[serverKey]
       storage.update({

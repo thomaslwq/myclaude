@@ -18,6 +18,7 @@ import {
 import { GREP_TOOL_NAME } from '../tools/GrepTool/prompt.js'
 import { isReplModeEnabled } from '../tools/REPLTool/constants.js'
 import { logForDebugging } from '../utils/debug.js'
+import { errorMessage } from '../utils/errors.js'
 import { hasEmbeddedSearchTools } from '../utils/embeddedTools.js'
 import { isEnvTruthy } from '../utils/envUtils.js'
 import { formatFileSize } from '../utils/format.js'
@@ -150,6 +151,106 @@ export async function ensureMemoryDirExists(memoryDir: string): Promise<void> {
  * Log memory directory file/subdir counts asynchronously.
  * Fire-and-forget — doesn't block prompt building.
  */
+export type MemoryStoreVerification =
+  | {
+      status: 'ok'
+      path: string
+      entrypointPresent: boolean
+      entrypointContent: string
+      diagnostics: string[]
+    }
+  | {
+      status: 'error'
+      path: string
+      error: string
+    }
+
+let lastMemoryLoadFailure: MemoryStoreVerification | null = null
+
+/**
+ * Last fail-loud memory load failure for this process, or null when the
+ * memory store verified cleanly (or verification hasn't run yet).
+ *
+ * Surfaced by the REPL as a one-time startup notification (issue #1012):
+ * operators must see "your persistent memory did not load" instead of
+ * silently getting session amnesia across restarts.
+ */
+export function getMemoryLoadFailure(): MemoryStoreVerification | null {
+  return lastMemoryLoadFailure
+}
+
+/**
+ * Fail-loud verification of the persistent memory store (issue #1012).
+ *
+ * Runs at session start (from loadMemoryPrompt) to prove the memory
+ * directory actually loads before the session relies on it:
+ * - directory missing → ok (fresh install; the prompt still teaches the
+ *   model how to create memories)
+ * - path is a regular file → error (squatting breaks every memory write)
+ * - directory unreadable (EACCES etc.) → error
+ * - readable → ok, with MEMORY.md content when present
+ *
+ * Distinguishes "no memories yet" (fine) from "memories exist but cannot be
+ * read" (the session-amnesia case).
+ */
+export async function verifyMemoryStore(
+  memoryDir: string,
+): Promise<MemoryStoreVerification> {
+  const fs = getFsImplementation()
+  const path = memoryDir
+  if (!fs.existsSync(path)) {
+    return {
+      status: 'ok',
+      path,
+      entrypointPresent: false,
+      entrypointContent: '',
+      diagnostics: ['memory directory missing (fresh install — nothing loaded)'],
+    }
+  }
+  let stats
+  try {
+    stats = await fs.stat(path)
+  } catch (e) {
+    return { status: 'error', path, error: errorMessage(e) }
+  }
+  if (!stats.isDirectory()) {
+    return {
+      status: 'error',
+      path,
+      error: 'memory store path is not a directory',
+    }
+  }
+  try {
+    const dirents = await fs.readdir(path)
+    const hasEntrypoint = dirents.some(d => d.name === ENTRYPOINT_NAME)
+    if (!hasEntrypoint) {
+      const fileCount = dirents.filter(d => d.isFile()).length
+      return {
+        status: 'ok',
+        path,
+        entrypointPresent: false,
+        entrypointContent: '',
+        diagnostics:
+          fileCount === 0
+            ? ['memory directory empty (no memories loaded yet)']
+            : [],
+      }
+    }
+    const entrypointContent = await fs.readFile(join(path, ENTRYPOINT_NAME), {
+      encoding: 'utf8',
+    })
+    return {
+      status: 'ok',
+      path,
+      entrypointPresent: true,
+      entrypointContent,
+      diagnostics: [],
+    }
+  } catch (e) {
+    return { status: 'error', path, error: errorMessage(e) }
+  }
+}
+
 function logMemoryDirCounts(
   memoryDir: string,
   baseMetadata: Record<
@@ -481,12 +582,46 @@ export async function loadMemoryPrompt(): Promise<string | null> {
       memory_type:
         'auto' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
-    return buildMemoryLines(
+    // Fail-loud check (issue #1012): if the store cannot be read, record the
+    // failure so the REPL can surface it at session start instead of letting
+    // the session run with silent amnesia. Prompt building continues either
+    // way — the model can still create the store on first write.
+    const verification = await verifyMemoryStore(autoDir)
+    const memoryPrompt = buildMemoryLines(
       'auto memory',
       autoDir,
       extraGuidelines,
       skipIndex,
     ).join('\n')
+    if (verification.status === 'error') {
+      lastMemoryLoadFailure = verification
+      logEvent('tengu_memdir_load_failed', {
+        path: verification.path as
+          | AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        error: verification.error as
+          | AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      })
+      logForDebugging(
+        `memory store verification FAILED for ${verification.path}: ${verification.error}`,
+        { level: 'warn' },
+      )
+      // Fail loud (issue #1012): the model must tell the user their persistent
+      // memory did not load, instead of silently running with session amnesia.
+      return [
+        memoryPrompt,
+        '',
+        '> **WARNING — persistent memory did not load at session start.** The memory',
+        `> directory \`${verification.path}\` is unreadable (${verification.error}).`,
+        '> Tell the user that memories from previous sessions are NOT available in this',
+        '> session and that the filesystem/permissions problem should be fixed. Once',
+        '> access is restored, /memory can open the memory file.',
+      ].join('\n')
+    }
+    lastMemoryLoadFailure = null
+    for (const diag of verification.diagnostics) {
+      logForDebugging(`memory store: ${diag}`, { level: 'debug' })
+    }
+    return memoryPrompt
   }
 
   logEvent('tengu_memdir_disabled', {
