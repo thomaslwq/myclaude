@@ -47,10 +47,48 @@ export function isBridgeEnabled(): boolean {
  * a specific diagnostic. For render-body UI visibility checks, use
  * `isBridgeEnabled()` instead.
  */
+
+/**
+ * Timeout for blocking GrowthBook gate checks. Without this, if the
+ * GrowthBook service is unreachable or hangs, `checkGate_CACHED_OR_BLOCKING`
+ * never resolves and the CLI hangs at startup (DoS). See gh-1066.
+ *
+ * The value is intentionally short: this is a startup/entitlement path, and
+ * a stale `false` is preferable to a hung CLI. Callers that need a fresh
+ * value can retry later; the disk cache will be populated by the periodic
+ * refresh once GrowthBook becomes reachable.
+ */
+const GATE_CHECK_TIMEOUT_MS = 5_000
+
+/**
+ * Race a promise against a timeout, returning `fallback` if the promise
+ * doesn't settle within `ms` milliseconds. The underlying promise is left
+ * to resolve in the background — we just stop waiting for it.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  fallback: T,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<T>(resolve => {
+    timer = setTimeout(() => resolve(fallback), ms)
+  })
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
 export async function isBridgeEnabledBlocking(): Promise<boolean> {
   return feature('BRIDGE_MODE')
     ? isClaudeAISubscriber() &&
-        (await checkGate_CACHED_OR_BLOCKING('tengu_ccr_bridge'))
+        (await withTimeout(
+            checkGate_CACHED_OR_BLOCKING('tengu_ccr_bridge'),
+            GATE_CHECK_TIMEOUT_MS,
+            false,
+          ))
     : false
 }
 
@@ -78,7 +116,11 @@ export async function getBridgeDisabledReason(): Promise<string | null> {
     if (!getOauthAccountInfo()?.organizationUuid) {
       return 'Unable to determine your organization for Remote Control eligibility. Run `myclaude auth login` to refresh your account information.'
     }
-    if (!(await checkGate_CACHED_OR_BLOCKING('tengu_ccr_bridge'))) {
+    if (!(await withTimeout(
+      checkGate_CACHED_OR_BLOCKING('tengu_ccr_bridge'),
+      GATE_CHECK_TIMEOUT_MS,
+      false,
+    ))) {
       return 'Remote Control is not yet enabled for your account.'
     }
     return null
