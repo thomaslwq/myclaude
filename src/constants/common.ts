@@ -55,7 +55,12 @@ export function getLocalMonthYear(): string {
   if (process.env.CLAUDE_CODE_OVERRIDE_DATE) {
     // Validate the override date is a valid ISO date string before using it
     if (isValidISODate(process.env.CLAUDE_CODE_OVERRIDE_DATE)) {
-      const date = new Date(process.env.CLAUDE_CODE_OVERRIDE_DATE)
+      // Parse components manually so the date is constructed in the local
+      // timezone. new Date("YYYY-MM-DD") is interpreted as UTC midnight per
+      // the ES spec, which shifts the month/year for users in negative UTC
+      // offsets (e.g. US Pacific).
+      const [year, month] = process.env.CLAUDE_CODE_OVERRIDE_DATE.split("-").map(Number)
+      const date = new Date(year, month - 1, 1)
       return date.toLocaleString('en-US', { month: 'long', year: 'numeric' })
     }
   }
