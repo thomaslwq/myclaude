@@ -106,6 +106,42 @@ describe('getOauthConfig caching', () => {
   })
 })
 
+describe('OAuth config type is always prod (Issue #1077)', () => {
+  test('USER_TYPE=ant + USE_STAGING_OAUTH=true cannot switch to staging config', async () => {
+    process.env.USER_TYPE = 'ant'
+    process.env.USE_STAGING_OAUTH = 'true'
+    const mod = await import('../constants/oauth.js')
+    mod._resetOauthConfigCache()
+    const config = mod.getOauthConfig()
+    // Must remain on the production endpoints
+    expect(config.BASE_API_URL).toBe('https://api.anthropic.com')
+    expect(config.OAUTH_FILE_SUFFIX).toBe('')
+  })
+
+  test('USE_LOCAL_OAUTH=true cannot switch to local config', async () => {
+    process.env.USE_LOCAL_OAUTH = 'true'
+    const mod = await import('../constants/oauth.js')
+    mod._resetOauthConfigCache()
+    const config = mod.getOauthConfig()
+    expect(config.BASE_API_URL).toBe('https://api.anthropic.com')
+    expect(config.OAUTH_FILE_SUFFIX).toBe('')
+  })
+
+  test('fileSuffixForOauthConfig returns empty string without a custom OAuth URL', async () => {
+    process.env.USER_TYPE = 'ant'
+    process.env.USE_STAGING_OAUTH = 'true'
+    process.env.USE_LOCAL_OAUTH = 'true'
+    const mod = await import('../constants/oauth.js')
+    expect(mod.fileSuffixForOauthConfig()).toBe('')
+  })
+
+  test('fileSuffixForOauthConfig returns -custom-oauth for an approved FedStart URL', async () => {
+    process.env.CLAUDE_CODE_CUSTOM_OAUTH_URL = 'https://claude.fedstart.com'
+    const mod = await import('../constants/oauth.js')
+    expect(mod.fileSuffixForOauthConfig()).toBe('-custom-oauth')
+  })
+})
+
 describe('getGrowthBookClientKey caching', () => {
   test('returns the same string on subsequent calls (memoized)', async () => {
     const { getGrowthBookClientKey } = await import('../constants/keys.js')
