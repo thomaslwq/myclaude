@@ -1,26 +1,9 @@
-import { isEnvTruthy } from '../utils/envUtils.js'
-
-// Default to prod config, override with test/staging if enabled
-type OauthConfigType = 'prod' | 'staging' | 'local'
-
-function getOauthConfigType(): OauthConfigType {
-  // Always use production OAuth config - USER_TYPE is user-controllable in open-source fork
-  return 'prod'
-}
-
 export function fileSuffixForOauthConfig(): string {
   if (process.env.CLAUDE_CODE_CUSTOM_OAUTH_URL) {
     return '-custom-oauth'
   }
-  switch (getOauthConfigType()) {
-    case 'local':
-      return '-local-oauth'
-    case 'staging':
-      return '-staging-oauth'
-    case 'prod':
-      // No suffix for production config
-      return ''
-  }
+  // No suffix for production config
+  return ''
 }
 
 export const CLAUDE_AI_INFERENCE_SCOPE = 'user:inference' as const
@@ -110,74 +93,6 @@ const PROD_OAUTH_CONFIG = {
 export const MCP_CLIENT_METADATA_URL =
   'https://claude.ai/oauth/claude-code-client-metadata'
 
-// Staging OAuth configuration - only included in ant builds with staging flag
-// Uses literal check for dead code elimination
-const STAGING_OAUTH_CONFIG =
-  process.env.USER_TYPE === 'ant'
-    ? ({
-        BASE_API_URL: 'https://api-staging.anthropic.com',
-        CONSOLE_AUTHORIZE_URL:
-          'https://platform.staging.ant.dev/oauth/authorize',
-        CLAUDE_AI_AUTHORIZE_URL:
-          'https://claude-ai.staging.ant.dev/oauth/authorize',
-        CLAUDE_AI_ORIGIN: 'https://claude-ai.staging.ant.dev',
-        TOKEN_URL: 'https://platform.staging.ant.dev/v1/oauth/token',
-        API_KEY_URL:
-          'https://api-staging.anthropic.com/api/oauth/claude_cli/create_api_key',
-        ROLES_URL:
-          'https://api-staging.anthropic.com/api/oauth/claude_cli/roles',
-        CONSOLE_SUCCESS_URL:
-          'https://platform.staging.ant.dev/buy_credits?returnUrl=/oauth/code/success%3Fapp%3Dclaude-code',
-        CLAUDEAI_SUCCESS_URL:
-          'https://platform.staging.ant.dev/oauth/code/success?app=claude-code',
-        MANUAL_REDIRECT_URL:
-          'https://platform.staging.ant.dev/oauth/code/callback',
-        // NOTE: This is a placeholder CLIENT_ID. In production, you must obtain your own
-        // OAuth credentials from Anthropic's developer portal and set them via the
-        // CLAUDE_CODE_OAUTH_CLIENT_ID environment variable.
-        // Example: export CLAUDE_CODE_OAUTH_CLIENT_ID='your-uuid-here'
-        CLIENT_ID: 'PLACEHOLDER_CLIENT_ID_DO_NOT_USE',
-        OAUTH_FILE_SUFFIX: '-staging-oauth',
-        MCP_PROXY_URL: 'https://mcp-proxy-staging.anthropic.com',
-        MCP_PROXY_PATH: '/v1/mcp/{server_id}',
-      } as const)
-    : undefined
-
-// Three local dev servers: :8000 api-proxy (`api dev start -g ccr`),
-// :4000 claude-ai frontend, :3000 Console frontend. Env vars let
-// scripts/claude-localhost override if your layout differs.
-function getLocalOauthConfig(): OauthConfig {
-  const api =
-    process.env.CLAUDE_LOCAL_OAUTH_API_BASE?.replace(/\/$/, '') ??
-    'http://localhost:8000'
-  const apps =
-    process.env.CLAUDE_LOCAL_OAUTH_APPS_BASE?.replace(/\/$/, '') ??
-    'http://localhost:4000'
-  const consoleBase =
-    process.env.CLAUDE_LOCAL_OAUTH_CONSOLE_BASE?.replace(/\/$/, '') ??
-    'http://localhost:3000'
-  return {
-    BASE_API_URL: api,
-    CONSOLE_AUTHORIZE_URL: `${consoleBase}/oauth/authorize`,
-    CLAUDE_AI_AUTHORIZE_URL: `${apps}/oauth/authorize`,
-    CLAUDE_AI_ORIGIN: apps,
-    TOKEN_URL: `${api}/v1/oauth/token`,
-    API_KEY_URL: `${api}/api/oauth/claude_cli/create_api_key`,
-    ROLES_URL: `${api}/api/oauth/claude_cli/roles`,
-    CONSOLE_SUCCESS_URL: `${consoleBase}/buy_credits?returnUrl=/oauth/code/success%3Fapp%3Dclaude-code`,
-    CLAUDEAI_SUCCESS_URL: `${consoleBase}/oauth/code/success?app=claude-code`,
-    MANUAL_REDIRECT_URL: `${consoleBase}/oauth/code/callback`,
-    // NOTE: This is a placeholder CLIENT_ID. In production, you must obtain your own
-    // OAuth credentials from Anthropic's developer portal and set them via the
-    // CLAUDE_CODE_OAUTH_CLIENT_ID environment variable.
-    // Example: export CLAUDE_CODE_OAUTH_CLIENT_ID='your-uuid-here'
-    CLIENT_ID: 'PLACEHOLDER_CLIENT_ID_DO_NOT_USE',
-    OAUTH_FILE_SUFFIX: '-local-oauth',
-    MCP_PROXY_URL: 'http://localhost:8205',
-    MCP_PROXY_PATH: '/v1/toolbox/shttp/mcp/{server_id}',
-  }
-}
-
 // Allowed base URLs for CLAUDE_CODE_CUSTOM_OAUTH_URL override.
 // Only production FedStart deployments are permitted to prevent OAuth tokens
 // from being sent to arbitrary endpoints.
@@ -193,22 +108,12 @@ export function _resetOauthConfigCache(): void {
   _cachedOauthConfig = null
 }
 
-// Default to prod config, override with test/staging if enabled
 export function getOauthConfig(): OauthConfig {
   if (_cachedOauthConfig !== null) {
     return _cachedOauthConfig
   }
 
-  let config: OauthConfig = (() => {
-    switch (getOauthConfigType()) {
-      case 'local':
-        return getLocalOauthConfig()
-      case 'staging':
-        return STAGING_OAUTH_CONFIG ?? PROD_OAUTH_CONFIG
-      case 'prod':
-        return PROD_OAUTH_CONFIG
-    }
-  })()
+  let config: OauthConfig = PROD_OAUTH_CONFIG
 
   // Allow overriding all OAuth URLs to point to an approved FedStart deployment.
   // Only allowlisted base URLs are accepted to prevent credential leakage.
