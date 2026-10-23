@@ -124,4 +124,24 @@ describe('getLocalMonthYear', () => {
     const result = getLocalMonthYear()
     expect(result).toMatch(/\w+ \d{4}/)
   })
+
+  test('returns correct month/year for date-only override in negative UTC timezone', () => {
+    // Regression test: new Date('YYYY-MM-DD') is interpreted as UTC midnight,
+    // which shifts the month/year for users in negative UTC offsets (e.g. US Pacific).
+    const originalTZ = process.env.TZ
+    process.env.TZ = 'America/Los_Angeles' // UTC-8
+    process.env.CLAUDE_CODE_OVERRIDE_DATE = '2025-01-01'
+    const result = getLocalMonthYear()
+    expect(result).toBe('January 2025')
+    process.env.TZ = originalTZ
+  })
+
+  test('returns correct month/year for date-only override in positive UTC timezone', () => {
+    const originalTZ = process.env.TZ
+    process.env.TZ = 'Asia/Tokyo' // UTC+9
+    process.env.CLAUDE_CODE_OVERRIDE_DATE = '2025-01-01'
+    const result = getLocalMonthYear()
+    expect(result).toBe('January 2025')
+    process.env.TZ = originalTZ
+  })
 })
