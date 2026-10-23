@@ -47,7 +47,45 @@ export function getLocalISODate(): string {
 // When midnight rolls over, getDateChangeAttachments appends the new date at
 // the tail (though simple mode disables attachments, so the trade-off there is:
 // stale date after midnight vs. ~entire-conversation cache bust — stale wins).
-export const getSessionStartDate = memoize(getLocalISODate)
+// Memoized for prompt-cache stability — captures the date once at session start.
+// The main interactive path gets this behavior via memoize(getUserContext) in
+// context.ts; simple mode (--bare) calls getSystemPrompt per-request and needs
+// an explicit memoized date to avoid busting the cached prefix at midnight.
+//
+// Unlike a plain lodash memoize, this wrapper re-evaluates when the local date
+// rolls over (midnight boundary) so long-running sessions don't keep embedding
+// a stale date in prompts. Within a single day the value is stable, preserving
+// prompt-cache stability. Callers can also force a reset via
+// resetSessionStartDate() or getSessionStartDate.cache.clear().
+let _sessionStartDateCache: string | null = null
+
+export function getSessionStartDate(): string {
+  if (_sessionStartDateCache === null) {
+    _sessionStartDateCache = getLocalISODate()
+  } else {
+    // Cheap staleness check: only recompute when the current local date differs
+    // from the cached one (i.e., we crossed midnight). This keeps the value
+    // stable within a day for prompt-cache stability while avoiding stale
+    // dates in long-running sessions.
+    const fresh = getLocalISODate()
+    if (fresh !== _sessionStartDateCache) {
+      _sessionStartDateCache = fresh
+    }
+  }
+  return _sessionStartDateCache
+}
+
+// Explicit invalidation hook for tests, /clear, and any caller that needs to
+// force a re-read of the current local date.
+export function resetSessionStartDate(): void {
+  _sessionStartDateCache = null
+}
+
+// Backward-compatible `.cache.clear()` API so existing callers (e.g.
+// clearSessionCaches in commands/clear/caches.ts) keep working unchanged.
+;(getSessionStartDate as unknown as { cache: { clear: () => void } }).cache = {
+  clear: resetSessionStartDate,
+}
 
 // Returns "Month YYYY" (e.g. "February 2026") in the user's local timezone.
 // Changes monthly, not daily — used in tool prompts to minimize cache busting.
