@@ -41,6 +41,31 @@ describe('OSC8 sanitization completeness (issue #769)', () => {
     expect(out).not.toContain('%2520')
   })
 
+  test('surrogate pairs (emoji) are not corrupted into lone-surrogate escapes', () => {
+    const family = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}'
+    const out = wrapWithOsc8Link(family, 'https://x.com/' + family)
+    // No lone-surrogate escapes may appear (they are invalid code points).
+    // A lone surrogate would be a 4-digit %XXXX escape in the D800-DBFF or
+    // DC00-DFFF range; a real astral code point is 5+ digits.
+    expect(out).not.toMatch(/%[D-F][89A-F][0-9A-F]{2}(?![0-9A-F])/)
+    // The ZWJ (U+200D) must be encoded as its full code point, not as a
+    // lone high surrogate (which the old charCodeAt(0) produced).
+    expect(out).toContain('%200D')
+    // Astral characters that are not control chars pass through intact.
+    expect(out).toContain('\u{1F468}')
+    // Every %XX escape must decode to a valid (non-surrogate) code point.
+    // (The decoded string itself may contain surrogate pairs from intact
+    // astral characters, so we only assert on the escapes themselves.)
+    const escapes = [...out.matchAll(/%([0-9A-F]{2,4})(?![0-9A-F])/g)].map(m => parseInt(m[1], 16))
+    expect(escapes.every(cp => cp < 0xD800 || cp > 0xDFFF)).toBe(true)
+  })
+
+  test('CJK extension-B and other astral characters are preserved', () => {
+    const out = wrapWithOsc8Link('\u{20000}', 'https://x.com')
+    expect(out).not.toMatch(/%[D-F][89A-F][0-9A-F]{2}/)
+    expect(out).toContain('\u{20000}')
+  })
+
   test('a single well-formed OSC8 link, no smuggling', () => {
     const out = wrapWithOsc8Link('L', 'https://x.com/' + String.fromCharCode(0x1b) + ']8;;https://evil.com' + String.fromCharCode(0x07))
     expect(out).not.toContain(String.fromCharCode(0x1b) + ']8;;https://evil.com')

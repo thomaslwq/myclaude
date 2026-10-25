@@ -139,8 +139,8 @@ function sanitizeOsc8Part(value: string): string {
   // and zero-width characters as %XX. Percent signs are intentionally NOT
   // encoded so legitimate %20-style sequences are not double-encoded, and a
   // non-string URL (null/undefined) is treated as an empty string.
-  return input.replace(/[\x00-\x1f\x7f\x80-\x9f;\\\u2028\u2029\u200b\u200c\u200d\ufeff]/g, char => {
-    return '%' + char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
+  return input.replace(/[\x00-\x1f\x7f\x80-\x9f;\\\u2028\u2029\u200b\u200c\u200d\ufeff]/gu, char => {
+    return '%' + char.codePointAt(0)!.toString(16).padStart(2, '0').toUpperCase()
   })
 }
 
