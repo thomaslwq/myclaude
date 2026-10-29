@@ -13,12 +13,34 @@
 
 import { lastGrapheme } from './intl.js'
 
+// Maximum number of characters to buffer for early input.
+// Prevents unbounded memory growth if input keeps arriving before the REPL
+// is ready (e.g., a user pastes a huge amount of text or a script floods stdin).
+const MAX_EARLY_INPUT_LENGTH = 10_000
+
 // Buffer for early input characters
 let earlyInputBuffer = ''
 // Flag to track if we're currently capturing
 let isCapturing = false
 // Reference to the readable handler so we can remove it later
 let readableHandler: (() => void) | null = null
+
+/**
+ * Append text to the early input buffer, enforcing a maximum size.
+ * If the buffer would exceed the limit, we stop capturing and clear the
+ * buffer to avoid an unbounded memory leak. Returns false if the limit was
+ * hit (and capturing was stopped), true otherwise.
+ */
+function appendToBuffer(text: string): boolean {
+  if (earlyInputBuffer.length + text.length > MAX_EARLY_INPUT_LENGTH) {
+    // Too much early input - stop capturing and discard the buffer.
+    stopCapturingEarlyInput()
+    earlyInputBuffer = ''
+    return false
+  }
+  earlyInputBuffer += text
+  return true
+}
 
 /**
  * Start capturing stdin data early, before the REPL is initialized.
@@ -70,6 +92,11 @@ export function startCapturingEarlyInput(): void {
  * Process a chunk of input data
  */
 function processChunk(str: string): void {
+  // If capturing was stopped (e.g., the buffer limit was hit), ignore
+  // any further input that may still be queued.
+  if (!isCapturing) {
+    return
+  }
   let i = 0
   while (i < str.length) {
     const char = str[i]!
