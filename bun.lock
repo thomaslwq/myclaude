@@ -21,7 +21,7 @@
         "@opentelemetry/sdk-logs": "0.52.0",
         "@opentelemetry/sdk-metrics": "1.28.0",
         "@opentelemetry/sdk-trace-base": "1.28.0",
-        "@opentelemetry/semantic-conventions": "1.43.0",
+        "@opentelemetry/semantic-conventions": "1.28.0",
         "ajv": "8.18.0",
         "asciichart": "1.5.25",
         "async-mutex": "0.5.0",
@@ -242,7 +242,7 @@
 
     "@opentelemetry/sdk-trace-base": ["@opentelemetry/sdk-trace-base@1.28.0", "", { "dependencies": { "@opentelemetry/core": "1.28.0", "@opentelemetry/resources": "1.28.0", "@opentelemetry/semantic-conventions": "1.27.0" }, "peerDependencies": { "@opentelemetry/api": ">=1.0.0 <1.10.0" } }, "sha512-ceUVWuCpIao7Y5xE02Xs3nQi0tOGmMea17ecBdwtCvdo9ekmO+ijc9RFDgfifMl7XCBf41zne/1POM3LqSTZDA=="],
 
-    "@opentelemetry/semantic-conventions": ["@opentelemetry/semantic-conventions@1.43.0", "", {}, "sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg=="],
+    "@opentelemetry/semantic-conventions": ["@opentelemetry/semantic-conventions@1.28.0", "", {}, "sha512-lp4qAiMTD4sNWW4DbKLBkfiMZ4jbAboJIGOQr5DvciMRI494OapieI9qiODpOt0XBr1LjIDy1xAGAnVs5supTA=="],
 
     "@pondwader/socks5-server": ["@pondwader/socks5-server@1.0.10", "https://mirrors.cloud.tencent.com/npm/@pondwader/socks5-server/-/socks5-server-1.0.10.tgz", {}, "sha512-bQY06wzzR8D2+vVCUoBsr5QS2U6UgPUQRmErNwtsuI6vLcyRKkafjkr3KxbtGFf9aBBIV2mcvlsKD1UYaIV+sg=="],
 
